@@ -1,0 +1,76 @@
+{
+  "name": "selfhost-helper",
+  "version": "1.0.0",
+  "description": "Node.js Project Manager",
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev:react\" \"npm run dev:electron\"",
+    "dev:react": "vite",
+    "dev:electron": "cross-env NODE_ENV=development electron .",
+    "build": "vite build && electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "lint": "eslint ."
+  },
+  "build": {
+    "appId": "com.selfhosthelper.app",
+    "productName": "SelfHost Helper",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "database/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "author": "User",
+  "license": "ISC",
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "vite": "latest",
+    "wait-on": "latest"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "latest",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/vite": "^4.1.18",
+    "ansi-to-react": "^6.1.6",
+    "auto-launch": "latest",
+    "chokidar": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "framer-motion": "latest",
+    "lucide-react": "latest",
+    "pg-hstore": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "sequelize": "latest",
+    "sqlite3": "latest",
+    "tailwind-merge": "latest"
+  }
+}
