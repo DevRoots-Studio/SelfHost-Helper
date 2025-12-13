@@ -18,14 +18,22 @@ const sendLog = (projectId, data, type = "stdout") => {
   logHistory[projectId].push(logEntry);
   if (logHistory[projectId].length > 1000) logHistory[projectId].shift(); // Keep last 1000
 
-  if (global.mainWindow) {
-    global.mainWindow.webContents.send("project:log", logEntry);
+  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    try {
+      global.mainWindow.webContents.send("project:log", logEntry);
+    } catch (error) {
+      // Window might be destroyed during shutdown, ignore silently
+    }
   }
 };
 
 const sendStatus = (projectId, status) => {
-  if (global.mainWindow) {
-    global.mainWindow.webContents.send("project:status", { projectId, status });
+  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    try {
+      global.mainWindow.webContents.send("project:status", { projectId, status });
+    } catch (error) {
+      // Window might be destroyed during shutdown, ignore silently
+    }
   }
 };
 
