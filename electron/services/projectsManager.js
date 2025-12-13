@@ -2,8 +2,8 @@ import { spawn, exec } from "child_process";
 import { Project } from "../../database/models/Project.js";
 import path from "path";
 
-const runningProcesses = {}; // map projectId -> child_process instance
-const logHistory = {}; // map projectId -> array of logs (limit 1000)
+const runningProcesses = {};
+const logHistory = {};
 
 const sendLog = (projectId, data, type = "stdout") => {
   const logEntry = {
@@ -121,9 +121,6 @@ export const stopProject = async (id) => {
 
 export const restartProject = async (id) => {
   await stopProject(id);
-  // Wait for it to stop? Logic in 'stop' does not wait for close event strictly here.
-  // A better way is wrapping in promise provided by ON close.
-  // Hacky delay for now or improvement:
   return new Promise((resolve) => {
     setTimeout(async () => {
       const res = await startProject(id);

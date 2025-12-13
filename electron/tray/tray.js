@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 let tray = null;
 
 export const initTray = (mainWindow, onQuit) => {
-  const iconPath = path.join(__dirname, "../../resources/icon.png");
+  const iconPath = path.join(process.resourcesPath, "icon.png");
   tray = new Tray(iconPath);
 
   const contextMenu = Menu.buildFromTemplate([

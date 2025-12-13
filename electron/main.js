@@ -30,8 +30,9 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false, // Sometimes needed for certain node modules in preload, but try to avoid if possible.
+      devTools: false,
     },
-    show: false,
+    show: true,
     autoHideMenuBar: true,
     icon: path.join(__dirname, "../resources/icon.png"),
   });
@@ -85,12 +86,14 @@ app.whenReady().then(async () => {
   });
 });
 
+let isShuttingDown = false;
+
 app.on("before-quit", async (e) => {
-  // e.preventDefault(); // If we need to wait for async cleanup, we might need to prevent default, do work, then quit.
-  // However, for spawning taskkills, usually sync start is enough, but to be safe:
-  // Actually, handling async in before-quit is tricky.
-  // Ideally we stop them.
+  if (isShuttingDown) return;
+  e.preventDefault();
+  isShuttingDown = true;
   await stopAllProjects();
+  app.quit();
 });
 
 app.on("window-all-closed", () => {
