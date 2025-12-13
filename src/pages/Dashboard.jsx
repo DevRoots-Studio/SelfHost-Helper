@@ -29,9 +29,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import MonacoEditor from "@/editors/MonacoEditor";
 import { cn } from "@/lib/utils";
-// New Components
+
 import FileTree from "@/components/FileTree";
-import LogViewer from "@/components/LogViewer"; // Assuming created
+import LogViewer from "@/components/LogViewer";
 
 const API = window.api;
 
@@ -45,7 +45,6 @@ export default function Dashboard() {
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
 
-  // Detect language from file extension
   const getLanguageFromPath = (filePath) => {
     if (!filePath) return "plaintext";
     const ext = filePath.split(".").pop()?.toLowerCase();
@@ -81,11 +80,9 @@ export default function Dashboard() {
     return languageMap[ext] || "plaintext";
   };
 
-  // File Tree State
   const [fileTree, setFileTree] = useState([]);
   const [isFileTreeLoading, setIsFileTreeLoading] = useState(false);
 
-  // Dialog States
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
@@ -105,7 +102,6 @@ export default function Dashboard() {
         );
         return updated;
       });
-      // Update selectedProject if it matches the projectId
       setSelectedProject((prevSelected) => {
         if (prevSelected?.id === projectId) {
           return { ...prevSelected, status };
@@ -150,10 +146,8 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch log history when selecting a project
   useEffect(() => {
     if (selectedProject) {
-      // Reload projects to ensure status is synced when switching
       const syncProjectStatus = async () => {
         const list = await API.getProjects();
         setProjects(list);
@@ -212,7 +206,6 @@ export default function Dashboard() {
     const path = await API.selectDirectory();
     if (path) {
       setNewProject((prev) => ({ ...prev, path }));
-      // Auto guess name?
       const name = path.split("\\").pop().split("/").pop();
       if (!newProject.name) setNewProject((prev) => ({ ...prev, name }));
     }
@@ -226,7 +219,6 @@ export default function Dashboard() {
     }
   };
 
-  // When clicking a file in tree
   const handleFileSelect = async (node) => {
     if (node.type === "file") {
       console.log("Loading file:", node.path);
@@ -234,10 +226,9 @@ export default function Dashboard() {
       setFileLoadError(null);
       setCurrentFile(node.path);
       setViewMode("editor");
-      setEditorContent(""); // Clear previous content
+      setEditorContent("");
 
       try {
-        // Add timeout to prevent infinite loading
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("File read timeout after 10 seconds")),
@@ -248,7 +239,6 @@ export default function Dashboard() {
         const contentPromise = API.readFile(node.path);
         const content = await Promise.race([contentPromise, timeoutPromise]);
 
-        console.log("File loaded successfully, length:", content?.length || 0);
         setEditorContent(content || "");
         setFileLoadError(null);
       } catch (e) {
@@ -288,7 +278,7 @@ export default function Dashboard() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="hover:bg-primary/20 hover:text-primary"
+                className="hover:bg-primary/20 hover:text-primary cursor-pointer"
               >
                 <Plus className="h-5 w-5" />
               </Button>
@@ -311,7 +301,11 @@ export default function Dashboard() {
                       placeholder="Select a directory..."
                       className="bg-muted/50"
                     />
-                    <Button variant="secondary" onClick={handleBrowseValues}>
+                    <Button
+                      variant="secondary"
+                      onClick={handleBrowseValues}
+                      className="cursor-pointer"
+                    >
                       <FolderIcon className="mr-2 h-4 w-4" /> Browse
                     </Button>
                   </div>
@@ -340,7 +334,11 @@ export default function Dashboard() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleAddProject} disabled={!newProject.path}>
+                <Button
+                  onClick={handleAddProject}
+                  disabled={!newProject.path}
+                  className="cursor-pointer"
+                >
                   Add Project
                 </Button>
               </DialogFooter>
@@ -394,7 +392,7 @@ export default function Dashboard() {
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-start text-muted-foreground hover:text-foreground"
+                className="w-full justify-start text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <Settings className="mr-2 h-4 w-4" /> Settings
               </Button>
@@ -462,6 +460,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => setIsSettingsOpen(false)}
+                  className="cursor-pointer"
                 >
                   Close
                 </Button>
@@ -506,7 +505,7 @@ export default function Dashboard() {
                         variant="destructive"
                         size="sm"
                         onClick={() => handleStop(selectedProject.id)}
-                        className="shadow-lg shadow-red-900/20 active:scale-95 transition-transform"
+                        className="shadow-lg shadow-red-900/20 active:scale-95 transition-transform cursor-pointer"
                       >
                         <Square className="mr-2 h-4 w-4 fill-current" /> Stop
                       </Button>
@@ -514,9 +513,9 @@ export default function Dashboard() {
                         variant="secondary"
                         size="sm"
                         onClick={() => handleRestart(selectedProject.id)}
-                        className="active:scale-95 transition-transform"
+                        className="active:scale-95 transition-transform cursor-pointer"
                       >
-                        <RefreshCw className="mr-2 h-4 w-4" /> Restart
+                        <RefreshCw className="mr-2 h-4 w-4 " /> Restart
                       </Button>
                     </motion.div>
                   ) : (
@@ -529,10 +528,10 @@ export default function Dashboard() {
                     >
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 text-white active:scale-95 transition-transform"
+                        className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 text-white active:scale-95 transition-transform cursor-pointer"
                         onClick={() => handleStart(selectedProject.id)}
                       >
-                        <Play className="mr-2 h-4 w-4 fill-current" /> Start
+                        <Play className="mr-2 h-4 w-4 fill-current " /> Start
                       </Button>
                     </motion.div>
                   )}
@@ -541,7 +540,7 @@ export default function Dashboard() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                   onClick={() => handleDelete(selectedProject.id)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -555,7 +554,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => setViewMode("logs")}
                   className={cn(
-                    "px-6 py-3 text-sm font-medium border-b-2 transition-all flex items-center focus:outline-none",
+                    "px-6 py-3 text-sm font-medium border-b-2 transition-all flex items-center focus:outline-none cursor-pointer",
                     viewMode === "logs"
                       ? "border-primary text-primary bg-primary/5"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20"
@@ -568,7 +567,7 @@ export default function Dashboard() {
                     setViewMode("editor");
                   }}
                   className={cn(
-                    "px-6 py-3 text-sm font-medium border-b-2 transition-all flex items-center focus:outline-none",
+                    "px-6 py-3 text-sm font-medium border-b-2 transition-all flex items-center focus:outline-none cursor-pointer",
                     viewMode === "editor"
                       ? "border-primary text-primary bg-primary/5"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20"
@@ -626,7 +625,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            className="h-7 text-xs"
+                            className="h-7 text-xs cursor-pointer"
                             onClick={handleSaveFile}
                             disabled={!currentFile}
                           >
@@ -667,6 +666,7 @@ export default function Dashboard() {
                                   };
                                   handleFileSelect(node);
                                 }}
+                                className="cursor-pointer"
                               >
                                 <RefreshCw className="h-4 w-4 mr-2" /> Retry
                               </Button>
@@ -703,7 +703,10 @@ export default function Dashboard() {
               Select a project from the sidebar or create a new one to get
               started handling your self-hosted apps.
             </p>
-            <Button className="mt-8" onClick={() => setIsAddOpen(true)}>
+            <Button
+              className="mt-8 cursor-pointer"
+              onClick={() => setIsAddOpen(true)}
+            >
               <Plus className="mr-2 h-4 w-4" /> Create New Project
             </Button>
           </div>
