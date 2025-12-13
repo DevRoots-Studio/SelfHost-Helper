@@ -15,11 +15,17 @@
   "build": {
     "appId": "com.selfhosthelper.app",
     "productName": "SelfHost Helper",
+    "asar": true,
     "files": [
       "dist/**/*",
       "electron/**/*",
       "database/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/node_modules/*/{test,tests,example,examples}",
+      "!**/node_modules/.bin",
+      "!**/node_modules/**/README.md"
     ],
     "directories": {
       "output": "release"
@@ -31,14 +37,10 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "extraResources": [
-      {
-        "from": "resources/icon.png",
-        "to": "icon.png"
-      }
-    ]
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico"
+    }
   },
   "author": "@DevRoots/AboMeezO",
   "license": "ISC",
