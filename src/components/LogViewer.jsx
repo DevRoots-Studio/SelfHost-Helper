@@ -43,7 +43,7 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
           <div
             key={i}
             className={cn(
-              "break-words leading-tight",
+              "wrap-break-word leading-tight",
               log.type === "stderr" ? "opacity-90" : ""
             )}
           >

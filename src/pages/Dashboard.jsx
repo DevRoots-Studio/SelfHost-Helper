@@ -246,7 +246,7 @@ export default function Dashboard() {
               className={cn(
                 "group p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all border border-transparent select-none",
                 selectedProject?.id === p.id
-                  ? "bg-accent/10 border-border bg-gradient-to-r from-secondary/50 to-transparent shadow-sm"
+                  ? "bg-accent/10 border-border bg-linear-to-r from-secondary/50 to-transparent shadow-sm"
                   : "hover:bg-accent/50 hover:border-border/50"
               )}
             >
