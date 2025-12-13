@@ -40,7 +40,7 @@
       }
     ]
   },
-  "author": "User",
+  "author": "@DevRoots/AboMeezO",
   "license": "ISC",
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
