@@ -3,7 +3,7 @@ import Ansi from "ansi-to-react";
 import { Terminal as TerminalIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils"; // Assuming this exists
+import { cn } from "@/lib/utils";
 
 export default function LogViewer({ logs, projectId, onSendInput }) {
   const [input, setInput] = useState("");

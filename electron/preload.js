@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("api", {
 
   getLogs: (id) => ipcRenderer.invoke("logs:get", id),
 
+  isAutoLaunchEnabled: () => ipcRenderer.invoke("app:isAutoLaunchEnabled"),
   enableAutoLaunch: () => ipcRenderer.invoke("app:enableAutoLaunch"),
   disableAutoLaunch: () => ipcRenderer.invoke("app:disableAutoLaunch"),
 

@@ -63,10 +63,17 @@ export const registerHandlers = () => {
   // Files
   ipcMain.handle("file:read", async (_, filePath) => {
     try {
-      return await fs.readFile(filePath, "utf-8");
+      if (!filePath) {
+        throw new Error("File path is required");
+      }
+      console.log("Reading file:", filePath);
+      const content = await fs.readFile(filePath, "utf-8");
+      console.log("File read successfully, size:", content.length);
+      return content;
     } catch (e) {
-      console.error(e);
-      throw e;
+      console.error("Error reading file:", filePath, e);
+      const errorMessage = e.message || e.toString() || "Unknown error";
+      throw new Error(`Failed to read file: ${errorMessage}`);
     }
   });
 
@@ -86,6 +93,14 @@ export const registerHandlers = () => {
   });
 
   // AutoLaunch
+  ipcMain.handle("app:isAutoLaunchEnabled", async () => {
+    try {
+      return await appLauncher.isEnabled();
+    } catch (e) {
+      return false;
+    }
+  });
+
   ipcMain.handle("app:enableAutoLaunch", async () => {
     try {
       await appLauncher.enable();

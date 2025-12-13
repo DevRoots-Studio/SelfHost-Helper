@@ -13,6 +13,7 @@ import {
   Folder as FolderIcon,
   History,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import MonacoEditor from "@/editors/MonacoEditor";
 import { cn } from "@/lib/utils";
 // New Components
@@ -40,6 +42,44 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState("logs");
   const [editorContent, setEditorContent] = useState("");
   const [currentFile, setCurrentFile] = useState(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+  const [fileLoadError, setFileLoadError] = useState(null);
+
+  // Detect language from file extension
+  const getLanguageFromPath = (filePath) => {
+    if (!filePath) return "plaintext";
+    const ext = filePath.split(".").pop()?.toLowerCase();
+    const languageMap = {
+      js: "javascript",
+      jsx: "javascript",
+      ts: "typescript",
+      tsx: "typescript",
+      json: "json",
+      html: "html",
+      css: "css",
+      scss: "scss",
+      sass: "sass",
+      py: "python",
+      java: "java",
+      c: "c",
+      cpp: "cpp",
+      cs: "csharp",
+      php: "php",
+      rb: "ruby",
+      go: "go",
+      rs: "rust",
+      sh: "shell",
+      bash: "shell",
+      yml: "yaml",
+      yaml: "yaml",
+      xml: "xml",
+      md: "markdown",
+      sql: "sql",
+      vue: "vue",
+      svelte: "svelte",
+    };
+    return languageMap[ext] || "plaintext";
+  };
 
   // File Tree State
   const [fileTree, setFileTree] = useState([]);
@@ -47,6 +87,8 @@ export default function Dashboard() {
 
   // Dialog States
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [newProject, setNewProject] = useState({
     name: "",
     path: "",
@@ -55,10 +97,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadProjects();
+    loadAutoLaunchStatus();
     const cleanupStatus = API.onStatusChange(({ projectId, status }) => {
-      setProjects((prev) =>
-        prev.map((p) => (p.id === projectId ? { ...p, status } : p))
-      );
+      setProjects((prev) => {
+        const updated = prev.map((p) =>
+          p.id === projectId ? { ...p, status } : p
+        );
+        return updated;
+      });
+      // Update selectedProject if it matches the projectId
+      setSelectedProject((prevSelected) => {
+        if (prevSelected?.id === projectId) {
+          return { ...prevSelected, status };
+        }
+        return prevSelected;
+      });
     });
     const cleanupLogs = API.onLog(({ projectId, data, type, timestamp }) => {
       setLogs((prev) => ({
@@ -73,11 +126,45 @@ export default function Dashboard() {
       API.removeAllListeners("project:status");
       API.removeAllListeners("project:log");
     };
-  }, []);
+  }, [selectedProject?.id]);
+
+  const loadAutoLaunchStatus = async () => {
+    try {
+      const enabled = await API.isAutoLaunchEnabled();
+      setAutoLaunchEnabled(enabled);
+    } catch (e) {
+      console.error("Failed to load auto-launch status", e);
+    }
+  };
+
+  const handleAutoLaunchToggle = async (enabled) => {
+    try {
+      if (enabled) {
+        await API.enableAutoLaunch();
+      } else {
+        await API.disableAutoLaunch();
+      }
+      setAutoLaunchEnabled(enabled);
+    } catch (e) {
+      console.error("Failed to toggle auto-launch", e);
+    }
+  };
 
   // Fetch log history when selecting a project
   useEffect(() => {
     if (selectedProject) {
+      // Reload projects to ensure status is synced when switching
+      const syncProjectStatus = async () => {
+        const list = await API.getProjects();
+        setProjects(list);
+        // Update selectedProject with the latest data from projects array
+        const updatedProject = list.find((p) => p.id === selectedProject.id);
+        if (updatedProject) {
+          setSelectedProject(updatedProject);
+        }
+      };
+      syncProjectStatus();
+
       API.getLogHistory(selectedProject.id).then((history) => {
         if (history && history.length > 0) {
           setLogs((prev) => ({
@@ -90,7 +177,7 @@ export default function Dashboard() {
       // Load File Tree
       loadFileTree(selectedProject.path);
     }
-  }, [selectedProject]);
+  }, [selectedProject?.id]);
 
   const loadFileTree = async (path) => {
     setIsFileTreeLoading(true);
@@ -142,13 +229,35 @@ export default function Dashboard() {
   // When clicking a file in tree
   const handleFileSelect = async (node) => {
     if (node.type === "file") {
+      console.log("Loading file:", node.path);
+      setIsFileLoading(true);
+      setFileLoadError(null);
+      setCurrentFile(node.path);
+      setViewMode("editor");
+      setEditorContent(""); // Clear previous content
+
       try {
-        const content = await API.readFile(node.path);
-        setEditorContent(content);
-        setCurrentFile(node.path);
-        setViewMode("editor");
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("File read timeout after 10 seconds")),
+            10000
+          )
+        );
+
+        const contentPromise = API.readFile(node.path);
+        const content = await Promise.race([contentPromise, timeoutPromise]);
+
+        console.log("File loaded successfully, length:", content?.length || 0);
+        setEditorContent(content || "");
+        setFileLoadError(null);
       } catch (e) {
         console.error("Failed to read file", e);
+        const errorMessage = e?.message || e?.toString() || "Unknown error";
+        setFileLoadError(`Failed to load file: ${errorMessage}`);
+        setEditorContent("");
+      } finally {
+        setIsFileLoading(false);
       }
     }
   };
@@ -256,25 +365,109 @@ export default function Dashboard() {
                   {p.path}
                 </span>
               </div>
-              <div
+              <motion.div
                 className={cn(
-                  "w-2.5 h-2.5 rounded-full shadow-[0_0_8px] transition-all duration-500",
-                  p.status === "running"
-                    ? "bg-green-500 shadow-green-500/50"
-                    : "bg-red-500/20 shadow-none"
+                  "w-2.5 h-2.5 rounded-full",
+                  p.status === "running" ? "bg-green-500" : "bg-red-500/20"
                 )}
+                animate={{
+                  scale: p.status === "running" ? [1, 1.2, 1] : 1,
+                  opacity: p.status === "running" ? [0.8, 1, 0.8] : 0.5,
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: p.status === "running" ? Infinity : 0,
+                  ease: "easeInOut",
+                }}
+                style={{
+                  boxShadow:
+                    p.status === "running"
+                      ? "0 0 8px rgba(34, 197, 94, 0.5), 0 0 16px rgba(34, 197, 94, 0.3)"
+                      : "none",
+                }}
               />
             </div>
           ))}
         </div>
         <div className="p-4 border-t border-border bg-card/30">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-muted-foreground hover:text-foreground"
-            onClick={() => API.disableAutoLaunch()}
-          >
-            <Settings className="mr-2 h-4 w-4" /> Settings
-          </Button>
+          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-muted-foreground hover:text-foreground"
+              >
+                <Settings className="mr-2 h-4 w-4" /> Settings
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px] bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Settings
+                </DialogTitle>
+                <DialogDescription>
+                  Configure application preferences and behavior.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 py-4">
+                {/* Auto Launch Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20 hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="auto-launch"
+                        className="text-base font-semibold cursor-pointer"
+                      >
+                        Launch on Startup
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically start SelfHost Helper when your computer
+                        boots up.
+                      </p>
+                    </div>
+                    <Switch
+                      id="auto-launch"
+                      checked={autoLaunchEnabled}
+                      onCheckedChange={handleAutoLaunchToggle}
+                      className="ml-4"
+                    />
+                  </div>
+                </div>
+
+                {/* App Info Section */}
+                <div className="space-y-2 pt-4 border-t border-border">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    About
+                  </h3>
+                  <div className="p-4 rounded-lg border border-border bg-muted/10">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
+                        <Terminal className="text-white h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">SelfHost Helper</p>
+                        <p className="text-xs text-muted-foreground">
+                          Version 1.0.0
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Manage and monitor your self-hosted Node.js applications
+                      with ease.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSettingsOpen(false)}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </aside>
 
@@ -299,34 +492,51 @@ export default function Dashboard() {
                 </h2>
               </div>
               <div className="flex items-center space-x-2">
-                {selectedProject.status === "running" ? (
-                  <>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleStop(selectedProject.id)}
-                      className="shadow-lg shadow-red-900/20 active:scale-95 transition-transform"
+                <AnimatePresence mode="wait">
+                  {selectedProject.status === "running" ? (
+                    <motion.div
+                      key="running-buttons"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex items-center space-x-2"
                     >
-                      <Square className="mr-2 h-4 w-4 fill-current" /> Stop
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleRestart(selectedProject.id)}
-                      className="active:scale-95 transition-transform"
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleStop(selectedProject.id)}
+                        className="shadow-lg shadow-red-900/20 active:scale-95 transition-transform"
+                      >
+                        <Square className="mr-2 h-4 w-4 fill-current" /> Stop
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleRestart(selectedProject.id)}
+                        className="active:scale-95 transition-transform"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" /> Restart
+                      </Button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="start-button"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
                     >
-                      <RefreshCw className="mr-2 h-4 w-4" /> Restart
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 text-white active:scale-95 transition-transform"
-                    onClick={() => handleStart(selectedProject.id)}
-                  >
-                    <Play className="mr-2 h-4 w-4 fill-current" /> Start
-                  </Button>
-                )}
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 text-white active:scale-95 transition-transform"
+                        onClick={() => handleStart(selectedProject.id)}
+                      >
+                        <Play className="mr-2 h-4 w-4 fill-current" /> Start
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <div className="h-6 w-px bg-border mx-2"></div>
                 <Button
                   variant="ghost"
@@ -426,10 +636,48 @@ export default function Dashboard() {
                       </div>
                       <div className="flex-1">
                         {currentFile ? (
-                          <MonacoEditor
-                            value={editorContent}
-                            onChange={setEditorContent}
-                          />
+                          isFileLoading ? (
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{
+                                  duration: 1,
+                                  repeat: Infinity,
+                                  ease: "linear",
+                                }}
+                                className="mb-4"
+                              >
+                                <FileCode className="h-12 w-12 opacity-50" />
+                              </motion.div>
+                              <p className="text-sm">Loading file...</p>
+                            </div>
+                          ) : fileLoadError ? (
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                              <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
+                              <p className="text-sm text-destructive mb-2">
+                                {fileLoadError}
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const node = {
+                                    type: "file",
+                                    path: currentFile,
+                                  };
+                                  handleFileSelect(node);
+                                }}
+                              >
+                                <RefreshCw className="h-4 w-4 mr-2" /> Retry
+                              </Button>
+                            </div>
+                          ) : (
+                            <MonacoEditor
+                              value={editorContent}
+                              onChange={setEditorContent}
+                              language={getLanguageFromPath(currentFile)}
+                            />
+                          )
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
                             <FolderOpen className="h-10 w-10 mb-2" />

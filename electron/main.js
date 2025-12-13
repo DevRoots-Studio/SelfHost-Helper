@@ -29,7 +29,7 @@ async function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false, // Sometimes needed for certain node modules in preload, but try to avoid if possible.
+      sandbox: false,
       devTools: false,
     },
     show: true,
@@ -40,7 +40,6 @@ async function createWindow() {
   global.mainWindow = mainWindow;
 
   if (isDev) {
-    // Wait a bit for Vite to be ready if running simultaneously, or just load
     try {
       await mainWindow.loadURL("http://localhost:5173");
     } catch (e) {

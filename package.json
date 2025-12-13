@@ -40,7 +40,13 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "resources/icon.ico",
       "installerHeaderIcon": "resources/icon.ico"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      }
+    ]
   },
   "author": "@DevRoots/AboMeezO",
   "license": "ISC",
