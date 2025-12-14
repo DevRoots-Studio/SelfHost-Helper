@@ -10,8 +10,11 @@ const API = window.api;
 const getLanguageFromPath = (filePath) => {
   if (!filePath) return "plaintext";
   const ext = filePath.split(".").pop()?.toLowerCase();
+
   const languageMap = {
     js: "javascript",
+    mjs: "javascript",
+    cjs: "javascript",
     jsx: "javascript",
     ts: "typescript",
     tsx: "typescript",
@@ -20,6 +23,7 @@ const getLanguageFromPath = (filePath) => {
     css: "css",
     scss: "scss",
     sass: "sass",
+    less: "less",
     py: "python",
     java: "java",
     c: "c",
@@ -31,14 +35,35 @@ const getLanguageFromPath = (filePath) => {
     rs: "rust",
     sh: "shell",
     bash: "shell",
+    zsh: "shell",
     yml: "yaml",
     yaml: "yaml",
     xml: "xml",
     md: "markdown",
+    markdown: "markdown",
     sql: "sql",
     vue: "vue",
     svelte: "svelte",
+    tsbuildinfo: "plaintext",
+    lock: "plaintext",
+    env: "dotenv",
+    dockerfile: "docker",
+    gitignore: "git",
+    gitattributes: "git",
+    editorconfig: "config",
+    npmignore: "config",
   };
+
+  const nameMap = {
+    Dockerfile: "docker",
+    Makefile: "makefile",
+    README: "markdown",
+    LICENSE: "plaintext",
+  };
+
+  const baseName = filePath.split("/").pop();
+  if (nameMap[baseName]) return nameMap[baseName];
+
   return languageMap[ext] || "plaintext";
 };
 

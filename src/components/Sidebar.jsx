@@ -47,7 +47,7 @@ export default function Sidebar({
   const [newProject, setNewProject] = useState({
     name: "",
     path: "",
-    script: "npm start",
+    script: "npm i && node .",
   });
 
   const DISCORD_INVITE_CODE = "C62mj58Q2D";
@@ -133,7 +133,7 @@ export default function Sidebar({
       animate={{ width: isCollapsed ? "64px" : "288px" }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
     >
-      <div className="p-4 border-b border-border/50 flex justify-between items-center bg-card/50">
+      <div className="p-4  flex justify-between items-center bg-card/50">
         <AnimatePresence mode="wait">
           {!isCollapsed ? (
             <motion.h1
@@ -257,7 +257,7 @@ export default function Sidebar({
               </div>
               <motion.div
                 className={cn(
-                  "w-2.5 h-2.5 rounded-full",
+                  "shrink-0 w-2.5 h-2.5 rounded-full",
                   p.status === "running" ? "bg-green-500" : "bg-red-500/20"
                 )}
                 animate={{
@@ -291,7 +291,7 @@ export default function Sidebar({
                   ? "bg-accent border-primary shadow-lg scale-110"
                   : "bg-muted/30 border-border/50 hover:bg-accent/50 hover:border-border hover:scale-105"
               )}
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.1, duration: 0.1 }}
               whileTap={{ scale: 0.95 }}
               title={p.name}
             >
@@ -319,7 +319,7 @@ export default function Sidebar({
           ))}
         </div>
       )}
-      <div className="p-4 border-t border-border bg-card/30 space-y-2">
+      <div className="p-4  bg-card/30 space-y-2 ">
         <AnimatePresence>
           {!isCollapsed && (
             <motion.div
@@ -338,10 +338,8 @@ export default function Sidebar({
                   backgroundPosition: "center",
                 }}
               >
-                {/* Blurred backdrop overlay */}
                 <div className="absolute inset-0 bg-background/60 backdrop-blur-md" />
 
-                {/* Content */}
                 <div className="relative z-10">
                   <div className="flex items-start gap-3 mb-3">
                     {/* Server Avatar */}
@@ -376,8 +374,7 @@ export default function Sidebar({
                             <span className="flex items-center gap-1 text-green-500">
                               <div className="w-2 h-2 bg-green-500 rounded-full" />
                               {discordInfo.approximate_presence_count?.toLocaleString() ||
-                                "—"}{" "}
-                              online
+                                "—"}
                             </span>
                           )}
                         </div>
@@ -423,16 +420,18 @@ export default function Sidebar({
             <Button
               variant="ghost"
               className={cn(
-                // base
-                "text-muted-foreground hover:text-foreground cursor-pointer flex items-center",
-                // when collapsed, show a square icon-only button centered
+                "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
+
                 isCollapsed
                   ? "w-10 h-10 justify-center p-2"
                   : "w-full justify-start px-3 py-2 gap-2"
               )}
             >
               <Settings
-                className={cn(isCollapsed ? "h-5 w-5" : "h-4 w-4", !isCollapsed && "mr-2")}
+                className={cn(
+                  isCollapsed ? "h-5 w-5" : "h-4 w-4",
+                  !isCollapsed && "mr-2"
+                )}
               />
               {!isCollapsed && "Settings"}
             </Button>

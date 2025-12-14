@@ -11,7 +11,6 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
-    // Auto scroll if near bottom
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: "smooth" });
     }
@@ -58,15 +57,14 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
             {log.type === "stdin" ? (
               <span className="text-cyan-400 font-bold opacity-80">
                 {log.data}
-              </span> // Input echo
+              </span>
             ) : (
-              // Render ANSI
               <span
                 className={
                   log.type === "stderr" ? "text-red-400" : "text-gray-100"
                 }
               >
-                <Ansi useClasses>{log.data}</Ansi>
+                <Ansi useClasses={false}>{log.data}</Ansi>
               </span>
             )}
           </div>
