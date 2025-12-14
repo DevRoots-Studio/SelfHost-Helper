@@ -203,4 +203,16 @@ export const registerHandlers = () => {
       return false;
     }
   });
+  ipcMain.handle("discord:getInviteInfo", async (_, inviteCode) => {
+    try {
+      const response = await fetch(
+        `https://discord.com/api/invites/${inviteCode}?with_counts=true`
+      );
+      if (!response.ok) throw new Error("Failed to fetch Discord server info");
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
 };

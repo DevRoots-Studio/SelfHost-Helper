@@ -60,17 +60,15 @@ export default function Sidebar({
   const fetchDiscordInfo = async () => {
     try {
       setDiscordLoading(true);
-      const response = await fetch(
-        `https://discord.com/api/invites/${DISCORD_INVITE_CODE}?with_counts=true`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setDiscordInfo(data);
+      const result = await API.getDiscordInfo(DISCORD_INVITE_CODE);
+
+      if (result.success) {
+        setDiscordInfo(result.data);
       } else {
-        console.error("Failed to fetch Discord server info");
+        console.error("Error fetching Discord info:", result.error);
       }
     } catch (error) {
-      console.error("Error fetching Discord info:", error);
+      console.error("IPC error:", error);
     } finally {
       setDiscordLoading(false);
     }

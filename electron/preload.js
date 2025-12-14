@@ -61,4 +61,6 @@ contextBridge.exposeInMainWorld("api", {
 
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
+  getDiscordInfo: (invitecode) =>
+    ipcRenderer.invoke("discord:getInviteInfo", invitecode),
 });

@@ -46,23 +46,25 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
               log.type === "stderr" ? "opacity-90" : ""
             )}
           >
-            <span className="opacity-30 text-[10px] mr-2 select-none inline-block w-14 text-right">
+            {/* <span className="opacity-30 text-[10px] mr-2 select-none inline-block w-14 text-right">
               {new Date(log.timestamp).toLocaleTimeString([], {
                 hour12: false,
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",
               })}
-            </span>
+            </span> */}
             {log.type === "stdin" ? (
               <span className="text-cyan-400 font-bold opacity-80">
                 {log.data}
               </span>
             ) : (
               <span
-                className={
-                  log.type === "stderr" ? "text-red-400" : "text-gray-100"
-                }
+                className={cn(
+                  "leading-tight",
+                  log.type === "stderr" ? "text-red-400" : "text-gray-100",
+                  "whitespace-pre-wrap"
+                )}
               >
                 <Ansi useClasses={false}>{log.data}</Ansi>
               </span>
