@@ -31,7 +31,17 @@ export const initProjectModel = (sequelize) => {
         type: DataTypes.TEXT, // JSON string or text
         get() {
           const rawValue = this.getDataValue("env");
-          return rawValue ? JSON.parse(rawValue) : {};
+          if (!rawValue) return {};
+          try {
+            return JSON.parse(rawValue);
+          } catch (e) {
+            // If the stored value is corrupted, return an empty object and log a warning
+            // This prevents the app from throwing when reading malformed env data
+            // during runtime while preserving the raw value in the DB.
+            // eslint-disable-next-line no-console
+            console.warn(`Project.env contains invalid JSON for project id=${this.id}:`, e);
+            return {};
+          }
         },
         set(value) {
           this.setDataValue("env", JSON.stringify(value));

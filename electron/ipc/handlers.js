@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from "electron";
+import { ipcMain, dialog, BrowserWindow, shell } from "electron";
 import fs from "fs/promises";
 import path from "path";
 import AutoLaunch from "auto-launch";
@@ -164,6 +164,43 @@ export const registerHandlers = () => {
     } catch (e) {
       console.error(e);
       return [];
+    }
+  });
+
+  // Window controls
+  ipcMain.on("window:close", () => {
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow;
+    if (window) {
+      window.close();
+    }
+  });
+
+  ipcMain.on("window:minimize", () => {
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow;
+    if (window) {
+      window.minimize();
+    }
+  });
+
+  ipcMain.on("window:toggleMaximize", () => {
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow;
+    if (window) {
+      if (window.isMaximized()) {
+        window.unmaximize();
+      } else {
+        window.maximize();
+      }
+    }
+  });
+
+  // Open external URL in default browser
+  ipcMain.handle("app:openExternal", async (_, url) => {
+    try {
+      await shell.openExternal(url);
+      return true;
+    } catch (error) {
+      console.error("Failed to open external URL:", error);
+      return false;
     }
   });
 };

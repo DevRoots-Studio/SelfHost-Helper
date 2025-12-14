@@ -30,7 +30,10 @@ const sendLog = (projectId, data, type = "stdout") => {
 const sendStatus = (projectId, status) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
-      global.mainWindow.webContents.send("project:status", { projectId, status });
+      global.mainWindow.webContents.send("project:status", {
+        projectId,
+        status,
+      });
     } catch (error) {
       // Window might be destroyed during shutdown, ignore silently
     }
@@ -60,19 +63,15 @@ export const startProject = async (id) => {
     return { success: false, message: "Already running" };
   }
 
-  // Parse command "npm start" -> cmd: "npm", args: ["start"]
-  const [cmd, ...args] = project.script.split(" ");
+  // Use the full script string to support complex shell commands and arguments.
+  // Using `shell: true` with the full command string avoids naive space-splitting
+  // which breaks quoted arguments or compound commands.
+  const commandStr = project.script || "npm start";
 
-  // Windows compatibility for npm
-  const command =
-    process.platform === "win32" && cmd === "npm" ? "npm.cmd" : cmd;
-
-  console.log(
-    `Starting project ${id}: ${command} ${args.join(" ")} in ${project.path}`
-  );
+  console.log(`Starting project ${id}: ${commandStr} in ${project.path}`);
 
   try {
-    const child = spawn(command, args, {
+    const child = spawn(commandStr, {
       cwd: project.path,
       env: { ...process.env, ...project.env }, // user envs
       shell: true,

@@ -5,7 +5,7 @@ import { registerHandlers } from "./ipc/handlers.js";
 import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
 
-import { stopAllProjects } from "./services/projectsManager.js"; // Import
+import { stopAllProjects } from "./services/projectsManager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,21 +16,19 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 
-// Make accessible to other modules if needed, though strictly passing it is better
-// We will modify the global object for now as requested/implied for easy access,
-// but cleaner is to pass it around.
 global.mainWindow = null;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    // frame: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      devTools: false,
+      devTools: isDev,
     },
     show: true,
     autoHideMenuBar: true,
@@ -61,6 +59,14 @@ async function createWindow() {
       mainWindow.hide();
       return false;
     }
+  });
+
+  mainWindow.on("maximize", () => {
+    mainWindow.webContents.send("window:maximize");
+  });
+
+  mainWindow.on("unmaximize", () => {
+    mainWindow.webContents.send("window:unmaximize");
   });
 
   return mainWindow;

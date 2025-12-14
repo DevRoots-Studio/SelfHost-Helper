@@ -44,4 +44,21 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+  // for custom title bar
+  closeWindow: () => ipcRenderer.send("window:close"),
+  minimizeWindow: () => ipcRenderer.send("window:minimize"),
+  toggleMaximize: () => ipcRenderer.send("window:toggleMaximize"),
+  onMaximize: (callback) => {
+    const subscription = () => callback();
+    ipcRenderer.on("window:maximize", subscription);
+    return () => ipcRenderer.removeListener("window:maximize", subscription);
+  },
+  onUnmaximize: (callback) => {
+    const subscription = () => callback();
+    ipcRenderer.on("window:unmaximize", subscription);
+    return () => ipcRenderer.removeListener("window:unmaximize", subscription);
+  },
+
+  // Open external URL in default browser
+  openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
 });
