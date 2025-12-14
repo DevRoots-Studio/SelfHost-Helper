@@ -111,7 +111,7 @@ export default function Sidebar({
       await API.addProject(newProject);
       onProjectsChange();
       setIsAddOpen(false);
-      setNewProject({ name: "", path: "", script: "npm start" });
+      setNewProject({ name: "", path: "", script: "npm i && node ." });
     }
   };
 
