@@ -1,6 +1,6 @@
 import { ipcMain, dialog } from "electron";
 import fs from "fs/promises";
-import path from "path"; // Added import
+import path from "path";
 import AutoLaunch from "auto-launch";
 import { Project } from "../../database/models/Project.js";
 import {
@@ -19,12 +19,9 @@ const appLauncher = new AutoLaunch({
 });
 
 export const registerHandlers = () => {
-  // Projects
   ipcMain.handle("projects:getAll", async () => {
     const projects = await Project.findAll();
-    // mix in status? for now just data. Status is sent via events or separate query.
-    // We could map running state:
-    const runningIds = getRunningProjects(); // array of ids
+    const runningIds = getRunningProjects();
     return projects.map((p) => ({
       ...p.toJSON(),
       status: runningIds.includes(p.id) ? "running" : "stopped",
@@ -38,7 +35,7 @@ export const registerHandlers = () => {
   ipcMain.handle("projects:delete", async (_, id) => {
     const project = await Project.findByPk(id);
     if (project) {
-      await stopProject(id); // ensure stopped
+      await stopProject(id);
       await project.destroy();
       return true;
     }
@@ -55,20 +52,16 @@ export const registerHandlers = () => {
     return null;
   });
 
-  // Process Control
   ipcMain.handle("project:start", async (_, id) => startProject(id));
   ipcMain.handle("project:stop", async (_, id) => stopProject(id));
   ipcMain.handle("project:restart", async (_, id) => restartProject(id));
 
-  // Files
   ipcMain.handle("file:read", async (_, filePath) => {
     try {
       if (!filePath) {
         throw new Error("File path is required");
       }
-      console.log("Reading file:", filePath);
       const content = await fs.readFile(filePath, "utf-8");
-      console.log("File read successfully, size:", content.length);
       return content;
     } catch (e) {
       console.error("Error reading file:", filePath, e);
@@ -142,14 +135,6 @@ export const registerHandlers = () => {
 
   // File System (Recursive list)
   ipcMain.handle("files:readDirectory", async (_, dirPath) => {
-    // Simple recursive scanner or just one level?
-    // For efficiency, let's do one level if requested, or recursive with mapped structure.
-    // Let's do recursive but careful with depth.
-    // Actually, for a file tree, typically we load on demand or small depth.
-    // Let's provide a full tree for now (small projects) or a level scanner.
-    // User said "file directory of the project, the files and folders".
-    // Let's use a function to get tree.
-
     async function getFiles(dir) {
       const dirents = await fs.readdir(dir, { withFileTypes: true });
       const files = await Promise.all(

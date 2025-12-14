@@ -21,7 +21,6 @@ contextBridge.exposeInMainWorld("api", {
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
 
-  // New Feature APIs
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   readDirectory: (path) => ipcRenderer.invoke("files:readDirectory", path),
   sendInput: (id, data) => ipcRenderer.invoke("project:input", { id, data }),
