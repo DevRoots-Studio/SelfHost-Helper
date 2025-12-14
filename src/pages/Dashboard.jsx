@@ -43,10 +43,8 @@ export default function Dashboard() {
     return () => {
       cleanupStatus();
       cleanupLogs();
-      API.removeAllListeners("project:status");
-      API.removeAllListeners("project:log");
     };
-  }, [selectedProject?.id]);
+  }, []);
 
   useEffect(() => {
     if (selectedProject) {
@@ -91,8 +89,9 @@ export default function Dashboard() {
   const handleStop = (id) => API.stopProject(id);
   const handleRestart = (id) => API.restartProject(id);
 
-  const handleSendInput = (id, data) => {
-    API.sendInput(id, data);
+  const handleSendInput = async (id, data) => {
+    const res = await API.sendInput(id, data);
+    return res;
   };
 
   const handleDelete = async (id) => {

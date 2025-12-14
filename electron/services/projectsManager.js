@@ -47,11 +47,23 @@ export const getProjectLogs = (id) => logHistory[id] || [];
 export const writeToProcess = (id, data) => {
   const child = runningProcesses[id];
   if (child && child.stdin) {
-    child.stdin.write(data + "\n");
-    // Echo input to logs for visibility?
-    sendLog(id, `> ${data}\n`, "stdin");
-    return true;
+    const toWrite = data.endsWith("\n") ? data : data + "\n";
+    try {
+      child.stdin.write(toWrite);
+      // Echo input to logs for visibility
+      sendLog(id, `> ${toWrite}`, "stdin");
+      return true;
+    } catch (err) {
+      sendLog(
+        id,
+        `Failed to write to process stdin: ${err.message}\n`,
+        "stderr"
+      );
+      return false;
+    }
   }
+
+  sendLog(id, `Failed to send input: process not running\n`, "stderr");
   return false;
 };
 

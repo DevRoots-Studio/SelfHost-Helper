@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { registerHandlers } from "./ipc/handlers.js";
@@ -68,7 +68,10 @@ async function createWindow() {
   mainWindow.on("unmaximize", () => {
     mainWindow.webContents.send("window:unmaximize");
   });
-
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
   return mainWindow;
 }
 

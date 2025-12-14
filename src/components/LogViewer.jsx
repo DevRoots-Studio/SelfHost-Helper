@@ -1,25 +1,102 @@
 import React, { useEffect, useRef, useState } from "react";
-import Ansi from "ansi-to-react";
 import { Terminal as TerminalIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 
 export default function LogViewer({ logs, projectId, onSendInput }) {
   const [input, setInput] = useState("");
-  const endRef = useRef(null);
-  const containerRef = useRef(null);
+  const terminalContainerRef = useRef(null);
+  const xtermRef = useRef(null);
+  const fitAddonRef = useRef(null);
+  const lastLogIndexRef = useRef(0);
 
   useEffect(() => {
-    if (endRef.current) {
-      endRef.current.scrollIntoView({ behavior: "smooth" });
+    // Reset log index when switching projects
+    lastLogIndexRef.current = 0;
+
+    const term = new Terminal({
+      fontFamily: "monospace",
+      scrollOnUserInput: true,
+      smoothScrollDuration: 1,
+      fontSize: 16,
+      convertEol: true,
+      scrollback: 5000,
+      theme: {
+        background: "#000",
+        foreground: "#e5e7eb",
+        cursor: "#22c55e",
+      },
+    });
+
+    const fitAddon = new FitAddon();
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(new ClipboardAddon());
+    const webLinksAddon = new WebLinksAddon((event, uri) => {
+      event.preventDefault();
+      window.api.openExternal(uri);
+    });
+
+    term.loadAddon(webLinksAddon);
+
+    term.open(terminalContainerRef.current);
+    fitAddon.fit();
+
+    xtermRef.current = term;
+    fitAddonRef.current = fitAddon;
+    const resizeObserver = new ResizeObserver(() => {
+      fitAddon.fit();
+    });
+
+    resizeObserver.observe(terminalContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      term.dispose();
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!xtermRef.current) return;
+
+    const term = xtermRef.current;
+
+    // If logs have shrunk or we switched projects, clear terminal and reset index
+    if (lastLogIndexRef.current > logs.length) {
+      term.clear();
+      lastLogIndexRef.current = 0;
     }
+
+    for (let i = lastLogIndexRef.current; i < logs.length; i++) {
+      const log = logs[i];
+
+      if (log.type === "stdin") {
+        term.write(`\x1b[36m${log.data}\x1b[0m`);
+      } else {
+        term.write(log.data);
+      }
+    }
+
+    lastLogIndexRef.current = logs.length;
   }, [logs]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    onSendInput(projectId, input);
+    const dataToSend = input;
     setInput("");
+
+    const res = await onSendInput(projectId, dataToSend);
+
+    if (!res && xtermRef.current) {
+      xtermRef.current.write(
+        `\x1b[31mFailed to send input: process not running\x1b[0m\r\n`
+      );
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -28,53 +105,19 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
 
   return (
     <div className="flex flex-col h-full bg-black/95 text-white font-mono text-sm rounded-lg overflow-hidden border border-border/20 shadow-inner">
-      <div
-        className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-0.5"
-        ref={containerRef}
-      >
+      <div className="flex-1 relative p-3 bg-[#000]">
         {logs.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30 select-none">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30 select-none pointer-events-none">
             <TerminalIcon className="h-10 w-10 mb-2" />
             <p>No output to display</p>
           </div>
         )}
-        {logs.map((log, i) => (
-          <div
-            key={i}
-            className={cn(
-              "wrap-break-word leading-tight",
-              log.type === "stderr" ? "opacity-90" : ""
-            )}
-          >
-            {/* <span className="opacity-30 text-[10px] mr-2 select-none inline-block w-14 text-right">
-              {new Date(log.timestamp).toLocaleTimeString([], {
-                hour12: false,
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </span> */}
-            {log.type === "stdin" ? (
-              <span className="text-cyan-400 font-bold opacity-80">
-                {log.data}
-              </span>
-            ) : (
-              <span
-                className={cn(
-                  "leading-tight",
-                  log.type === "stderr" ? "text-red-400" : "text-gray-100",
-                  "whitespace-pre-wrap"
-                )}
-              >
-                <Ansi useClasses={false}>{log.data}</Ansi>
-              </span>
-            )}
-          </div>
-        ))}
-        <div ref={endRef} />
+        <div
+          ref={terminalContainerRef}
+          className={cn("h-full w-full", logs.length === 0 && "opacity-0")}
+        />
       </div>
 
-      {/* Input Area */}
       <div className="p-2 bg-muted/10 border-t border-white/10 flex gap-2">
         <div className="relative flex-1">
           <span className="absolute left-2 top-2.5 text-green-500 font-bold pointer-events-none">
