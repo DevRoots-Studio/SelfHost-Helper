@@ -2,7 +2,7 @@ import React from "react";
 import { Terminal, FileCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function ViewTabs({ viewMode, onViewModeChange }) {
+export default function ViewTabs({ viewMode, onViewModeChange, stats }) {
   return (
     <div className="flex border-b border-border bg-muted/10">
       <button
@@ -27,6 +27,22 @@ export default function ViewTabs({ viewMode, onViewModeChange }) {
       >
         <FileCode className="mr-2 h-4 w-4" /> Editor
       </button>
+
+      {/* Stats Display */}
+      <div className="ml-auto flex items-center gap-4 px-6 text-xs font-mono text-muted-foreground">
+        {stats && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500/50" />
+              <span>CPU: {stats.cpu.toFixed(1)}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-500/50" />
+              <span>MEM: {(stats.memory / 1024 / 1024).toFixed(1)} MB</span>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

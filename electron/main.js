@@ -86,6 +86,11 @@ app.whenReady().then(async () => {
   await initializeDatabase();
   registerHandlers(ipcMain);
 
+  // Auto-start projects
+  import("./services/projectsManager.js").then(({ startAutoStartProjects }) => {
+    startAutoStartProjects();
+  });
+
   const window = await createWindow();
   tray = initTray(window, () => {
     isQuitting = true;

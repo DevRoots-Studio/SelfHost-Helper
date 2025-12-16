@@ -63,4 +63,5 @@ contextBridge.exposeInMainWorld("api", {
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
   getDiscordInfo: (invitecode) =>
     ipcRenderer.invoke("discord:getInviteInfo", invitecode),
+  getProjectStats: (id) => ipcRenderer.invoke("project:getStats", id),
 });

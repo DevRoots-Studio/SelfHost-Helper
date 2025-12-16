@@ -8,7 +8,7 @@ import "@xterm/xterm/css/xterm.css";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 
-export default function LogViewer({ logs, projectId, onSendInput }) {
+export default function LogViewer({ logs, projectId, status, onSendInput }) {
   const [input, setInput] = useState("");
   const terminalContainerRef = useRef(null);
   const xtermRef = useRef(null);
@@ -86,7 +86,7 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
   }, [logs]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || status !== "running") return;
     const dataToSend = input;
     setInput("");
 
@@ -118,20 +118,24 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
             $
           </span>
           <input
-            className="w-full bg-transparent border-none text-white focus:ring-0 pl-6 h-10 font-mono text-sm placeholder:text-white/20 focus:outline-none"
+            className="w-full bg-transparent border-none text-white focus:ring-0 pl-6 h-10 font-mono text-sm placeholder:text-white/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type command..."
+            placeholder={
+              status === "running" ? "Type command..." : "Project is offline"
+            }
             spellCheck={false}
             autoComplete="off"
+            disabled={status !== "running"}
           />
         </div>
         <Button
           size="icon"
           variant="ghost"
-          className="h-10 w-10 text-white/50 hover:text-white hover:bg-white/10"
+          className="h-10 w-10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30"
           onClick={handleSend}
+          disabled={status !== "running"}
         >
           <Send className="h-4 w-4" />
         </Button>

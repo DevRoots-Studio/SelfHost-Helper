@@ -10,6 +10,8 @@ import {
   getRunningProjects,
   getProjectLogs,
   writeToProcess,
+  getProjectStats,
+  getProjectStartTime,
 } from "../services/projectsManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
 
@@ -25,6 +27,7 @@ export const registerHandlers = () => {
     return projects.map((p) => ({
       ...p.toJSON(),
       status: runningIds.includes(p.id) ? "running" : "stopped",
+      startTime: runningIds.includes(p.id) ? getProjectStartTime(p.id) : null,
     }));
   });
 
@@ -115,6 +118,10 @@ export const registerHandlers = () => {
   // Logs
   ipcMain.handle("logs:get", async (_, id) => {
     return getProjectLogs(id);
+  });
+
+  ipcMain.handle("project:getStats", async (_, id) => {
+    return getProjectStats(id);
   });
 
   ipcMain.handle("project:input", async (_, { id, data }) => {

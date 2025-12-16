@@ -86,6 +86,7 @@
     "framer-motion": "latest",
     "lucide-react": "latest",
     "pg-hstore": "^2.3.4",
+    "pidusage": "^4.0.1",
     "react": "latest",
     "react-dom": "latest",
     "sequelize": "latest",
