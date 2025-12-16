@@ -15,11 +15,30 @@ const MonacoEditor = ({
     <div className="h-full w-full rounded-md overflow-hidden border">
       <Editor
         height="100%"
+        width="100%"
         defaultLanguage={language}
         language={language}
         value={value}
         theme={theme}
         onChange={handleEditorChange}
+        onMount={(editor, monaco) => {
+          if (
+            monaco?.languages?.javascriptDefaults &&
+            monaco?.languages?.typescriptDefaults
+          ) {
+            monaco.languages.javascriptDefaults.setCompilerOptions({
+              allowNonTsExtensions: true,
+              checkJs: true,
+              jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+              target: monaco.languages.ScriptTarget.ESNext,
+            });
+
+            monaco.languages.typescriptDefaults.setCompilerOptions({
+              jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+              target: monaco.languages.ScriptTarget.ESNext,
+            });
+          }
+        }}
         loading={
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center">
@@ -31,8 +50,17 @@ const MonacoEditor = ({
         options={{
           minimap: { enabled: false },
           fontSize: 14,
-          scrollBeyondLastLine: false,
+          scrollBeyondLastLine: true,
           automaticLayout: true,
+          wordWrap: "off",
+          suggestOnTriggerCharacters: true,
+          quickSuggestions: true,
+
+          scrollbar: {
+            horizontal: "auto",
+            horizontalScrollbarSize: 10,
+            verticalScrollbarSize: 10,
+          },
         }}
       />
     </div>
