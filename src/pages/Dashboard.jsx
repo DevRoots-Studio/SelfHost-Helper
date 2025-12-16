@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import LogViewer from "@/components/LogViewer";
 import Sidebar from "@/components/Sidebar";
 import ProjectHeader from "@/components/ProjectHeader";

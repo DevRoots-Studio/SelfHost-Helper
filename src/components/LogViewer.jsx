@@ -91,12 +91,6 @@ export default function LogViewer({ logs, projectId, onSendInput }) {
     setInput("");
 
     const res = await onSendInput(projectId, dataToSend);
-
-    if (!res && xtermRef.current) {
-      xtermRef.current.write(
-        `\x1b[31mFailed to send input: process not running\x1b[0m\r\n`
-      );
-    }
   };
 
   const handleKeyDown = (e) => {

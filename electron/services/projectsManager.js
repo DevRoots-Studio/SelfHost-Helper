@@ -1,10 +1,10 @@
 import { spawn, exec } from "child_process";
 import { Project } from "../../database/models/Project.js";
-import path from "path";
 
 const runningProcesses = {};
 const logHistory = {};
 
+//============================{Sends Logs to the Front-end}=============================
 const sendLog = (projectId, data, type = "stdout") => {
   const logEntry = {
     projectId,
@@ -13,10 +13,9 @@ const sendLog = (projectId, data, type = "stdout") => {
     timestamp: new Date(),
   };
 
-  // Update history
   if (!logHistory[projectId]) logHistory[projectId] = [];
   logHistory[projectId].push(logEntry);
-  if (logHistory[projectId].length > 1000) logHistory[projectId].shift(); // Keep last 1000
+  if (logHistory[projectId].length > 1000) logHistory[projectId].shift(); // Keep last 1000 log line
 
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
@@ -26,6 +25,7 @@ const sendLog = (projectId, data, type = "stdout") => {
     }
   }
 };
+//============================{Sends Projects Power Status }=============================
 
 const sendStatus = (projectId, status) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
@@ -44,13 +44,13 @@ export const getRunningProjects = () =>
   Object.keys(runningProcesses).map(Number);
 export const getProjectLogs = (id) => logHistory[id] || [];
 
+//============================{Writes Commands to the Projects Processes}=============================
 export const writeToProcess = (id, data) => {
   const child = runningProcesses[id];
   if (child && child.stdin) {
     const toWrite = data.endsWith("\n") ? data : data + "\n";
     try {
       child.stdin.write(toWrite);
-      // Echo input to logs for visibility
       sendLog(id, `> ${toWrite}`, "stdin");
       return true;
     } catch (err) {
@@ -67,6 +67,7 @@ export const writeToProcess = (id, data) => {
   return false;
 };
 
+//============================{Starts a Project}=============================
 export const startProject = async (id) => {
   const project = await Project.findByPk(id);
   if (!project) throw new Error("Project not found");
@@ -85,10 +86,19 @@ export const startProject = async (id) => {
   try {
     const child = spawn(commandStr, {
       cwd: project.path,
-      env: { ...process.env, ...project.env }, // user envs
       shell: true,
-      stdio: ["pipe", "pipe", "pipe"], // explicitly pipe for stdin
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ...project.env,
+    
+        TERM: "xterm-256color",
+        COLORTERM: "truecolor",
+        FORCE_COLOR: "1",
+        NPM_CONFIG_COLOR: "always",
+      },
     });
+    
 
     runningProcesses[id] = child;
     sendStatus(id, "running");
@@ -116,6 +126,7 @@ export const startProject = async (id) => {
   }
 };
 
+//============================{Stops a Project}=============================
 export const stopProject = async (id) => {
   const child = runningProcesses[id];
   if (!child) return { success: false, message: "Not running" };
@@ -134,10 +145,10 @@ export const stopProject = async (id) => {
   };
 
   await kill(child.pid);
-  // Status update happens in 'close' event
   return { success: true };
 };
 
+//============================{Restarts a Project}=============================
 export const restartProject = async (id) => {
   await stopProject(id);
   return new Promise((resolve) => {
@@ -148,6 +159,7 @@ export const restartProject = async (id) => {
   });
 };
 
+//============================{Stops All Projects at Once}=============================
 export const stopAllProjects = async () => {
   const ids = Object.keys(runningProcesses);
   console.log(`Stopping all ${ids.length} running projects...`);

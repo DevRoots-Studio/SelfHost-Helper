@@ -23,6 +23,7 @@ async function createWindow() {
     width: 1280,
     height: 800,
     // frame: false,
+    title: isDev ? "SelfHost helper Dev" : "SelfHost helper",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
@@ -73,6 +74,12 @@ async function createWindow() {
     return { action: "deny" };
   });
   return mainWindow;
+}
+
+// to separate the dev env from the prod
+if (process.env.NODE_ENV === "development") {
+  app.setAppUserModelId("com.selfhosthelper.dev");
+  app.setPath("userData", app.getPath("userData") + "-dev");
 }
 
 app.whenReady().then(async () => {

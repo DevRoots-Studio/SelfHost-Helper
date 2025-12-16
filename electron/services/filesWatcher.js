@@ -2,13 +2,14 @@ import chokidar from "chokidar";
 
 const watchers = {};
 
+//============================{Starts a WatchDog on a Specific Directory}=============================
 export const watchFolder = (folderPath) => {
   if (watchers[folderPath]) {
-    return; // Already watching
+    return;
   }
 
   const watcher = chokidar.watch(folderPath, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
+    ignored: /(^|[\/\\])\../,
     persistent: true,
     ignoreInitial: true,
   });
@@ -30,6 +31,7 @@ const notifyChange = (event, filePath) => {
   }
 };
 
+//============================{Stops a WatchDog on a Specific Directory}=============================
 export const stopWatching = async (folderPath) => {
   if (watchers[folderPath]) {
     await watchers[folderPath].close();

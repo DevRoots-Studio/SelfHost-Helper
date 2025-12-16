@@ -20,8 +20,12 @@ export const initTray = (mainWindow, onQuit) => {
     { type: "separator" },
     { label: "Quit", click: () => onQuit() },
   ]);
+  const tooltop =
+    process.env.NODE_ENV === "development"
+      ? "SelfHost helper Dev"
+      : "SelfHost helper";
 
-  tray.setToolTip("SelfHost Helper");
+  tray.setToolTip(tooltop);
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow.show());
 
