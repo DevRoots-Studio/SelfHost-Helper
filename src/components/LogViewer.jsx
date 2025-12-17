@@ -10,19 +10,20 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 
 export default function LogViewer({ logs, projectId, status, onSendInput }) {
   const [input, setInput] = useState("");
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const terminalContainerRef = useRef(null);
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
   const lastLogIndexRef = useRef(0);
 
   useEffect(() => {
-    // Reset log index when switching projects
     lastLogIndexRef.current = 0;
 
     const term = new Terminal({
       fontFamily: "monospace",
       scrollOnUserInput: true,
-      smoothScrollDuration: 1,
+      smoothScrollDuration: 2,
       fontSize: 16,
       convertEol: true,
       scrollback: 5000,
@@ -31,6 +32,7 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
         foreground: "#e5e7eb",
         cursor: "#22c55e",
       },
+      disableStdin: true, // Allow native selection/copy behavior
     });
 
     const fitAddon = new FitAddon();
@@ -43,6 +45,14 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
     });
 
     term.loadAddon(webLinksAddon);
+
+    term.attachCustomKeyEventHandler((arg) => {
+      // Allow Ctrl+C and Ctrl+V to propagate for copy/paste
+      if (arg.ctrlKey && (arg.code === "KeyC" || arg.code === "KeyV")) {
+        return false;
+      }
+      return true;
+    });
 
     term.open(terminalContainerRef.current);
     fitAddon.fit();
@@ -88,13 +98,43 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
   const handleSend = async () => {
     if (!input.trim() || status !== "running") return;
     const dataToSend = input;
+
+    setHistory((prev) => [...prev, dataToSend]);
+    setHistoryIndex(-1);
     setInput("");
 
     const res = await onSendInput(projectId, dataToSend);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") handleSend();
+    if (e.key === "Enter") {
+      handleSend();
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (history.length === 0) return;
+
+      const newIndex =
+        historyIndex === -1
+          ? history.length - 1
+          : Math.max(0, historyIndex - 1);
+      setHistoryIndex(newIndex);
+      setInput(history[newIndex]);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (history.length === 0 || historyIndex === -1) return;
+
+      const newIndex = historyIndex + 1;
+      if (newIndex >= history.length) {
+        setHistoryIndex(-1);
+        setInput("");
+      } else {
+        setHistoryIndex(newIndex);
+        setInput(history[newIndex]);
+      }
+    }
   };
 
   return (
