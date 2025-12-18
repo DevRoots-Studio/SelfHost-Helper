@@ -1,0 +1,6 @@
+> release "v0.3.4"
+
+
+
+input commands history ( ctrl + (↑\↓) )
+Ability to copy console directly by Ctrl+C
