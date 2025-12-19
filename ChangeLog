@@ -10,6 +10,7 @@
   - Resolved `net::ERR_UNEXPECTED` for local resources.
   - Fixed Xterm.js "dimensions of undefined" resizing error.
   - Corrected `ReferenceError` in Project Settings.
+  - Fixed production routing issues by switching to `HashRouter`.
   - Updated Content Security Policy (CSP) for secure image loading.
 - **Command History**: Input commands history (Ctrl + ↑/↓).
 - **Console Copy**: Ability to copy console output directly via Ctrl+C.

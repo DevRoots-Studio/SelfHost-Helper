@@ -1,6 +1,6 @@
 import Dashboard from "./pages/Dashboard";
 // import TitleBar from "./components/ui/titleBar";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 
 import Settings from "./pages/Settings";
 
