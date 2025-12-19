@@ -39,13 +39,33 @@ export const initProjectModel = (sequelize) => {
             // This prevents the app from throwing when reading malformed env data
             // during runtime while preserving the raw value in the DB.
             // eslint-disable-next-line no-console
-            console.warn(`Project.env contains invalid JSON for project id=${this.id}:`, e);
+            console.warn(
+              `Project.env contains invalid JSON for project id=${this.id}:`,
+              e
+            );
             return {};
           }
         },
         set(value) {
           this.setDataValue("env", JSON.stringify(value));
         },
+      },
+      pid: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "node",
+      },
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      icon: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
     },
     {

@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, shell } from "electron";
+import { ipcMain, dialog, BrowserWindow, shell, app } from "electron";
 import fs from "fs/promises";
 import path from "path";
 import AutoLaunch from "auto-launch";
@@ -140,6 +140,20 @@ export const registerHandlers = () => {
     }
   });
 
+  ipcMain.handle("dialog:openFile", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "Images", extensions: ["jpg", "png", "gif", "ico", "svg"] },
+      ],
+    });
+    if (canceled) {
+      return null;
+    } else {
+      return filePaths[0];
+    }
+  });
+
   // File System (Recursive list)
   ipcMain.handle("files:readDirectory", async (_, dirPath) => {
     async function getFiles(dir) {
@@ -221,5 +235,8 @@ export const registerHandlers = () => {
     } catch (error) {
       return { success: false, error: error.message };
     }
+  });
+  ipcMain.handle("app:getVersion", () => {
+    return app.getVersion();
   });
 };

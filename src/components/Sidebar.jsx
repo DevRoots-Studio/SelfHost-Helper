@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Plus,
-  Terminal,
   Settings,
   Folder as FolderIcon,
   ChevronLeft,
@@ -22,10 +21,29 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const API = window.api;
+
+const PROJECT_TYPES = [
+  { value: "nodejs", label: "Node.js", script: "npm install && npm start" },
+  { value: "react", label: "React", script: "npm install && npm run dev" },
+  {
+    value: "python",
+    label: "Python",
+    script: "pip install -r requirements.txt && python main.py",
+  },
+  { value: "go", label: "Go", script: "go mod download && go run ." },
+  { value: "other", label: "Other", script: "" },
+];
 
 export default function Sidebar({
   projects,
@@ -39,21 +57,20 @@ export default function Sidebar({
   const isAddOpen =
     externalIsAddOpen !== undefined ? externalIsAddOpen : internalIsAddOpen;
   const setIsAddOpen = externalOnAddOpenChange || setInternalIsAddOpen;
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [discordInfo, setDiscordInfo] = useState(null);
   const [discordLoading, setDiscordLoading] = useState(true);
   const [newProject, setNewProject] = useState({
     name: "",
     path: "",
-    script: "npm i && node .",
+    type: "nodejs",
+    script: "npm install && npm start",
   });
 
   const DISCORD_INVITE_CODE = "C62mj58Q2D";
 
   useEffect(() => {
-    loadAutoLaunchStatus();
     fetchDiscordInfo();
   }, []);
 
@@ -84,34 +101,17 @@ export default function Sidebar({
     return `https://cdn.discordapp.com/banners/${discordInfo.guild.id}/${discordInfo.guild.banner}.png?size=1024`;
   };
 
-  const loadAutoLaunchStatus = async () => {
-    try {
-      const enabled = await API.isAutoLaunchEnabled();
-      setAutoLaunchEnabled(enabled);
-    } catch (e) {
-      console.error("Failed to load auto-launch status", e);
-    }
-  };
-
-  const handleAutoLaunchToggle = async (enabled) => {
-    try {
-      if (enabled) {
-        await API.enableAutoLaunch();
-      } else {
-        await API.disableAutoLaunch();
-      }
-      setAutoLaunchEnabled(enabled);
-    } catch (e) {
-      console.error("Failed to toggle auto-launch", e);
-    }
-  };
-
   const handleAddProject = async () => {
     if (newProject.name && newProject.path) {
       await API.addProject(newProject);
       onProjectsChange();
       setIsAddOpen(false);
-      setNewProject({ name: "", path: "", script: "npm i && node ." });
+      setNewProject({
+        name: "",
+        path: "",
+        type: "nodejs",
+        script: "npm install && npm start",
+      });
     }
   };
 
@@ -195,6 +195,33 @@ export default function Sidebar({
                       }
                       placeholder="My Server"
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="type">Project Type</Label>
+                    <Select
+                      value={newProject.type}
+                      onValueChange={(value) => {
+                        const typeInfo = PROJECT_TYPES.find(
+                          (t) => t.value === value
+                        );
+                        setNewProject((prev) => ({
+                          ...prev,
+                          type: value,
+                          script: typeInfo ? typeInfo.script : prev.script,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger id="type" className="w-full">
+                        <SelectValue placeholder="Select project type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROJECT_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="script">Start Script</Label>
@@ -293,9 +320,19 @@ export default function Sidebar({
               whileTap={{ scale: 0.95 }}
               title={p.name}
             >
-              <span className="font-bold text-sm text-foreground">
-                {p.name.charAt(0).toUpperCase()}
-              </span>
+              {p.icon ? (
+                <div className="w-8 h-8 rounded overflow-hidden">
+                  <img
+                    src={`media:///${p.icon.replace(/\\/g, "/")}`}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <span className="font-bold text-sm text-foreground">
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+              )}
               {p.status === "running" && (
                 <motion.div
                   className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
@@ -413,97 +450,25 @@ export default function Sidebar({
             </motion.div>
           )}
         </AnimatePresence>
-        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(
-                "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/settings")}
+          className={cn(
+            "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
 
-                isCollapsed
-                  ? "w-10 h-10 justify-center p-2"
-                  : "w-full justify-start px-3 py-2 gap-2"
-              )}
-            >
-              <Settings
-                className={cn(
-                  isCollapsed ? "h-5 w-5" : "h-4 w-4",
-                  !isCollapsed && "mr-2"
-                )}
-              />
-              {!isCollapsed && "Settings"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Settings
-              </DialogTitle>
-              <DialogDescription>
-                Configure application preferences and behavior.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-6 py-4">
-              {/* Auto Launch Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20 hover:bg-muted/30 transition-colors">
-                  <div className="flex-1 space-y-1">
-                    <Label
-                      htmlFor="auto-launch"
-                      className="text-base font-semibold cursor-pointer"
-                    >
-                      Launch on Startup
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically start SelfHost Helper when your computer
-                      boots up.
-                    </p>
-                  </div>
-                  <Switch
-                    id="auto-launch"
-                    checked={autoLaunchEnabled}
-                    onCheckedChange={handleAutoLaunchToggle}
-                    className="ml-4"
-                  />
-                </div>
-              </div>
-
-              {/* App Info Section */}
-              <div className="space-y-2 pt-4 border-t border-border">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  About
-                </h3>
-                <div className="p-4 rounded-lg border border-border bg-muted/10">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
-                      <Terminal className="text-white h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">SelfHost Helper</p>
-                      <p className="text-xs text-muted-foreground">
-                        Version 1.0.0
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Manage and monitor your self-hosted Node.js applications
-                    with ease.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsSettingsOpen(false)}
-                className="cursor-pointer"
-              >
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            isCollapsed
+              ? "w-10 h-10 justify-center p-2"
+              : "w-full justify-start px-3 py-2 gap-2"
+          )}
+        >
+          <Settings
+            className={cn(
+              isCollapsed ? "h-5 w-5" : "h-4 w-4",
+              !isCollapsed && "mr-2"
+            )}
+          />
+          {!isCollapsed && "Settings"}
+        </Button>
       </div>
     </motion.aside>
   );

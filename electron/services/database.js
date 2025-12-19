@@ -32,7 +32,7 @@ export const initializeDatabase = async () => {
     );
     initProjectModel(sequelize);
 
-    await sequelize.sync(); // or sync({ alter: true }) for dev
+    await sequelize.sync({ alter: true });
     console.log("Database synced");
   } catch (error) {
     console.error("Unable to connect to the database:", error);

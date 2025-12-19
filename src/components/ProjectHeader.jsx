@@ -107,6 +107,7 @@ export default function ProjectHeader({
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSave={onUpdate}
+        onDelete={onDelete}
       />
     </header>
   );

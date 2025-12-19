@@ -1,6 +1,15 @@
-> release "v0.3.4"
+> release "v0.4.0"
 
-
-
-input commands history ( ctrl + (↑\↓) )
-Ability to copy console directly by Ctrl+C
+- **New Settings Page**: Dedicated app settings page for global configurations.
+- **Zombie Process Protection**: Detect and clean up processes from previous sessions/crashes.
+- **Enhanced Project Settings**: Support for Project Types, Descriptions, and Custom Icons.
+- **Smart Script Suggestions**: Automatic startup commands based on project type, including dependency installation (npm, pip, go).
+- **Custom Icon Support**: Secure `media://` protocol for loading local project icons with full Windows path support.
+- **Dynamic Versioning**: Settings page now displays the real app version from `package.json`.
+- **Bug Fixes**:
+  - Resolved `net::ERR_UNEXPECTED` for local resources.
+  - Fixed Xterm.js "dimensions of undefined" resizing error.
+  - Corrected `ReferenceError` in Project Settings.
+  - Updated Content Security Policy (CSP) for secure image loading.
+- **Command History**: Input commands history (Ctrl + ↑/↓).
+- **Console Copy**: Ability to copy console output directly via Ctrl+C.

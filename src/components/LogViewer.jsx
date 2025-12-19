@@ -55,12 +55,28 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
     });
 
     term.open(terminalContainerRef.current);
-    fitAddon.fit();
+    term.open(terminalContainerRef.current);
+    requestAnimationFrame(() => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        console.warn("Term fit error", e);
+      }
+    });
 
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
+      if (
+        terminalContainerRef.current &&
+        terminalContainerRef.current.clientWidth > 0
+      ) {
+        try {
+          fitAddon.fit();
+        } catch (e) {
+          console.warn("Resize fit error", e);
+        }
+      }
     });
 
     resizeObserver.observe(terminalContainerRef.current);

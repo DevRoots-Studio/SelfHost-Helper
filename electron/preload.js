@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("api", {
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
 
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
+  selectFile: () => ipcRenderer.invoke("dialog:openFile"),
   readDirectory: (path) => ipcRenderer.invoke("files:readDirectory", path),
   sendInput: (id, data) => ipcRenderer.invoke("project:input", { id, data }),
   getLogHistory: (id) => ipcRenderer.invoke("logs:get", id),
@@ -64,4 +65,5 @@ contextBridge.exposeInMainWorld("api", {
   getDiscordInfo: (invitecode) =>
     ipcRenderer.invoke("discord:getInviteInfo", invitecode),
   getProjectStats: (id) => ipcRenderer.invoke("project:getStats", id),
+  getVersion: () => ipcRenderer.invoke("app:getVersion"),
 });

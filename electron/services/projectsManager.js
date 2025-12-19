@@ -29,15 +29,46 @@ const sendLog = (projectId, data, type = "stdout") => {
 };
 //============================{Sends Projects Power Status }=============================
 
-const sendStatus = (projectId, status) => {
+const sendStatus = (projectId, status, extraData = {}) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
       global.mainWindow.webContents.send("project:status", {
         projectId,
         status,
+        ...extraData,
       });
     } catch (error) {
       // Window might be destroyed during shutdown, ignore silently
+    }
+  }
+};
+
+export const checkZombieProcesses = async () => {
+  const projects = await Project.findAll({
+    where: {
+      pid: { [import("sequelize").Op.ne]: null },
+    },
+  });
+
+  for (const project of projects) {
+    if (project.pid) {
+      try {
+        process.kill(project.pid, 0);
+        console.warn(
+          `Zombie process found for project ${project.name} (PID: ${project.pid})`
+        );
+
+        setTimeout(() => {
+          sendStatus(project.id, "zombie", {
+            message: "Improper Shutdown Detected",
+            pid: project.pid,
+          });
+        }, 2000); // Small delay to ensure UI is ready
+      } catch (e) {
+        console.log(`Cleaning up stale PID for project ${project.name}`);
+        project.pid = null;
+        await project.save();
+      }
     }
   }
 };
@@ -114,6 +145,9 @@ export const startProject = async (id) => {
     runningProcesses[id] = child;
     projectStats[id] = { startTime: new Date() };
 
+    project.pid = child.pid;
+    await project.save();
+
     // Send initial status with start time
     if (global.mainWindow && !global.mainWindow.isDestroyed()) {
       try {
@@ -130,10 +164,17 @@ export const startProject = async (id) => {
     child.stdout.on("data", (data) => sendLog(id, data, "stdout"));
     child.stderr.on("data", (data) => sendLog(id, data, "stderr"));
 
-    child.on("close", (code) => {
+    child.on("close", async (code) => {
       console.log(`Project ${id} exited with code ${code}`);
       delete runningProcesses[id];
       delete projectStats[id];
+
+      try {
+        await Project.update({ pid: null }, { where: { id } });
+      } catch (err) {
+        console.error("Failed to clear PID from DB", err);
+      }
+
       sendStatus(id, "stopped");
     });
 

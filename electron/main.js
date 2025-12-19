@@ -1,16 +1,22 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, protocol, net } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { registerHandlers } from "./ipc/handlers.js";
 import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
-
 import { stopAllProjects } from "./services/projectsManager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isDev = process.env.NODE_ENV === "development";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "media",
+    privileges: { secure: true, supportFetchAPI: true, standard: true },
+  },
+]);
 
 let mainWindow = null;
 let tray = null;
@@ -83,13 +89,51 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.whenReady().then(async () => {
+  protocol.handle("media", (request) => {
+    try {
+      const parsedUrl = new URL(request.url);
+
+      // On Windows, if the URL is media:///C:/path, pathname is /C:/path
+      // If the browser parsed "C" as hostname, hostname is c, pathname is /path
+
+      let filePath;
+
+      if (parsedUrl.hostname && parsedUrl.hostname.length === 1) {
+        // Drive letter was interpreted as hostname (e.g. media://c/path)
+        // Construct: C:/path
+        filePath = `${parsedUrl.hostname}:${parsedUrl.pathname}`;
+      } else {
+        // Standard path (e.g. media:///C:/path) -> pathname is /C:/path
+        // We need to strip the leading slash for Windows path logic usually,
+        // but pathToFileURL handles it if we pass it correctly?
+        // Actually, raw "file://" + pathname works best for net.fetch if pathname includes drive letter
+
+        // Remove leading slash if it precedes a drive letter (e.g. /C:/...)
+        const pathname = decodeURIComponent(parsedUrl.pathname);
+        if (process.platform === "win32" && /^\/[a-zA-Z]:/.test(pathname)) {
+          filePath = pathname.slice(1);
+        } else {
+          filePath = pathname;
+        }
+      }
+
+      return net.fetch("file:///" + filePath);
+    } catch (e) {
+      console.error("Protocol Error:", e);
+      return new Response("Not Found", { status: 404 });
+    }
+  });
+
   await initializeDatabase();
   registerHandlers(ipcMain);
 
-  // Auto-start projects
-  import("./services/projectsManager.js").then(({ startAutoStartProjects }) => {
-    startAutoStartProjects();
-  });
+  // Auto-start projects and check for zombies
+  import("./services/projectsManager.js").then(
+    ({ startAutoStartProjects, checkZombieProcesses }) => {
+      checkZombieProcesses();
+      startAutoStartProjects();
+    }
+  );
 
   const window = await createWindow();
   tray = initTray(window, () => {
