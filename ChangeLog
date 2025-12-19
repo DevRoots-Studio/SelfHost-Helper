@@ -1,3 +1,11 @@
+> release "v0.4.2"
+
+- **Major Process Management Upgrade**: Replaced basic PID tracking with robust Process Groups (Unix) and PowerShell-based tree inspection (Windows).
+- **Accurate Resource Aggregation**: Real-time CPU and RAM usage now sums up the entire process tree (Vite, Nodemon, child shells, etc.).
+- **Dynamic Supervisor Detection**: Intelligent detection of process managers (Vite, Nodemon, PM2, etc.) via `package.json` resolution and live tree inspection.
+- **Tree-Safe Shutdown**: Guaranteed cleanup of all child processes when stopping a project, preventing orphaned "zombies".
+- **Performance Optimizations**: Snapshot-based process lookup and batch `pidusage` for minimal overhead.
+
 > release "v0.4.0"
 
 - **New Settings Page**: Dedicated app settings page for global configurations.

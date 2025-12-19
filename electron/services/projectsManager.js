@@ -1,9 +1,16 @@
-import { spawn, exec } from "child_process";
+import { spawn } from "child_process";
 import { Project } from "../../database/models/Project.js";
+import { Op } from "sequelize";
 import pidusage from "pidusage";
+import {
+  getProjectPids,
+  killProjectGroup,
+  getProjectProcessInfo,
+} from "./processTree.js";
+import path from "path";
+import fs from "fs";
 
-const runningProcesses = {};
-const projectStats = {}; // { [id]: { startTime: Date } }
+const runningRuntimes = {};
 const logHistory = {};
 
 //============================{Sends Logs to the Front-end}=============================
@@ -15,9 +22,13 @@ const sendLog = (projectId, data, type = "stdout") => {
     timestamp: new Date(),
   };
 
-  if (!logHistory[projectId]) logHistory[projectId] = [];
+  if (!logHistory[projectId]) {
+    logHistory[projectId] = [];
+  }
   logHistory[projectId].push(logEntry);
-  if (logHistory[projectId].length > 1000) logHistory[projectId].shift(); // Keep last 1000 log line
+  if (logHistory[projectId].length > 1000) {
+    logHistory[projectId].shift(); // Keep last 1000 log line
+  }
 
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
@@ -46,16 +57,16 @@ const sendStatus = (projectId, status, extraData = {}) => {
 export const checkZombieProcesses = async () => {
   const projects = await Project.findAll({
     where: {
-      pid: { [import("sequelize").Op.ne]: null },
+      pid: { [Op.ne]: null },
     },
   });
 
   for (const project of projects) {
     if (project.pid) {
-      try {
-        process.kill(project.pid, 0);
+      const isAlive = await isProcessGroupAlive(project.pid, process.platform);
+      if (isAlive) {
         console.warn(
-          `Zombie process found for project ${project.name} (PID: ${project.pid})`
+          `Zombie process group found for project ${project.name} (PID: ${project.pid})`
         );
 
         setTimeout(() => {
@@ -63,8 +74,8 @@ export const checkZombieProcesses = async () => {
             message: "Improper Shutdown Detected",
             pid: project.pid,
           });
-        }, 2000); // Small delay to ensure UI is ready
-      } catch (e) {
+        }, 2000);
+      } else {
         console.log(`Cleaning up stale PID for project ${project.name}`);
         project.pid = null;
         await project.save();
@@ -73,22 +84,30 @@ export const checkZombieProcesses = async () => {
   }
 };
 
+async function isProcessGroupAlive(rootPid, platform) {
+  try {
+    const pids = await getProjectPids(rootPid, platform);
+    return pids.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
 export const getRunningProjects = () =>
-  Object.keys(runningProcesses).map(Number);
+  Object.keys(runningRuntimes).map(Number);
 export const getProjectLogs = (id) => logHistory[id] || [];
 export const getProjectStartTime = (id) =>
-  projectStats[id] ? projectStats[id].startTime : null;
+  runningRuntimes[id] ? runningRuntimes[id].startTime : null;
 
 //============================{Writes Commands to the Projects Processes}=============================
 export const writeToProcess = (id, data) => {
-  const child = runningProcesses[id];
-
-  // Extra protection: Check if process actually exists and is not killed
-  if (!child || child.killed) {
+  const runtime = runningRuntimes[id];
+  if (!runtime || !runtime.child || runtime.child.killed) {
     sendLog(id, `Failed to send input: process not running\n`, "stderr");
     return false;
   }
 
+  const { child } = runtime;
   if (child.stdin) {
     const toWrite = data.endsWith("\n") ? data : data + "\n";
     try {
@@ -114,16 +133,16 @@ export const startProject = async (id) => {
   const project = await Project.findByPk(id);
   if (!project) throw new Error("Project not found");
 
-  if (runningProcesses[id]) {
+  if (runningRuntimes[id]) {
     return { success: false, message: "Already running" };
   }
 
-  // Use the full script string to support complex shell commands and arguments.
-  // Using `shell: true` with the full command string avoids naive space-splitting
-  // which breaks quoted arguments or compound commands.
   const commandStr = project.script || "npm start";
+  const resolvedScript = resolveNpmScript(project.path, commandStr);
 
-  console.log(`Starting project ${id}: ${commandStr} in ${project.path}`);
+  console.log(
+    `Starting project ${id}: ${commandStr} (resolved: ${resolvedScript}) in ${project.path}`
+  );
 
   try {
     const child = spawn(commandStr, {
@@ -133,55 +152,71 @@ export const startProject = async (id) => {
       env: {
         ...process.env,
         ...project.env,
-
         TERM: "xterm-256color",
         COLORTERM: "truecolor",
         FORCE_COLOR: "1",
         NPM_CONFIG_COLOR: "always",
       },
-      detached: false,
+      detached: process.platform !== "win32",
     });
 
-    runningProcesses[id] = child;
-    projectStats[id] = { startTime: new Date() };
+    const startTime = new Date();
+    runningRuntimes[id] = {
+      child,
+      startTime,
+      platform: process.platform,
+      supervisorType: detectSupervisor(resolvedScript),
+    };
 
     project.pid = child.pid;
     await project.save();
 
-    // Send initial status with start time
     if (global.mainWindow && !global.mainWindow.isDestroyed()) {
       try {
         global.mainWindow.webContents.send("project:status", {
           projectId: id,
           status: "running",
-          startTime: projectStats[id].startTime,
+          startTime: startTime,
         });
-      } catch (error) {
-        // Window might be destroyed during shutdown
+      } catch (_error) {
+        // Ignored
       }
     }
 
-    child.stdout.on("data", (data) => sendLog(id, data, "stdout"));
+    child.stdout.on("data", (data) => {
+      const text = data.toString();
+      if (!runningRuntimes[id].supervisorType) {
+        runningRuntimes[id].supervisorType = detectSupervisorFromOutput(text);
+      }
+      sendLog(id, data, "stdout");
+    });
     child.stderr.on("data", (data) => sendLog(id, data, "stderr"));
 
     child.on("close", async (code) => {
-      console.log(`Project ${id} exited with code ${code}`);
-      delete runningProcesses[id];
-      delete projectStats[id];
+      console.log(`Project ${id} shell exited with code ${code}`);
+      const runtime = runningRuntimes[id];
 
-      try {
-        await Project.update({ pid: null }, { where: { id } });
-      } catch (err) {
-        console.error("Failed to clear PID from DB", err);
+      // If no supervisor, or if the whole group is gone, mark as stopped
+      const pids = await getProjectPids(child.pid, process.platform);
+      if (pids.length === 0 || !runtime.supervisorType) {
+        delete runningRuntimes[id];
+        try {
+          await Project.update({ pid: null }, { where: { id } });
+        } catch (err) {
+          console.error("Failed to clear PID from DB", err);
+        }
+        sendStatus(id, "stopped");
+      } else {
+        console.log(
+          `Supervisor detected for project ${id}, keeping status as running even if shell closed.`
+        );
       }
-
-      sendStatus(id, "stopped");
     });
 
     child.on("error", (err) => {
       console.error(`Failed to start project ${id}`, err);
       sendLog(id, `Failed to start: ${err.message}`, "error");
-      delete runningProcesses[id];
+      delete runningRuntimes[id];
       sendStatus(id, "error");
     });
 
@@ -192,25 +227,57 @@ export const startProject = async (id) => {
   }
 };
 
+function resolveNpmScript(projectPath, command) {
+  const match = command.match(/^(npm|yarn|pnpm)\s+(run\s+)?([^\s]+)/);
+  if (!match) return command;
+
+  const scriptName = match[3];
+  try {
+    const pkgPath = path.join(projectPath, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      if (pkg.scripts && pkg.scripts[scriptName]) {
+        return pkg.scripts[scriptName];
+      }
+    }
+  } catch (_e) {
+    // Ignore and return original command
+  }
+  return command;
+}
+
+function detectSupervisor(command) {
+  if (!command) return null;
+  const c = command.toLowerCase();
+  if (c.includes("nodemon")) return "nodemon";
+  if (c.includes("vite")) return "vite";
+  if (c.includes("pm2")) return "pm2";
+  if (c.includes("uvicorn")) return "uvicorn";
+  if (c.includes("gunicorn")) return "gunicorn";
+  return null;
+}
+
+function detectSupervisorFromOutput(output) {
+  if (output.includes("[nodemon]")) return "nodemon";
+  if (output.includes("VITE v")) return "vite";
+  return null;
+}
+
 //============================{Stops a Project}=============================
 export const stopProject = async (id) => {
-  const child = runningProcesses[id];
-  if (!child) return { success: false, message: "Not running" };
+  const runtime = runningRuntimes[id];
+  if (!runtime) return { success: false, message: "Not running" };
 
-  const kill = (pid) => {
-    return new Promise((resolve) => {
-      if (process.platform === "win32") {
-        exec(`taskkill /pid ${pid} /f /t`, (err) => {
-          resolve();
-        });
-      } else {
-        child.kill();
-        resolve();
-      }
-    });
-  };
+  await killProjectGroup(runtime.child.pid, runtime.platform);
+  delete runningRuntimes[id];
 
-  await kill(child.pid);
+  try {
+    await Project.update({ pid: null }, { where: { id } });
+  } catch (_err) {
+    // Ignored
+  }
+
+  sendStatus(id, "stopped");
   return { success: true };
 };
 
@@ -227,7 +294,7 @@ export const restartProject = async (id) => {
 
 //============================{Stops All Projects at Once}=============================
 export const stopAllProjects = async () => {
-  const ids = Object.keys(runningProcesses);
+  const ids = Object.keys(runningRuntimes);
   console.log(`Stopping all ${ids.length} running projects...`);
   const promises = ids.map((id) => stopProject(id));
   await Promise.all(promises);
@@ -236,28 +303,79 @@ export const stopAllProjects = async () => {
 //============================{Get Project Stats}=============================
 
 export const getProjectStats = async (id) => {
-  const child = runningProcesses[id];
-  const stats = projectStats[id];
-
-  if (!child || !stats) return null;
+  const runtime = runningRuntimes[id];
+  if (!runtime) return null;
 
   try {
-    const usage = await pidusage(child.pid);
+    const procInfo = await getProjectProcessInfo(
+      runtime.child.pid,
+      runtime.platform
+    );
 
-    return {
+    if (procInfo.length === 0) {
+      return {
+        id,
+        startTime: runtime.startTime,
+        uptime: Date.now() - runtime.startTime.getTime(),
+        cpu: 0,
+        memory: 0,
+        timestamp: Date.now(),
+        pidsCount: 0,
+        supervisorType: runtime.supervisorType,
+      };
+    }
+
+    // Dynamic Supervisor Check: if not already detected, look at command lines of children
+    if (!runtime.supervisorType) {
+      for (const info of procInfo) {
+        const detected = detectSupervisor(info.commandLine);
+        if (detected) {
+          runtime.supervisorType = detected;
+          console.log(
+            `Dynamically detected supervisor ${detected} for project ${id} from process tree.`
+          );
+          break;
+        }
+      }
+    }
+
+    const pids = procInfo.map((i) => i.pid);
+    let totalCpu = 0;
+    let totalMemory = 0;
+
+    try {
+      const usages = await pidusage(pids);
+      for (const pid of pids) {
+        if (usages[pid]) {
+          totalCpu += usages[pid].cpu;
+          totalMemory += usages[pid].memory;
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[projectsManager] pidusage failed for some PIDs of project ${id}:`,
+        err.message
+      );
+    }
+
+    const result = {
       id,
-      startTime: stats.startTime,
-      uptime: Date.now() - stats.startTime.getTime(),
-      cpu: usage.cpu, //
-      memory: usage.memory,
+      startTime: runtime.startTime,
+      uptime: Date.now() - runtime.startTime.getTime(),
+      cpu: totalCpu,
+      memory: totalMemory,
       timestamp: Date.now(),
+      pidsCount: procInfo.length,
+      supervisorType: runtime.supervisorType,
     };
+
+    return result;
   } catch (err) {
     console.error(`Failed to get stats for project ${id}:`, err);
     return {
       id,
-      startTime: stats.startTime,
-      uptime: Date.now() - stats.startTime.getTime(),
+      startTime: runtime.startTime,
+      uptime: Date.now() - runtime.startTime.getTime(),
       cpu: 0,
       memory: 0,
     };
@@ -273,7 +391,7 @@ export const startAutoStartProjects = async () => {
       // Start sequentially to avoid resource spikes, or use Promise.all for speed
       for (const project of projects) {
         // Check if already running (redundant if app just started, but good practice)
-        if (!runningProcesses[project.id]) {
+        if (!runningRuntimes[project.id]) {
           await startProject(project.id);
         }
       }

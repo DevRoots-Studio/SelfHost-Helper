@@ -151,3 +151,4 @@ src/Database/Data/Database.sqlite
 temp.csv
 Servers/**/node_modules/
 Servers/**/package-lock.json
+release-dev
