@@ -17,3 +17,6 @@
 - [x] automatic script suggestions with dependency installation
 - [x] dynamic app version display
 - [ ] update the app's logo
+- [ ] process tree visualization (see all children of a project)
+- [ ] resource usage history/graphs
+- [ ] alerts for high CPU/RAM usage
