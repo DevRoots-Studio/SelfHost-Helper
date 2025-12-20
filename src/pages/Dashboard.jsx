@@ -123,6 +123,8 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [selectedProject?.id, selectedProject?.status]);
 
+  const [projectEditorStates, setProjectEditorStates] = useState({});
+
   const handleUpdateProject = async (projectData) => {
     const updated = await API.updateProject(projectData);
     if (updated) {
@@ -133,7 +135,17 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditorFileChange = (projectId, filePath) => {
+    setProjectEditorStates((prev) => ({
+      ...prev,
+      [projectId]: filePath,
+    }));
+  };
+
   const activeLogs = selectedProject ? logs[selectedProject.id] || [] : [];
+  const selectedProjectEditorFile = selectedProject
+    ? projectEditorStates[selectedProject.id]
+    : null;
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
@@ -178,9 +190,14 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <EditorView
+                    projectId={selectedProject.id}
                     projectPath={selectedProject.path}
                     fileTree={fileTree}
                     isFileTreeLoading={isFileTreeLoading}
+                    initialFile={selectedProjectEditorFile}
+                    onFileSelect={(path) =>
+                      handleEditorFileChange(selectedProject.id, path)
+                    }
                   />
                 )}
               </div>

@@ -1,5 +1,7 @@
 ### Core Features:
 
+- [x] Project-specific editor state (last opened file)
+- [x] Material Icon Theme integration
 - [x] Update the database model to be able to store more settings and specifically the PID codes for better handling of project instances
 - [x] Zombie process detection and protection
 - [ ] docker support
@@ -11,7 +13,7 @@
 ### UX\UI Features:
 
 - [ ] more animations 🫦🫦
-- [ ] better colors (it's disgusting)
+- [/] better colors (Integrated Material Icon Theme)
 - [x] full settings page rather than a dialog
 - [x] the ability to customize server's icons
 - [x] automatic script suggestions with dependency installation

@@ -1,3 +1,17 @@
+> release "v0.4.5"
+
+- **Full Material Icon Theme Integration**:
+  - Integrated 1,100+ high-quality SVG icons.
+  - Comprehensive mapping logic for 3,100+ file extensions, filenames, and folder structures.
+  - Robust icon fallback system using Lucide for generic files/folders.
+- **Improved Asset Loading**: Hardened `media://app` protocol for secure and fast local asset loading.
+- **Project-Specific Editor State**: Isolated "last opened file" state per project, ensuring a clean context when switching between servers.
+- **Visual Polish**: Replaced generic file tree icons with context-aware Material Icons and improved animations.
+- **Framer Motion Upgrade**: Updated all motion components to use `motion.create()` for better performance and future-proofing.
+- **Bug Fixes**:
+  - Resolved `net::ERR_FILE_NOT_FOUND` and `net::ERR_UNEXPECTED` errors on Windows.
+  - Fixed `ReferenceError` for `useMemo` in the File Tree.
+
 > release "v0.4.2"
 
 - **Major Process Management Upgrade**: Replaced basic PID tracking with robust Process Groups (Unix) and PowerShell-based tree inspection (Windows).

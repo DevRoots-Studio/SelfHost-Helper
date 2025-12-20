@@ -1,13 +1,8 @@
-import React, { useState, useMemo } from "react";
-import {
-  ChevronRight,
-  ChevronDown,
-  File,
-  Folder,
-  FolderOpen,
-} from "lucide-react";
+import { useState, useMemo } from "react";
+import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { getFileIcon, getFolderIcon } from "@/lib/materialIcons";
 
 // Sort function: folders first, then files (alphabetically)
 const sortTree = (nodes) => {
@@ -40,6 +35,7 @@ const FileTreeNode = ({
   defaultOpen = false,
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
+  const [iconError, setIconError] = useState(false);
   const isDirectory = node.type === "directory";
   const isSelected = selectedPath === node.path;
   const hasChildren = isDirectory && node.children && node.children.length > 0;
@@ -63,6 +59,20 @@ const FileTreeNode = ({
     // Only call onSelect for files
     onSelect(node);
   };
+
+  const iconName = isDirectory
+    ? getFolderIcon(node.name, isOpen)
+    : getFileIcon(node.name);
+
+  // If the iconName is just "file" or "folder", we use Lucide by default
+  // to avoid trying to load non-existent generic icons.
+  const useLucide =
+    iconError ||
+    iconName === "file" ||
+    iconName === "folder" ||
+    iconName === "folder-open";
+
+  const iconUrl = `media://app/src/assets/file-icons/${iconName}.svg`;
 
   return (
     <div className="select-none">
@@ -94,14 +104,23 @@ const FileTreeNode = ({
           )}
         </span>
         <div className="flex items-center flex-1 min-w-0">
-          {isDirectory ? (
-            isOpen ? (
-              <FolderOpen className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+          {useLucide ? (
+            isDirectory ? (
+              isOpen ? (
+                <FolderOpen className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+              ) : (
+                <Folder className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+              )
             ) : (
-              <Folder className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+              <File className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
             )
           ) : (
-            <File className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
+            <img
+              src={iconUrl}
+              className="h-4 w-4 mr-2 shrink-0 object-contain"
+              alt=""
+              onError={() => setIconError(true)}
+            />
           )}
           <span className="truncate">{node.name}</span>
         </div>

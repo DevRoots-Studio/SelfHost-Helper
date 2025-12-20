@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
   Dialog,
@@ -91,18 +92,28 @@ export default function ProjectSettingsDialog({
     }
   };
 
+  const MIN_LOADING_TIME = 600;
+
   const handleSave = async () => {
+    const start = Date.now();
     setIsLoading(true);
+
     try {
       await onSave({
         ...project,
         ...formData,
       });
-      onClose();
     } catch (error) {
       console.error("Failed to update project", error);
     } finally {
-      setIsLoading(false);
+      const elapsed = Date.now() - start;
+      const remaining = MIN_LOADING_TIME - elapsed;
+
+      if (remaining > 0) {
+        setTimeout(() => setIsLoading(false), remaining);
+      } else {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -117,8 +128,37 @@ export default function ProjectSettingsDialog({
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      name: project?.name || "",
+      path: project?.path || "",
+      script:
+        project?.script ||
+        (project?.type &&
+          PROJECT_TYPES.find((t) => t.value === project.type)?.script) ||
+        "npm start",
+      autoStart: project?.autoStart || false,
+      type: project?.type || "node",
+      description: project?.description || "",
+      icon: project?.icon || "",
+    });
+  };
+
+  const handleCancel = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleDialogOpenChange = (open) => {
+    if (!open) {
+      resetForm();
+      onClose();
+    }
+  };
+
+  const MotionButton = motion.create(Button);
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-2xl bg-card text-card-foreground border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Project Settings</DialogTitle>
@@ -236,34 +276,68 @@ export default function ProjectSettingsDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="icon">Custom Icon Path</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="icon"
-                  value={formData.icon}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, icon: e.target.value }))
-                  }
-                  className="bg-background/50"
-                  placeholder="Path to .png, .jpg, .ico"
-                />
-                {formData.icon && (
-                  <div className="w-9 h-9 shrink-0 bg-secondary rounded overflow-hidden border border-border">
-                    <img
-                      src={`media:///${formData.icon.replace(/\\/g, "/")}`}
-                      className="w-full h-full object-cover"
-                      alt="Preview"
-                    />
-                  </div>
-                )}
+              <motion.div className="flex gap-2 items-center">
+                <motion.div
+                  layout
+                  transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                  className="flex-1 min-w-0"
+                >
+                  <Input
+                    id="icon"
+                    value={formData.icon}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, icon: e.target.value }))
+                    }
+                    className="bg-background/50 w-full"
+                    placeholder="Path to .png, .jpg, .ico"
+                  />
+                </motion.div>
+                <AnimatePresence initial={false} mode="sync">
+                  {formData.icon && (
+                    <motion.div
+                      layout
+                      className="w-9 h-9 bg-secondary rounded overflow-hidden border border-border flex items-center justify-center relative shrink-0"
+                      role="img"
+                      aria-label={`Icon preview for ${
+                        formData.name || "project"
+                      }`}
+                      initial={{ opacity: 0, width: 0, x: -6 }}
+                      animate={{ opacity: 1, width: 36, x: 0 }}
+                      exit={{ opacity: 0, width: 0, x: 6 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 320,
+                        damping: 28,
+                        duration: 0.28,
+                      }}
+                    >
+                      <AnimatePresence initial={false} mode="sync">
+                        <motion.img
+                          src={`media:///${formData.icon.replace(/\\/g, "/")}`}
+                          className="absolute inset-0 w-full h-full object-contain object-center"
+                          alt={`${formData.name || "Project"} icon preview`}
+                          key={formData.icon}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.22 }}
+                          style={{ imageRendering: "auto" }}
+                        />
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handleBrowseIcon}
                   title="Select Icon"
+                  aria-label="Select Icon"
+                  className="w-9 h-9 p-0 flex items-center justify-center rounded border border-border"
                 >
                   <ImageIcon className="h-4 w-4" />
                 </Button>
-              </div>
+              </motion.div>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
@@ -313,17 +387,48 @@ export default function ProjectSettingsDialog({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
             Cancel
           </Button>
-          <Button
+          <MotionButton
             onClick={handleSave}
             disabled={isLoading}
-            className="bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+            whileTap={{ scale: 0.97 }}
+            animate={{
+              opacity: isLoading ? 0.8 : 1,
+            }}
+            transition={{
+              duration: 0.25,
+              ease: "easeInOut",
+            }}
+            className="bg-primary text-primary-foreground shadow-lg shadow-primary/20 cursor-pointer overflow-hidden"
           >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
-          </Button>
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.span
+                  key="loading"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center"
+                >
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="text"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  Save Changes
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </MotionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -239,4 +239,10 @@ export const registerHandlers = () => {
   ipcMain.handle("app:getVersion", () => {
     return app.getVersion();
   });
+  ipcMain.handle("app:getAppPath", () => {
+    return app.getAppPath();
+  });
+  ipcMain.handle("path:join", (_, ...args) => {
+    return path.join(...args);
+  });
 };

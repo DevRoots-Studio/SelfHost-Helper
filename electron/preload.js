@@ -66,4 +66,6 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("discord:getInviteInfo", invitecode),
   getProjectStats: (id) => ipcRenderer.invoke("project:getStats", id),
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
+  getAppPath: () => ipcRenderer.invoke("app:getAppPath"),
+  joinPath: (...args) => ipcRenderer.invoke("path:join", ...args),
 });

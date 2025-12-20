@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FileCode, Save, FolderOpen, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -68,43 +68,62 @@ const getLanguageFromPath = (filePath) => {
 };
 
 export default function EditorView({
+  projectId,
   projectPath,
   fileTree,
   isFileTreeLoading,
+  initialFile,
+  onFileSelect,
 }) {
   const [editorContent, setEditorContent] = useState("");
   const [currentFile, setCurrentFile] = useState(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
 
+  useEffect(() => {
+    if (initialFile) {
+      if (initialFile !== currentFile) {
+        loadFile(initialFile);
+      }
+    } else {
+      setCurrentFile(null);
+      setEditorContent("");
+    }
+  }, [projectId]);
+
+  const loadFile = async (filePath) => {
+    setIsFileLoading(true);
+    setFileLoadError(null);
+    setCurrentFile(filePath);
+    setEditorContent("");
+
+    try {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("File read timeout after 10 seconds")),
+          10000
+        )
+      );
+
+      const contentPromise = API.readFile(filePath);
+      const content = await Promise.race([contentPromise, timeoutPromise]);
+
+      setEditorContent(content || "");
+      setFileLoadError(null);
+      onFileSelect?.(filePath);
+    } catch (e) {
+      console.error("Failed to read file", e);
+      const errorMessage = e?.message || e?.toString() || "Unknown error";
+      setFileLoadError(`Failed to load file: ${errorMessage}`);
+      setEditorContent("");
+    } finally {
+      setIsFileLoading(false);
+    }
+  };
+
   const handleFileSelect = async (node) => {
     if (node.type === "file") {
-      setIsFileLoading(true);
-      setFileLoadError(null);
-      setCurrentFile(node.path);
-      setEditorContent("");
-
-      try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("File read timeout after 10 seconds")),
-            10000
-          )
-        );
-
-        const contentPromise = API.readFile(node.path);
-        const content = await Promise.race([contentPromise, timeoutPromise]);
-
-        setEditorContent(content || "");
-        setFileLoadError(null);
-      } catch (e) {
-        console.error("Failed to read file", e);
-        const errorMessage = e?.message || e?.toString() || "Unknown error";
-        setFileLoadError(`Failed to load file: ${errorMessage}`);
-        setEditorContent("");
-      } finally {
-        setIsFileLoading(false);
-      }
+      loadFile(node.path);
     }
   };
 

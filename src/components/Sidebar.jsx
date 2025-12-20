@@ -126,12 +126,17 @@ export default function Sidebar({
 
   return (
     <motion.aside
-      className="bg-muted/20 border-r border-border flex flex-col backdrop-blur-xl relative"
+      className="bg-muted/20 border-r border-border flex flex-col backdrop-blur-xl relative overflow-x-hidden"
       initial={false}
       animate={{ width: isCollapsed ? "64px" : "288px" }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
     >
-      <div className="p-4  flex justify-between items-center bg-card/50">
+      <div
+        className={cn(
+          "flex items-center bg-card/50",
+          isCollapsed ? "justify-center px-2 py-4" : "justify-between p-4"
+        )}
+      >
         <AnimatePresence mode="wait">
           {!isCollapsed ? (
             <motion.h1
@@ -158,7 +163,7 @@ export default function Sidebar({
                   <Plus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] bg-card border-border">
+              <DialogContent className="sm:max-w-125 bg-card border-border">
                 <DialogHeader>
                   <DialogTitle>Add Project</DialogTitle>
                   <DialogDescription>
@@ -251,7 +256,7 @@ export default function Sidebar({
             size="icon"
             variant="ghost"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hover:bg-primary/20 hover:text-primary cursor-pointer"
+            className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
           >
             {isCollapsed ? (
               <ChevronRight className="h-5 w-5" />
@@ -262,7 +267,7 @@ export default function Sidebar({
         </div>
       </div>
       {!isCollapsed ? (
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
           {projects.map((p) => (
             <div
               key={p.id}
@@ -305,7 +310,7 @@ export default function Sidebar({
           ))}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 flex flex-col items-center gap-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 flex flex-col items-center gap-2">
           {projects.map((p) => (
             <motion.button
               key={p.id}
@@ -321,7 +326,7 @@ export default function Sidebar({
               title={p.name}
             >
               {p.icon ? (
-                <div className="w-8 h-8 rounded overflow-hidden">
+                <div className="w-8 h-8 rounded overflow-hidden flex items-center justify-center m-auto">
                   <img
                     src={`media:///${p.icon.replace(/\\/g, "/")}`}
                     alt={p.name}
@@ -355,12 +360,43 @@ export default function Sidebar({
         </div>
       )}
       <div className="p-4  bg-card/30 space-y-2 ">
-        <AnimatePresence>
-          {!isCollapsed && (
+        <AnimatePresence mode="wait">
+          {isCollapsed ? (
+            <div className="flex justify-center items-center mb-2">
+              <motion.button
+                key="discord-collapsed"
+                layoutId="discord-card"
+                transition={{
+                  layout: { type: "spring", stiffness: 200, damping: 30 },
+                  opacity: { duration: 0.15 },
+                }}
+                className="w-10 h-10 rounded-lg bg-muted/30 border border-border/50 hover:bg-accent/50 flex items-center justify-center shrink-0 cursor-pointer"
+                onClick={() => setIsCollapsed(false)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {getDiscordAvatarUrl() ? (
+                  <img
+                    src={getDiscordAvatarUrl()}
+                    alt={discordInfo?.guild?.name || "Discord Server"}
+                    className="w-8 h-8 rounded object-cover block"
+                  />
+                ) : (
+                  <MessageCircle className="h-5 w-5 text-foreground block" />
+                )}
+              </motion.button>
+            </div>
+          ) : (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              key="discord-expanded"
+              layoutId="discord-card"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{
+                layout: { type: "spring", stiffness: 200, damping: 32 },
+                opacity: { duration: 0.2 },
+              }}
               className="mb-2 overflow-hidden rounded-lg border border-border"
             >
               <div
@@ -377,7 +413,6 @@ export default function Sidebar({
 
                 <div className="relative z-10">
                   <div className="flex items-start gap-3 mb-3">
-                    {/* Server Avatar */}
                     {getDiscordAvatarUrl() ? (
                       <img
                         src={getDiscordAvatarUrl()}
@@ -394,7 +429,7 @@ export default function Sidebar({
                       <h3 className="font-bold text-base mb-1 truncate">
                         {discordLoading
                           ? "Loading..."
-                          : discordInfo?.guild?.name || "Div Root"}
+                          : discordInfo?.guild?.name || "DivRoots Studio"}
                       </h3>
                       {discordInfo && (
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -420,28 +455,11 @@ export default function Sidebar({
                   <Button
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
                     size="sm"
-                    onClick={async () => {
-                      // Try to open the Discord app via protocol link first.
-                      // If that fails (returns false or throws), fall back to the web invite.
-                      // const protocolUrl = `discord://invite/${DISCORD_INVITE_CODE}`;
-                      const webUrl = `https://discord.gg/${DISCORD_INVITE_CODE}`;
-
-                      // try {
-                      //   const opened = await API.openExternal(protocolUrl);
-                      //   if (!opened) {
-                      //     // Fallback to web
-                      //     await API.openExternal(webUrl);
-                      //   }
-                      // } catch (e) {
-                      //   // If opening the protocol fails for any reason, open the web link.
-                      //   await API.openExternal(webUrl);
-                      // }
-                      try {
-                        await API.openExternal(webUrl);
-                      } catch (error) {
-                        console.error("Error opening external URL:", error);
-                      }
-                    }}
+                    onClick={async () =>
+                      await API.openExternal(
+                        `https://discord.gg/${DISCORD_INVITE_CODE}`
+                      )
+                    }
                   >
                     Join Server
                   </Button>
@@ -450,25 +468,61 @@ export default function Sidebar({
             </motion.div>
           )}
         </AnimatePresence>
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/settings")}
-          className={cn(
-            "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
 
-            isCollapsed
-              ? "w-10 h-10 justify-center p-2"
-              : "w-full justify-start px-3 py-2 gap-2"
-          )}
+        <motion.div
+          layout
+          transition={{
+            layout: { type: "spring", stiffness: 250, damping: 30 },
+          }}
+          className={isCollapsed ? "flex justify-center" : ""}
         >
-          <Settings
-            className={cn(
-              isCollapsed ? "h-5 w-5" : "h-4 w-4",
-              !isCollapsed && "mr-2"
-            )}
-          />
-          {!isCollapsed && "Settings"}
-        </Button>
+          <motion.div
+            layoutId="settings-button"
+            transition={{
+              layout: { type: "spring", stiffness: 400, damping: 30 },
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/settings")}
+              className={cn(
+                "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
+
+                isCollapsed
+                  ? "w-10 h-10 items-center justify-center p-2"
+                  : "w-full justify-start px-3 py-2 gap-2"
+              )}
+            >
+              <motion.div
+                layout
+                transition={{ duration: 0.15 }}
+                className="flex items-center justify-center"
+              >
+                <Settings
+                  className={cn(
+                    isCollapsed ? "h-5 w-5" : "h-4 w-4",
+                    !isCollapsed && "mr-2"
+                  )}
+                />
+              </motion.div>
+
+              <AnimatePresence>
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.1 }}
+                  >
+                    Settings
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Button>
+          </motion.div>
+        </motion.div>
       </div>
     </motion.aside>
   );

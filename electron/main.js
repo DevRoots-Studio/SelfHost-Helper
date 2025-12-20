@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, protocol, net } from "electron";
 import path from "path";
-import { fileURLToPath } from "url";
+import fs from "fs";
+import { fileURLToPath, pathToFileURL } from "url";
 import { registerHandlers } from "./ipc/handlers.js";
 import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
@@ -98,17 +99,26 @@ app.whenReady().then(async () => {
 
       let filePath;
 
-      if (parsedUrl.hostname && parsedUrl.hostname.length === 1) {
+      if (parsedUrl.hostname === "app") {
+        // Handle media://app/path/to/asset
+        const relativePath = decodeURIComponent(parsedUrl.pathname);
+        // Try multiple bases for dev flexibility
+        const appPath = app.getAppPath();
+        const cwd = process.cwd();
+
+        let targetPath = path.join(appPath, relativePath);
+        if (!fs.existsSync(targetPath)) {
+          console.warn(
+            `[Media Protocol] File not found at app path: ${targetPath}. Trying CWD.`
+          );
+          targetPath = path.join(cwd, relativePath);
+        }
+        filePath = targetPath;
+      } else if (parsedUrl.hostname && parsedUrl.hostname.length === 1) {
         // Drive letter was interpreted as hostname (e.g. media://c/path)
-        // Construct: C:/path
         filePath = `${parsedUrl.hostname}:${parsedUrl.pathname}`;
       } else {
         // Standard path (e.g. media:///C:/path) -> pathname is /C:/path
-        // We need to strip the leading slash for Windows path logic usually,
-        // but pathToFileURL handles it if we pass it correctly?
-        // Actually, raw "file://" + pathname works best for net.fetch if pathname includes drive letter
-
-        // Remove leading slash if it precedes a drive letter (e.g. /C:/...)
         const pathname = decodeURIComponent(parsedUrl.pathname);
         if (process.platform === "win32" && /^\/[a-zA-Z]:/.test(pathname)) {
           filePath = pathname.slice(1);
@@ -117,7 +127,16 @@ app.whenReady().then(async () => {
         }
       }
 
-      return net.fetch("file:///" + filePath);
+      if (!fs.existsSync(filePath)) {
+        console.error(
+          `[Media Protocol] File NOT found: ${filePath} (Original URL: ${request.url})`
+        );
+        return new Response("Not Found", { status: 404 });
+      }
+
+      const fileUrl = pathToFileURL(filePath).href;
+
+      return net.fetch(fileUrl);
     } catch (e) {
       console.error("Protocol Error:", e);
       return new Response("Not Found", { status: 404 });
