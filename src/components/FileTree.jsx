@@ -3,7 +3,7 @@ import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { getFileIcon, getFolderIcon } from "@/lib/materialIcons";
-
+const API = window.api;
 // Sort function: folders first, then files (alphabetically)
 const sortTree = (nodes) => {
   if (!nodes || !Array.isArray(nodes)) return [];
@@ -66,13 +66,19 @@ const FileTreeNode = ({
 
   // If the iconName is just "file" or "folder", we use Lucide by default
   // to avoid trying to load non-existent generic icons.
+  const getIconUrl = (iconName) => {
+    return import.meta.env.DEV
+      ? `/file-icons/${iconName}.svg`
+      : `media://app/dist/file-icons/${iconName}.svg`;
+  };
+
   const useLucide =
     iconError ||
     iconName === "file" ||
     iconName === "folder" ||
     iconName === "folder-open";
 
-  const iconUrl = `media://app/src/assets/file-icons/${iconName}.svg`;
+  const iconUrl = getIconUrl(iconName);
 
   return (
     <div className="select-none">
