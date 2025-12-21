@@ -116,7 +116,9 @@ app.whenReady().then(async () => {
         filePath = targetPath;
       } else if (parsedUrl.hostname && parsedUrl.hostname.length === 1) {
         // Drive letter was interpreted as hostname (e.g. media://c/path)
-        filePath = `${parsedUrl.hostname}:${parsedUrl.pathname}`;
+        filePath = `${parsedUrl.hostname}:${decodeURIComponent(
+          parsedUrl.pathname
+        )}`;
       } else {
         // Standard path (e.g. media:///C:/path) -> pathname is /C:/path
         const pathname = decodeURIComponent(parsedUrl.pathname);

@@ -1,3 +1,7 @@
+> release "v0.4.6"
+
+- **Media Protocol Improvements**: Fixed a critical bug where project icons on non-system partitions (e.g., G:, D:) or in folders with spaces failed to render. Improved URL decoding logic in the backend handlers.
+
 > release "v0.4.5"
 
 - **Full Material Icon Theme Integration**:
