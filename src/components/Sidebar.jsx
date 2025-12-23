@@ -275,7 +275,9 @@ export default function Sidebar({
               className={cn(
                 "group p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all border border-transparent select-none",
                 selectedProject?.id === p.id
-                  ? "bg-accent/10 border-border bg-linear-to-r from-secondary/50 to-transparent shadow-sm"
+                  ? "border-[hsl(217,91%,60%)] shadow-[0_0_0_1px_hsl(217,91%,60%,0.2),0_2px_8px_hsl(217,91%,60%,0.15)] dark:shadow-[0_0_0_1px_hsl(217,91%,60%,0.3),0_2px_12px_hsl(217,91%,60%,0.25)]" +
+                      " " +
+                      "bg-[linear-gradient(to_right,hsl(217,91%,60%,0.15),hsl(217,91%,60%,0.08))] dark:bg-[linear-gradient(to_right,hsl(217,91%,60%,0.25),hsl(217,91%,60%,0.12))]"
                   : "hover:bg-accent/50 hover:border-border/50"
               )}
             >
@@ -318,7 +320,7 @@ export default function Sidebar({
               className={cn(
                 "w-10 h-10 rounded-lg cursor-pointer flex items-center justify-center transition-all border-2 select-none relative group",
                 selectedProject?.id === p.id
-                  ? "bg-accent border-primary shadow-lg scale-110"
+                  ? "bg-[hsl(217,91%,60%,0.15)] dark:bg-[hsl(217,91%,60%,0.25)] border-[hsl(217,91%,60%)] shadow-[0_0_0_1px_hsl(217,91%,60%,0.3),0_4px_12px_hsl(217,91%,60%,0.25)] scale-110"
                   : "bg-muted/30 border-border/50 hover:bg-accent/50 hover:border-border hover:scale-105"
               )}
               whileHover={{ scale: 1.1, duration: 0.1 }}

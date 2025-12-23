@@ -81,9 +81,12 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 217 91% 60%;
 
     --radius: 0.5rem;
+
+    /* Custom focus ring color - vibrant blue */
+    --focus-ring: 217 91% 60%;
   }
 
   .dark {
@@ -113,16 +116,181 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 217 91% 60%;
+
+    /* Custom focus ring color - vibrant blue (same for dark mode) */
+    --focus-ring: 217 91% 60%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Comprehensive Focus, Selection & Interaction Styling */
+@layer base {
+  /* ============================================
+     BASE RESET - Remove Default Outlines
+     ============================================ */
+  *:focus {
+    outline: none;
+  }
+
+  /* ============================================
+     GLOBAL FOCUS-VISIBLE (Keyboard Navigation)
+     ============================================ */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+    transition: outline-color 0.2s ease-in-out, outline-offset 0.2s ease-in-out,
+      box-shadow 0.2s ease-in-out;
+  }
+
+  /* ============================================
+     ENHANCED INPUT FIELDS FOCUS
+     ============================================ */
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 0px;
+    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.12);
+    transition: outline-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out,
+      border-color 0.2s ease-in-out;
+  }
+
+  /* ============================================
+     BUTTON FOCUS WITH GLOW EFFECT
+     ============================================ */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px hsl(var(--focus-ring) / 0.18);
+    transition: outline-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out,
+      transform 0.15s ease-in-out;
+  }
+
+  /* ============================================
+     LINK & INTERACTIVE ELEMENT FOCUS
+     ============================================ */
+  a:focus-visible,
+  [role="link"]:focus-visible,
+  [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+    transition: outline-color 0.2s ease-in-out;
+  }
+
+  /* ============================================
+     DARK MODE FOCUS ENHANCEMENTS
+     ============================================ */
+  .dark input:focus,
+  .dark input:focus-visible,
+  .dark textarea:focus,
+  .dark textarea:focus-visible,
+  .dark select:focus,
+  .dark select:focus-visible {
+    outline-color: hsl(var(--focus-ring));
+    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.25);
+  }
+
+  .dark button:focus-visible,
+  .dark [role="button"]:focus-visible {
+    outline-color: hsl(var(--focus-ring));
+    box-shadow: 0 0 0 5px hsl(var(--focus-ring) / 0.3);
+  }
+
+  /* ============================================
+     SMOOTH HOVER TRANSITIONS
+     ============================================ */
+  button,
+  [role="button"],
+  a,
+  input,
+  textarea,
+  select,
+  [tabindex]:not([tabindex="-1"]) {
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out,
+      color 0.2s ease-in-out, transform 0.15s ease-in-out,
+      box-shadow 0.2s ease-in-out;
+  }
+
+  /* ============================================
+     ACTIVE/PRESSED STATE (Click Feedback)
+     ============================================ */
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease-in-out;
+  }
+
+  /* ============================================
+     DIALOG & POPOVER FOCUS TRAP
+     ============================================ */
+  [role="dialog"] input:focus,
+  [role="dialog"] textarea:focus,
+  [role="dialog"] select:focus,
+  [role="dialog"] button:focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.15);
+  }
+
+  .dark [role="dialog"] input:focus,
+  .dark [role="dialog"] textarea:focus,
+  .dark [role="dialog"] select:focus,
+  .dark [role="dialog"] button:focus-visible {
+    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.28);
+  }
+}
+
+/* ============================================
+   CUSTOM SELECTION STATES FOR SIDEBAR ITEMS
+   ============================================ */
+@layer components {
+  /* Selected server/project item */
+  .selected-item,
+  [data-selected="true"] {
+    background: linear-gradient(
+      to right,
+      hsl(var(--focus-ring) / 0.15),
+      hsl(var(--focus-ring) / 0.08)
+    ) !important;
+    border-color: hsl(var(--focus-ring) / 0.4) !important;
+    box-shadow: 0 0 0 1px hsl(var(--focus-ring) / 0.2),
+      0 2px 8px hsl(var(--focus-ring) / 0.15);
+    transition: background 0.25s ease-in-out, border-color 0.25s ease-in-out,
+      box-shadow 0.25s ease-in-out, transform 0.2s ease-in-out;
+  }
+
+  .dark .selected-item,
+  .dark [data-selected="true"] {
+    background: linear-gradient(
+      to right,
+      hsl(var(--focus-ring) / 0.25),
+      hsl(var(--focus-ring) / 0.12)
+    ) !important;
+    border-color: hsl(var(--focus-ring) / 0.5) !important;
+    box-shadow: 0 0 0 1px hsl(var(--focus-ring) / 0.3),
+      0 2px 12px hsl(var(--focus-ring) / 0.25);
+  }
+
+  /* Hover state for selectable items */
+  .selectable-item:hover,
+  [data-selectable="true"]:hover {
+    background: hsl(var(--accent) / 0.6);
+    border-color: hsl(var(--border) / 0.7);
+    transform: translateY(-1px);
+    transition: background 0.2s ease-in-out, border-color 0.2s ease-in-out,
+      transform 0.2s ease-in-out;
   }
 }
 
