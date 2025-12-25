@@ -8,6 +8,9 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-background text-text">
+        <title>
+          {import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}
+        </title>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />

@@ -31,6 +31,12 @@ async function createWindow() {
     height: 800,
     // frame: false,
     title: isDev ? "SelfHost helper Dev" : "SelfHost helper",
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#0f0f14",
+      symbolColor: "#ffffff",
+      height: 36,
+    },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
