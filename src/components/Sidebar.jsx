@@ -151,9 +151,9 @@ export default function Sidebar({
           ) : null}
         </AnimatePresence>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {!isCollapsed && (
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <div className="flex items-center gap-2 shrink-0">
+            {!isCollapsed && (
               <DialogTrigger asChild>
                 <Button
                   size="icon"
@@ -163,108 +163,108 @@ export default function Sidebar({
                   <Plus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-125 bg-card border-border">
-                <DialogHeader>
-                  <DialogTitle>Add Project</DialogTitle>
-                  <DialogDescription>
-                    Select a Node.js project directory to manage.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="path">Project Path</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="path"
-                        value={newProject.path}
-                        readOnly
-                        placeholder="Select a directory..."
-                        className="bg-muted/50"
-                      />
-                      <Button
-                        variant="secondary"
-                        onClick={handleBrowseValues}
-                        className="cursor-pointer"
-                      >
-                        <FolderIcon className="mr-2 h-4 w-4" /> Browse
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={newProject.name}
-                      onChange={(e) =>
-                        setNewProject({ ...newProject, name: e.target.value })
-                      }
-                      placeholder="My Server"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="type">Project Type</Label>
-                    <Select
-                      value={newProject.type}
-                      onValueChange={(value) => {
-                        const typeInfo = PROJECT_TYPES.find(
-                          (t) => t.value === value
-                        );
-                        setNewProject((prev) => ({
-                          ...prev,
-                          type: value,
-                          script: typeInfo ? typeInfo.script : prev.script,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger id="type" className="w-full">
-                        <SelectValue placeholder="Select project type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PROJECT_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="script">Start Script</Label>
-                    <Input
-                      id="script"
-                      value={newProject.script}
-                      onChange={(e) =>
-                        setNewProject({ ...newProject, script: e.target.value })
-                      }
-                      placeholder="npm start"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+          <DialogContent className="sm:max-w-125 bg-card border-border">
+            <DialogHeader>
+              <DialogTitle>Add Project</DialogTitle>
+              <DialogDescription>
+                Select a Node.js project directory to manage.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="path">Project Path</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="path"
+                    value={newProject.path}
+                    readOnly
+                    placeholder="Select a directory..."
+                    className="bg-muted/50"
+                  />
                   <Button
-                    onClick={handleAddProject}
-                    disabled={!newProject.path}
+                    variant="secondary"
+                    onClick={handleBrowseValues}
                     className="cursor-pointer"
                   >
-                    Add Project
+                    <FolderIcon className="mr-2 h-4 w-4" /> Browse
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={newProject.name}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, name: e.target.value })
+                  }
+                  placeholder="My Server"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="type">Project Type</Label>
+                <Select
+                  value={newProject.type}
+                  onValueChange={(value) => {
+                    const typeInfo = PROJECT_TYPES.find(
+                      (t) => t.value === value
+                    );
+                    setNewProject((prev) => ({
+                      ...prev,
+                      type: value,
+                      script: typeInfo ? typeInfo.script : prev.script,
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="type" className="w-full">
+                    <SelectValue placeholder="Select project type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="script">Start Script</Label>
+                <Input
+                  id="script"
+                  value={newProject.script}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, script: e.target.value })
+                  }
+                  placeholder="npm start"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={handleAddProject}
+                disabled={!newProject.path}
+                className="cursor-pointer"
+              >
+                Add Project
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
       {!isCollapsed ? (
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
