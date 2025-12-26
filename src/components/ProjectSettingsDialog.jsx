@@ -175,7 +175,9 @@ export default function ProjectSettingsDialog({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
+                <Label htmlFor="name">
+                  Project Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -241,7 +243,9 @@ export default function ProjectSettingsDialog({
             </h3>
 
             <div className="space-y-2">
-              <Label htmlFor="path">Project Path</Label>
+              <Label htmlFor="path">
+                Project Path <span className="text-destructive">*</span>
+              </Label>
               <div className="flex gap-2">
                 <Input
                   id="path"
@@ -263,7 +267,9 @@ export default function ProjectSettingsDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="script">Startup Command</Label>
+              <Label htmlFor="script">
+                Startup Command <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="script"
                 value={formData.script}
@@ -392,7 +398,12 @@ export default function ProjectSettingsDialog({
           </Button>
           <MotionButton
             onClick={handleSave}
-            disabled={isLoading}
+            disabled={
+              isLoading ||
+              !formData.name.trim() ||
+              !formData.path.trim() ||
+              !formData.script.trim()
+            }
             whileTap={{ scale: 0.97 }}
             animate={{
               opacity: isLoading ? 0.8 : 1,

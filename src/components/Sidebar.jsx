@@ -102,7 +102,7 @@ export default function Sidebar({
   };
 
   const handleAddProject = async () => {
-    if (newProject.name && newProject.path) {
+    if (newProject.name.trim() && newProject.path && newProject.script.trim()) {
       await API.addProject(newProject);
       onProjectsChange();
       setIsAddOpen(false);
@@ -186,14 +186,16 @@ export default function Sidebar({
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="path">Project Path</Label>
+                <Label htmlFor="path">
+                  Project Path <span className="text-destructive">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     id="path"
                     value={newProject.path}
                     readOnly
                     placeholder="Select a directory..."
-                    className="bg-muted/50"
+                    className="bg-muted/50 focus-visible:ring-1"
                   />
                   <Button
                     variant="secondary"
@@ -205,7 +207,9 @@ export default function Sidebar({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={newProject.name}
@@ -243,7 +247,9 @@ export default function Sidebar({
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="script">Start Script</Label>
+                <Label htmlFor="script">
+                  Start Script <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="script"
                   value={newProject.script}
@@ -257,7 +263,11 @@ export default function Sidebar({
             <DialogFooter>
               <Button
                 onClick={handleAddProject}
-                disabled={!newProject.path}
+                disabled={
+                  !newProject.path ||
+                  !newProject.name.trim() ||
+                  !newProject.script.trim()
+                }
                 className="cursor-pointer"
               >
                 Add Project
