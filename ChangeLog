@@ -1,3 +1,27 @@
+> release "v0.5.0"
+- **State Management Overhaul (Jotai)**:
+  - Migrated entire frontend to Jotai atoms for robust global state management.
+  - Significant performance gains by eliminating redundant re-renders in the project list and status updates.
+- **Enhanced System Tray Integration**:
+  - **Dynamic Context Menu**: Real-time sync between project status and tray controls.
+  - **Bulk Management**: Introduced "Start All" and "Stop All" functionality directly from the tray.
+  - **Granular Control**: Individual server submenus for Start/Stop/Restart without opening the main window.
+- **Real-Time Notification System**:
+  - Integrated `react-toastify` for instant visual feedback on all major actions.
+  - Passive notifications: Get notified of status changes even if they were triggered from the tray.
+  - Success/Error alerts for file operations, project management, and global settings.
+- **Frameless Window Experience**:
+  - Implemented modern frameless design with custom drag regions.
+  - Visual Polish: Added backdrop-blur/glassmorphism effects to the sidebar for a premium aesthetic.
+  - Smart Layout: Fixed component overlaps with system controls for a cleaner interface.
+- **Project Enhancements**:
+  - **Minecraft Server Support**: Added dedicated support with optimized Java startup scripts.
+  - **Improved Settings Flow**: Project settings dialog now stays open after save for better iterative configuration.
+  - **Component Refactoring**: Cleaned up the codebase by extracting dialogs (e.g., `AddProjectDialog`) into dedicated components.
+- **Stability & Internal Fixes**:
+  - Resolved race conditions in process resource monitoring.
+  - Hardened status broadcasting system for 100% consistency across all application layers.
+
 > release "v0.4.6"
 
 - **Media Protocol Improvements**: Fixed a critical bug where project icons on non-system partitions (e.g., G:, D:) or in folders with spaces failed to render. Improved URL decoding logic in the backend handlers.
