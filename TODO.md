@@ -9,16 +9,18 @@
 - [ ] backuping and rollback
 - [ ] tasks and schedules
 - [ ] the ability to start the application minimized in the system tray
+- [x] Robust System Tray implementation with real-time controls
+- [x] Application-wide notification system (react-toastify)
 
 ### UX\UI Features:
 
-- [ ] more animations 🫦🫦
-- [/] better colors (Integrated Material Icon Theme)
+- [x] more animations 🫦🫦 (Transitioned to frameless + Framer Motion)
+- [x] better colors (Glassmorphism + Material Icons)
 - [x] full settings page rather than a dialog
 - [x] the ability to customize server's icons
 - [x] automatic script suggestions with dependency installation
 - [x] dynamic app version display
-- [ ] update the app's logo
-- [ ] process tree visualization (see all children of a project)
+- [x] update the app's logo
+- [/] process tree visualization (Backend implemented for resource aggregation)
 - [ ] resource usage history/graphs
 - [ ] alerts for high CPU/RAM usage
