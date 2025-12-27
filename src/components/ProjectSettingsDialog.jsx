@@ -103,6 +103,7 @@ export default function ProjectSettingsDialog({
         ...project,
         ...formData,
       });
+      onClose();
     } catch (error) {
       console.error("Failed to update project", error);
     } finally {

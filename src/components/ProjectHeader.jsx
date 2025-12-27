@@ -16,8 +16,8 @@ export default function ProjectHeader({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-      <div className="flex flex-col">
+    <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
+      <div className="flex flex-col no-drag">
         <h2 className="text-xl font-bold flex items-center gap-2">
           {selectedProject.name}
           <span
@@ -38,7 +38,7 @@ export default function ProjectHeader({
           />
         )}
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 no-drag">
         <AnimatePresence mode="wait">
           {selectedProject.status === "running" ? (
             <motion.div

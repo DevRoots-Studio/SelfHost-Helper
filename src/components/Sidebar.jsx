@@ -45,18 +45,21 @@ const PROJECT_TYPES = [
   { value: "other", label: "Other", script: "" },
 ];
 
-export default function Sidebar({
-  projects,
-  selectedProject,
-  onProjectSelect,
-  onProjectsChange,
-  isAddOpen: externalIsAddOpen,
-  onAddOpenChange: externalOnAddOpenChange,
-}) {
-  const [internalIsAddOpen, setInternalIsAddOpen] = useState(false);
-  const isAddOpen =
-    externalIsAddOpen !== undefined ? externalIsAddOpen : internalIsAddOpen;
-  const setIsAddOpen = externalOnAddOpenChange || setInternalIsAddOpen;
+import { useAtom, useAtomValue } from "jotai";
+import {
+  projectsAtom,
+  selectedProjectAtom,
+  selectedProjectIdAtom,
+  isAddProjectModalOpenAtom,
+} from "@/store/atoms";
+
+const Sidebar = React.memo(({ onProjectsChange }) => {
+  const projects = useAtomValue(projectsAtom);
+  const selectedProject = useAtomValue(selectedProjectAtom);
+  const [selectedProjectId, setSelectedProjectId] = useAtom(
+    selectedProjectIdAtom
+  );
+  const [isAddOpen, setIsAddOpen] = useAtom(isAddProjectModalOpenAtom);
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [discordInfo, setDiscordInfo] = useState(null);
@@ -133,7 +136,7 @@ export default function Sidebar({
     >
       <div
         className={cn(
-          "flex items-center bg-card/50",
+          "flex items-center bg-card/50 drag",
           isCollapsed ? "justify-center px-2 py-4" : "justify-between p-4"
         )}
       >
@@ -152,7 +155,7 @@ export default function Sidebar({
         </AnimatePresence>
 
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 no-drag">
             {!isCollapsed && (
               <DialogTrigger asChild>
                 <Button
@@ -281,7 +284,7 @@ export default function Sidebar({
           {projects.map((p) => (
             <div
               key={p.id}
-              onClick={() => onProjectSelect(p)}
+              onClick={() => setSelectedProjectId(p.id)}
               className={cn(
                 "group p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all border border-transparent select-none",
                 selectedProject?.id === p.id
@@ -326,7 +329,7 @@ export default function Sidebar({
           {projects.map((p) => (
             <motion.button
               key={p.id}
-              onClick={() => onProjectSelect(p)}
+              onClick={() => setSelectedProjectId(p.id)}
               className={cn(
                 "w-10 h-10 rounded-lg cursor-pointer flex items-center justify-center transition-all border-2 select-none relative group",
                 selectedProject?.id === p.id
@@ -538,4 +541,6 @@ export default function Sidebar({
       </div>
     </motion.aside>
   );
-}
+});
+
+export default Sidebar;

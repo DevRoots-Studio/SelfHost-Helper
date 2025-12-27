@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useAtom, useSetAtom, useAtomValue } from "jotai";
+import * as atoms from "@/store/atoms";
 import LogViewer from "@/components/LogViewer";
 import Sidebar from "@/components/Sidebar";
 import ProjectHeader from "@/components/ProjectHeader";
@@ -9,30 +11,43 @@ import EmptyState from "@/components/EmptyState";
 const API = window.api;
 
 export default function Dashboard() {
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [logs, setLogs] = useState({});
-  const [viewMode, setViewMode] = useState("logs");
-  const [fileTree, setFileTree] = useState([]);
-  const [isFileTreeLoading, setIsFileTreeLoading] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [projects, setProjects] = useAtom(atoms.projectsAtom);
+  const [selectedProjectId, setSelectedProjectId] = useAtom(
+    atoms.selectedProjectIdAtom
+  );
+  const selectedProject = useAtomValue(atoms.selectedProjectAtom);
+  const setLogs = useSetAtom(atoms.logsAtom);
+  const [viewMode, setViewMode] = useAtom(atoms.viewModeAtom);
+  const [fileTree, setFileTree] = useAtom(atoms.fileTreeAtom);
+  const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(
+    atoms.isFileTreeLoadingAtom
+  );
+  const setStats = useSetAtom(atoms.statsAtom);
+  const [projectEditorStates, setProjectEditorStates] = useAtom(
+    atoms.projectEditorStatesAtom
+  );
+
+  const loadProjects = async () => {
+    const list = await API.getProjects();
+    setProjects(list);
+  };
+
+  const loadFileTree = async (path) => {
+    setIsFileTreeLoading(true);
+    const tree = await API.readDirectory(path);
+    setFileTree(tree);
+    setIsFileTreeLoading(false);
+  };
 
   useEffect(() => {
     loadProjects();
     const cleanupStatus = API.onStatusChange(
       ({ projectId, status, startTime }) => {
-        setProjects((prev) => {
-          const updated = prev.map((p) =>
+        setProjects((prev) =>
+          prev.map((p) =>
             p.id === projectId ? { ...p, status, startTime } : p
-          );
-          return updated;
-        });
-        setSelectedProject((prevSelected) => {
-          if (prevSelected?.id === projectId) {
-            return { ...prevSelected, status, startTime };
-          }
-          return prevSelected;
-        });
+          )
+        );
       }
     );
     const cleanupLogs = API.onLog(({ projectId, data, type, timestamp }) => {
@@ -49,70 +64,43 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (selectedProject) {
+    if (selectedProjectId) {
+      setStats(null); // Immediately clear stats on project switch
       const syncProjectStatus = async () => {
         const list = await API.getProjects();
         setProjects(list);
-        // Update selectedProject with the latest data from projects array
-        const updatedProject = list.find((p) => p.id === selectedProject.id);
-        if (updatedProject) {
-          setSelectedProject(updatedProject);
-        }
       };
       syncProjectStatus();
 
-      API.getLogHistory(selectedProject.id).then((history) => {
+      API.getLogHistory(selectedProjectId).then((history) => {
         if (history && history.length > 0) {
           setLogs((prev) => ({
             ...prev,
-            [selectedProject.id]: history,
+            [selectedProjectId]: history,
           }));
         }
       });
 
       // Load File Tree
-      loadFileTree(selectedProject.path);
+      const currentProject = projects.find((p) => p.id === selectedProjectId);
+      if (currentProject) {
+        loadFileTree(currentProject.path);
+      }
+    } else {
+      setStats(null);
     }
-  }, [selectedProject?.id]);
-
-  const loadFileTree = async (path) => {
-    setIsFileTreeLoading(true);
-    const tree = await API.readDirectory(path);
-    setFileTree(tree);
-    setIsFileTreeLoading(false);
-  };
-
-  const loadProjects = async () => {
-    const list = await API.getProjects();
-    setProjects(list);
-  };
-
-  const handleStart = (id) => API.startProject(id);
-  const handleStop = (id) => API.stopProject(id);
-  const handleRestart = (id) => API.restartProject(id);
-
-  const handleSendInput = async (id, data) => {
-    const res = await API.sendInput(id, data);
-    return res;
-  };
-
-  const handleDelete = async (id) => {
-    if (confirm("Are you sure you want to remove this project?")) {
-      await API.deleteProject(id);
-      loadProjects();
-      if (selectedProject?.id === id) setSelectedProject(null);
-    }
-  };
-
-  const [stats, setStats] = useState(null);
+  }, [selectedProjectId]);
 
   useEffect(() => {
-    // Poll stats if project is running
     let interval;
+    let isCancelled = false;
+
     if (selectedProject?.status === "running") {
       const fetchStats = async () => {
         const data = await API.getProjectStats(selectedProject.id);
-        setStats(data);
+        if (!isCancelled) {
+          setStats(data);
+        }
       };
       fetchStats();
       interval = setInterval(fetchStats, 1000);
@@ -120,18 +108,34 @@ export default function Dashboard() {
       setStats(null);
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, [selectedProject?.id, selectedProject?.status]);
 
-  const [projectEditorStates, setProjectEditorStates] = useState({});
+  const handleStart = (id) => API.startProject(id);
+  const handleStop = (id) => API.stopProject(id);
+  const handleRestart = (id) => API.restartProject(id);
+
+  const handleSendInput = async (id, data) => {
+    return await API.sendInput(id, data);
+  };
+
+  const handleDelete = async (id) => {
+    if (confirm("Are you sure you want to remove this project?")) {
+      await API.deleteProject(id);
+      loadProjects();
+      if (selectedProjectId === id) setSelectedProjectId(null);
+    }
+  };
 
   const handleUpdateProject = async (projectData) => {
     const updated = await API.updateProject(projectData);
     if (updated) {
-      loadProjects();
-      if (selectedProject?.id === updated.id) {
-        setSelectedProject((prev) => ({ ...prev, ...updated }));
-      }
+      setProjects((prev) =>
+        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+      );
     }
   };
 
@@ -142,23 +146,16 @@ export default function Dashboard() {
     }));
   };
 
-  const activeLogs = selectedProject ? logs[selectedProject.id] || [] : [];
   const selectedProjectEditorFile = selectedProject
     ? projectEditorStates[selectedProject.id]
     : null;
 
+  const setIsAddProjectModalOpen = useSetAtom(atoms.isAddProjectModalOpenAtom);
+
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
-      <Sidebar
-        projects={projects}
-        selectedProject={selectedProject}
-        onProjectSelect={setSelectedProject}
-        onProjectsChange={loadProjects}
-        isAddOpen={isAddOpen}
-        onAddOpenChange={setIsAddOpen}
-      />
+      <Sidebar onProjectsChange={loadProjects} />
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative">
         {selectedProject ? (
           <>
@@ -172,17 +169,12 @@ export default function Dashboard() {
             />
 
             <div className="flex-1 flex flex-col min-h-0">
-              <ViewTabs
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                stats={stats}
-              />
+              <ViewTabs viewMode={viewMode} onViewModeChange={setViewMode} />
 
               <div className="flex-1 overflow-hidden relative">
                 {viewMode === "logs" ? (
                   <div className="h-full p-0">
                     <LogViewer
-                      logs={activeLogs}
                       projectId={selectedProject.id}
                       status={selectedProject.status}
                       onSendInput={handleSendInput}
@@ -204,7 +196,7 @@ export default function Dashboard() {
             </div>
           </>
         ) : (
-          <EmptyState onAddProject={() => setIsAddOpen(true)} />
+          <EmptyState onAddProject={() => setIsAddProjectModalOpen(true)} />
         )}
       </main>
     </div>
