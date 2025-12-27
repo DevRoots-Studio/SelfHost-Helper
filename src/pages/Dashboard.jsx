@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAtom, useSetAtom, useAtomValue } from "jotai";
 import * as atoms from "@/store/atoms";
+import { toast } from "react-toastify";
 import LogViewer from "@/components/LogViewer";
 import Sidebar from "@/components/Sidebar";
 import ProjectHeader from "@/components/ProjectHeader";
@@ -43,11 +44,21 @@ export default function Dashboard() {
     loadProjects();
     const cleanupStatus = API.onStatusChange(
       ({ projectId, status, startTime }) => {
-        setProjects((prev) =>
-          prev.map((p) =>
+        setProjects((prev) => {
+          const project = prev.find((p) => p.id === projectId);
+          if (project && project.status !== status) {
+            if (status === "running") {
+              toast.success(`${project.name} is now running`);
+            } else if (status === "stopped") {
+              toast.info(`${project.name} has stopped`);
+            } else if (status === "error") {
+              toast.error(`${project.name} encountered an error`);
+            }
+          }
+          return prev.map((p) =>
             p.id === projectId ? { ...p, status, startTime } : p
-          )
-        );
+          );
+        });
       }
     );
     const cleanupLogs = API.onLog(({ projectId, data, type, timestamp }) => {
@@ -114,9 +125,28 @@ export default function Dashboard() {
     };
   }, [selectedProject?.id, selectedProject?.status]);
 
-  const handleStart = (id) => API.startProject(id);
-  const handleStop = (id) => API.stopProject(id);
-  const handleRestart = (id) => API.restartProject(id);
+  const handleStart = async (id) => {
+    const res = await API.startProject(id);
+    if (!res?.success) {
+      toast.error(
+        `Failed to start project: ${res?.message || "Unknown error"}`
+      );
+    }
+  };
+
+  const handleStop = async (id) => {
+    const res = await API.stopProject(id);
+    if (!res?.success) {
+      toast.error("Failed to stop project");
+    }
+  };
+
+  const handleRestart = async (id) => {
+    const res = await API.restartProject(id);
+    if (!res?.success) {
+      toast.error("Failed to restart project");
+    }
+  };
 
   const handleSendInput = async (id, data) => {
     return await API.sendInput(id, data);
@@ -124,9 +154,14 @@ export default function Dashboard() {
 
   const handleDelete = async (id) => {
     if (confirm("Are you sure you want to remove this project?")) {
-      await API.deleteProject(id);
-      loadProjects();
-      if (selectedProjectId === id) setSelectedProjectId(null);
+      const success = await API.deleteProject(id);
+      if (success) {
+        toast.warning("Project removed");
+        loadProjects();
+        if (selectedProjectId === id) setSelectedProjectId(null);
+      } else {
+        toast.error("Failed to remove project");
+      }
     }
   };
 
@@ -136,6 +171,9 @@ export default function Dashboard() {
       setProjects((prev) =>
         prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
       );
+      toast.success("Settings saved");
+    } else {
+      toast.error("Failed to save settings");
     }
   };
 

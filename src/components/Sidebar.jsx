@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -107,6 +108,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const handleAddProject = async () => {
     if (newProject.name.trim() && newProject.path && newProject.script.trim()) {
       await API.addProject(newProject);
+      toast.success("Project added successfully!");
       onProjectsChange();
       setIsAddOpen(false);
       setNewProject({

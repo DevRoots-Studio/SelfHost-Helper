@@ -12,6 +12,7 @@ import {
   writeToProcess,
   getProjectStats,
   getProjectStartTime,
+  notifyProjectListChanged,
 } from "../services/projectsManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
 
@@ -32,7 +33,9 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("projects:add", async (_, projectData) => {
-    return await Project.create(projectData);
+    const project = await Project.create(projectData);
+    notifyProjectListChanged();
+    return project;
   });
 
   ipcMain.handle("projects:delete", async (_, id) => {
@@ -40,6 +43,7 @@ export const registerHandlers = () => {
     if (project) {
       await stopProject(id);
       await project.destroy();
+      notifyProjectListChanged();
       return true;
     }
     return false;
@@ -50,6 +54,7 @@ export const registerHandlers = () => {
     const project = await Project.findByPk(id);
     if (project) {
       await project.update(data);
+      notifyProjectListChanged();
       return project;
     }
     return null;

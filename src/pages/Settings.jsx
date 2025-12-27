@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Terminal } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -37,12 +38,15 @@ export default function Settings() {
     try {
       if (enabled) {
         await API.enableAutoLaunch();
+        toast.success("Auto-launch enabled");
       } else {
         await API.disableAutoLaunch();
+        toast.info("Auto-launch disabled");
       }
       setAutoLaunchEnabled(enabled);
     } catch (e) {
       console.error("Failed to toggle auto-launch", e);
+      toast.error("Failed to change auto-launch setting");
     }
   };
 

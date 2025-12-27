@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { FileCode, Save, FolderOpen, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { toast } from "react-toastify";
 import FileTree from "@/components/FileTree";
 import MonacoEditor from "@/editors/MonacoEditor";
 
@@ -128,8 +129,17 @@ export default function EditorView({
   };
 
   const handleSaveFile = async () => {
-    if (currentFile && editorContent) {
-      await API.writeFile(currentFile, editorContent);
+    if (currentFile && editorContent !== undefined) {
+      try {
+        const success = await API.writeFile(currentFile, editorContent);
+        if (success) {
+          toast.success("File saved");
+        } else {
+          toast.error("Failed to save file");
+        }
+      } catch (err) {
+        toast.error(`Error saving file: ${err.message}`);
+      }
     }
   };
 

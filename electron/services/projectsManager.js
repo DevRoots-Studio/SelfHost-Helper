@@ -12,6 +12,22 @@ import fs from "fs";
 
 const runningRuntimes = {};
 const logHistory = {};
+const statusListeners = new Set();
+const listListeners = new Set();
+
+export const onStatusChange = (callback) => {
+  statusListeners.add(callback);
+  return () => statusListeners.delete(callback);
+};
+
+export const onProjectListChange = (callback) => {
+  listListeners.add(callback);
+  return () => listListeners.delete(callback);
+};
+
+export const notifyProjectListChanged = () => {
+  listListeners.forEach((cb) => cb());
+};
 
 //============================{Sends Logs to the Front-end}=============================
 const sendLog = (projectId, data, type = "stdout") => {
@@ -38,8 +54,8 @@ const sendLog = (projectId, data, type = "stdout") => {
     }
   }
 };
-//============================{Sends Projects Power Status }=============================
 
+//============================{Sends Projects Power Status }=============================
 const sendStatus = (projectId, status, extraData = {}) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
@@ -52,6 +68,9 @@ const sendStatus = (projectId, status, extraData = {}) => {
       // Window might be destroyed during shutdown, ignore silently
     }
   }
+
+  // Notify listeners
+  statusListeners.forEach((cb) => cb(projectId, status, extraData));
 };
 
 export const checkZombieProcesses = async () => {
@@ -79,6 +98,7 @@ export const checkZombieProcesses = async () => {
         console.log(`Cleaning up stale PID for project ${project.name}`);
         project.pid = null;
         await project.save();
+        sendStatus(project.id, "stopped");
       }
     }
   }
@@ -171,17 +191,10 @@ export const startProject = async (id) => {
     project.pid = child.pid;
     await project.save();
 
-    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
-      try {
-        global.mainWindow.webContents.send("project:status", {
-          projectId: id,
-          status: "running",
-          startTime: startTime,
-        });
-      } catch (_error) {
-        // Ignored
-      }
-    }
+    project.pid = child.pid;
+    await project.save();
+
+    sendStatus(id, "running", { startTime });
 
     child.stdout.on("data", (data) => {
       const text = data.toString();
@@ -290,6 +303,22 @@ export const restartProject = async (id) => {
       resolve(res);
     }, 1000);
   });
+};
+
+export const startAllProjects = async () => {
+  try {
+    const projects = await Project.findAll();
+    console.log(`Starting all ${projects.length} projects...`);
+    const promises = projects.map((project) => {
+      if (!runningRuntimes[project.id]) {
+        return startProject(project.id);
+      }
+      return Promise.resolve({ success: true, message: "Already running" });
+    });
+    await Promise.all(promises);
+  } catch (error) {
+    console.error("Failed to start all projects:", error);
+  }
 };
 
 //============================{Stops All Projects at Once}=============================
