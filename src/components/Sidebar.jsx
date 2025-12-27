@@ -11,48 +11,18 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const API = window.api;
-
-const PROJECT_TYPES = [
-  { value: "nodejs", label: "Node.js", script: "npm install && npm start" },
-  { value: "react", label: "React", script: "npm install && npm run dev" },
-  {
-    value: "python",
-    label: "Python",
-    script: "pip install -r requirements.txt && python main.py",
-  },
-  { value: "go", label: "Go", script: "go mod download && go run ." },
-  { value: "other", label: "Other", script: "" },
-];
-
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   projectsAtom,
   selectedProjectAtom,
   selectedProjectIdAtom,
   isAddProjectModalOpenAtom,
 } from "@/store/atoms";
+import AddProjectDialog from "./AddProjectDialog";
+
+const API = window.api;
 
 const Sidebar = React.memo(({ onProjectsChange }) => {
   const projects = useAtomValue(projectsAtom);
@@ -60,17 +30,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const [selectedProjectId, setSelectedProjectId] = useAtom(
     selectedProjectIdAtom
   );
-  const [isAddOpen, setIsAddOpen] = useAtom(isAddProjectModalOpenAtom);
+  const setIsAddOpen = useSetAtom(isAddProjectModalOpenAtom);
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [discordInfo, setDiscordInfo] = useState(null);
   const [discordLoading, setDiscordLoading] = useState(true);
-  const [newProject, setNewProject] = useState({
-    name: "",
-    path: "",
-    type: "nodejs",
-    script: "npm install && npm start",
-  });
 
   const DISCORD_INVITE_CODE = "C62mj58Q2D";
 
@@ -105,30 +69,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     return `https://cdn.discordapp.com/banners/${discordInfo.guild.id}/${discordInfo.guild.banner}.png?size=1024`;
   };
 
-  const handleAddProject = async () => {
-    if (newProject.name.trim() && newProject.path && newProject.script.trim()) {
-      await API.addProject(newProject);
-      toast.success("Project added successfully!");
-      onProjectsChange();
-      setIsAddOpen(false);
-      setNewProject({
-        name: "",
-        path: "",
-        type: "nodejs",
-        script: "npm install && npm start",
-      });
-    }
-  };
-
-  const handleBrowseValues = async () => {
-    const path = await API.selectDirectory();
-    if (path) {
-      setNewProject((prev) => ({ ...prev, path }));
-      const name = path.split("\\").pop().split("/").pop();
-      if (!newProject.name) setNewProject((prev) => ({ ...prev, name }));
-    }
-  };
-
   return (
     <motion.aside
       className="bg-muted/20 border-r border-border flex flex-col backdrop-blur-xl relative overflow-x-hidden"
@@ -156,130 +96,32 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           ) : null}
         </AnimatePresence>
 
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <div className="flex items-center gap-2 shrink-0 no-drag">
-            {!isCollapsed && (
-              <DialogTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="hover:bg-primary/20 hover:text-primary cursor-pointer"
-                >
-                  <Plus className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-            )}
+        <div className="flex items-center gap-2 shrink-0 no-drag">
+          {!isCollapsed && (
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+              onClick={() => setIsAddOpen(true)}
+              className="hover:bg-primary/20 hover:text-primary cursor-pointer"
             >
-              {isCollapsed ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
+              <Plus className="h-5 w-5" />
             </Button>
-          </div>
-          <DialogContent className="sm:max-w-125 bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Add Project</DialogTitle>
-              <DialogDescription>
-                Select a Node.js project directory to manage.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="path">
-                  Project Path <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="path"
-                    value={newProject.path}
-                    readOnly
-                    placeholder="Select a directory..."
-                    className="bg-muted/50 focus-visible:ring-1"
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={handleBrowseValues}
-                    className="cursor-pointer"
-                  >
-                    <FolderIcon className="mr-2 h-4 w-4" /> Browse
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="name">
-                  Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={newProject.name}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, name: e.target.value })
-                  }
-                  placeholder="My Server"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="type">Project Type</Label>
-                <Select
-                  value={newProject.type}
-                  onValueChange={(value) => {
-                    const typeInfo = PROJECT_TYPES.find(
-                      (t) => t.value === value
-                    );
-                    setNewProject((prev) => ({
-                      ...prev,
-                      type: value,
-                      script: typeInfo ? typeInfo.script : prev.script,
-                    }));
-                  }}
-                >
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select project type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROJECT_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="script">
-                  Start Script <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="script"
-                  value={newProject.script}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, script: e.target.value })
-                  }
-                  placeholder="npm start"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={handleAddProject}
-                disabled={
-                  !newProject.path ||
-                  !newProject.name.trim() ||
-                  !newProject.script.trim()
-                }
-                className="cursor-pointer"
-              >
-                Add Project
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5" />
+            ) : (
+              <ChevronLeft className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
+
+        <AddProjectDialog onProjectsChange={onProjectsChange} />
       </div>
       {!isCollapsed ? (
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
