@@ -2,7 +2,11 @@ import React from "react";
 import { Terminal, FileCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function ViewTabs({ viewMode, onViewModeChange, stats }) {
+import { useAtomValue } from "jotai";
+import { statsAtom } from "@/store/atoms";
+
+const ViewTabs = React.memo(({ viewMode, onViewModeChange }) => {
+  const stats = useAtomValue(statsAtom);
   return (
     <div className="flex border-b border-border bg-muted/10">
       <button
@@ -45,4 +49,6 @@ export default function ViewTabs({ viewMode, onViewModeChange, stats }) {
       </div>
     </div>
   );
-}
+});
+
+export default ViewTabs;

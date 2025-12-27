@@ -163,10 +163,51 @@ app.whenReady().then(async () => {
   );
 
   const window = await createWindow();
+
+  const {
+    startProject,
+    stopProject,
+    restartProject,
+    startAllProjects,
+    stopAllProjects,
+    getRunningProjects,
+    onStatusChange,
+    onProjectListChange,
+  } = await import("./services/projectsManager.js");
+  const { Project } = await import("../database/models/Project.js");
+  const { updateTrayMenu } = await import("./tray/tray.js");
+
+  const refreshTray = async () => {
+    const projects = await Project.findAll();
+    const runningIds = getRunningProjects();
+    updateTrayMenu(
+      projects,
+      runningIds,
+      startProject,
+      stopProject,
+      restartProject,
+      startAllProjects,
+      stopAllProjects
+    );
+  };
+
   tray = initTray(window, () => {
     isQuitting = true;
     app.quit();
   });
+
+  // Update tray on status changes
+  onStatusChange(() => {
+    refreshTray();
+  });
+
+  // Update tray on project list changes (add/delete)
+  onProjectListChange(() => {
+    refreshTray();
+  });
+
+  // Initial tray setup
+  refreshTray();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

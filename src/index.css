@@ -392,3 +392,12 @@
     background: hsl(var(--muted-foreground) / 0.8);
   }
 }
+
+/* Electron Frameless Window Draggability */
+.drag {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}

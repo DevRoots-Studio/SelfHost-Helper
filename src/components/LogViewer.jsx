@@ -8,7 +8,12 @@ import "@xterm/xterm/css/xterm.css";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 
-export default function LogViewer({ logs, projectId, status, onSendInput }) {
+import { useAtomValue } from "jotai";
+import { logsAtom } from "@/store/atoms";
+
+export default function LogViewer({ projectId, status, onSendInput }) {
+  const allLogs = useAtomValue(logsAtom);
+  const logs = allLogs[projectId] || [];
   const [input, setInput] = useState("");
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -23,7 +28,7 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
     const term = new Terminal({
       fontFamily: "monospace",
       scrollOnUserInput: true,
-      smoothScrollDuration: 2,
+      smoothScrollDuration: 0,
       fontSize: 16,
       convertEol: true,
       scrollback: 5000,
@@ -155,7 +160,7 @@ export default function LogViewer({ logs, projectId, status, onSendInput }) {
 
   return (
     <div className="flex flex-col h-full bg-black/95 text-white font-mono text-sm rounded-lg overflow-hidden border border-border/20 shadow-inner">
-      <div className="flex-1 relative p-3 bg-[#000]">
+      <div className="flex-1 relative p-3 bg-black">
         {logs.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30 select-none pointer-events-none">
             <TerminalIcon className="h-10 w-10 mb-2" />
