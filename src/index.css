@@ -210,21 +210,21 @@
   }
 
   .sidebar-item {
-    @apply flex items-center gap-3 p-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden relative min-h-[56px];
+    @apply flex items-center gap-3 p-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden relative min-h-[56px] border-2 border-transparent box-border hover:scale-105 active:scale-95;
   }
   .sidebar-item.active {
-    @apply text-primary shadow-lg shadow-primary/5;
+    @apply text-primary shadow-lg shadow-primary/5 scale-100 border-primary;
   }
   /* Default Expanded Active State */
   .sidebar-item:not(.collapsed).active {
-    @apply bg-primary/10 border border-primary/20;
+    @apply bg-primary/10 border-primary/20;
   }
-  /* Collapsed Active State - No Border/BG on container, specialized centering handled in JS or here */
+  /* Collapsed Active State: Symmetrical Square Container */
   .sidebar-item.collapsed {
-    @apply justify-center px-0 gap-0;
+    @apply justify-center p-0 gap-0 w-12 h-12 min-h-0 mx-auto rounded-xl transition-all border-2 border-transparent hover:scale-110 active:scale-90;
   }
   .sidebar-item.collapsed.active {
-    @apply bg-transparent border-none shadow-none;
+    @apply bg-primary/10 border-primary shadow-[0_0_15px_rgba(124,58,237,0.4)] scale-100;
   }
 
   .sidebar-item:not(.active):hover {

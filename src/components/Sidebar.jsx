@@ -194,10 +194,8 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 "sidebar-item group relative transition-all duration-200",
                 width < 120 ? "collapsed" : "",
                 isSelected ? "active" : "hover:bg-white/5",
-                // Centering handled by .collapsed in CSS, but explicit justified-center ensures it too
-                width < 120
-                  ? "justify-center px-0 py-2 border-none bg-transparent"
-                  : "px-3 py-2.5"
+                // Centering now handled by .collapsed in CSS, border styles restored via CSS active class
+                width < 120 ? "mx-auto" : "px-3 py-2.5"
               )}
               title={width < 120 ? p.name : undefined}
             >
@@ -232,15 +230,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   >
                     {p.name.charAt(0).toUpperCase()}
                   </div>
-                )}
-
-                {/* Collapsed Selected Ring */}
-                {width < 120 && isSelected && (
-                  <motion.div
-                    layoutId="selected-ring"
-                    className="absolute inset-0 rounded-xl border-2 border-primary shadow-[0_0_15px_rgba(124,58,237,0.4)]"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
                 )}
               </div>
 
@@ -285,12 +274,10 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         })}
       </div>
       <div className="p-4 bg-card/30 space-y-2 mt-auto">
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="wait">
           {isCollapsed ? (
             <motion.div
               key="discord-collapsed"
-              layoutId="discord-card-container"
-              className="flex justify-center"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
