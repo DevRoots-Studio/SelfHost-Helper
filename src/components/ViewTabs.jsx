@@ -8,13 +8,13 @@ import { statsAtom } from "@/store/atoms";
 const ViewTabs = React.memo(({ viewMode, onViewModeChange }) => {
   const stats = useAtomValue(statsAtom);
   return (
-    <div className="flex border-b border-white/5 bg-transparent backdrop-blur-sm px-4 pt-2 gap-2">
+    <div className="flex border-b-0 bg-transparent backdrop-blur-sm px-4 pt-2 gap-2">
       <button
         onClick={() => onViewModeChange("logs")}
         className={cn(
-          "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent relative top-[1px]",
+          "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent",
           viewMode === "logs"
-            ? "bg-muted/40 text-primary border-white/10 border-b-background/0 backdrop-blur-md shadow-[0_-4px_10px_rgba(0,0,0,0.1)]"
+            ? "bg-muted/40 text-primary border-white/10 backdrop-blur-md shadow-none"
             : "text-muted-foreground hover:text-foreground hover:bg-white/5"
         )}
       >
@@ -23,9 +23,9 @@ const ViewTabs = React.memo(({ viewMode, onViewModeChange }) => {
       <button
         onClick={() => onViewModeChange("editor")}
         className={cn(
-          "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent relative top-[1px]",
+          "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent",
           viewMode === "editor"
-            ? "bg-muted/40 text-primary border-white/10 border-b-background/0 backdrop-blur-md shadow-[0_-4px_10px_rgba(0,0,0,0.1)]"
+            ? "bg-muted/40 text-primary border-white/10 backdrop-blur-md shadow-none"
             : "text-muted-foreground hover:text-foreground hover:bg-white/5"
         )}
       >

@@ -16,7 +16,7 @@ export default function ProjectHeader({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    <header className="h-16 border-b border-white/5 flex items-center px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
+    <header className="h-16 flex items-center px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
       <div className="flex flex-col no-drag">
         <h2 className="text-xl font-bold flex items-center gap-3">
           {selectedProject.name}

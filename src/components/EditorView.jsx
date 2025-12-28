@@ -146,8 +146,8 @@ export default function EditorView({
   return (
     <div className="h-full flex text-sm">
       {/* Editor Sidebar (File Tree) */}
-      <div className="w-64 border-r border-white/5 bg-background/30 backdrop-blur-md flex flex-col">
-        <div className="p-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-white/5 shadow-sm">
+      <div className="w-64 border-r border-white/5 flex flex-col">
+        <div className="h-12 flex items-center px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-white/5 shadow-sm shrink-0">
           Explorer
         </div>
         <div className="flex-1 overflow-hidden">
@@ -164,7 +164,7 @@ export default function EditorView({
       </div>
       {/* Editor Main */}
       <div className="flex-1 flex flex-col bg-transparent relative z-0">
-        <div className="px-4 h-12 flex items-center justify-between text-xs border-b border-white/5 bg-background/40 backdrop-blur-sm z-10 shadow-sm">
+        <div className="px-4 h-12 flex items-center justify-between text-xs border-b border-white/5 z-10 shadow-sm shrink-0">
           <div className="flex items-center space-x-2 flex-1 min-w-0">
             {currentFile ? (
               <span className="flex items-center text-foreground font-medium truncate">

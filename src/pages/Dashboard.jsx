@@ -209,7 +209,7 @@ export default function Dashboard() {
             <div className="flex-1 flex flex-col min-h-0">
               <ViewTabs viewMode={viewMode} onViewModeChange={setViewMode} />
 
-              <div className="flex-1 overflow-hidden relative">
+              <div className="flex-1 overflow-hidden relative bg-muted/40 backdrop-blur-md">
                 {viewMode === "logs" ? (
                   <div className="h-full p-0">
                     <LogViewer
