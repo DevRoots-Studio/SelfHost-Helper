@@ -216,7 +216,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                     )}
                   >
                     <img
-                      src={`media:///${p.icon.replace(/\\/g, "/")}`}
+                      src={
+                        p.icon.match(/^(https?:\/\/|data:)/)
+                          ? p.icon
+                          : `media:///${p.icon.replace(/\\/g, "/")}`
+                      }
                       alt={p.name}
                       className="w-full h-full object-cover"
                     />

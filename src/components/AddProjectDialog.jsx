@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Folder as FolderIcon } from "lucide-react";
+import { Folder as FolderIcon, Image as ImageIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,20 +26,37 @@ import { isAddProjectModalOpenAtom } from "@/store/atoms";
 const API = window.api;
 
 const PROJECT_TYPES = [
-  { value: "nodejs", label: "Node.js", script: "npm install && npm start" },
-  { value: "react", label: "React", script: "npm install && npm run dev" },
+  {
+    value: "nodejs",
+    label: "Node.js",
+    script: "npm install && npm start",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
+  },
+  {
+    value: "react",
+    label: "React",
+    script: "npm install && npm run dev",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg",
+  },
   {
     value: "python",
     label: "Python",
     script: "pip install -r requirements.txt && python main.py",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg",
   },
-  { value: "go", label: "Go", script: "go mod download && go run ." },
+  {
+    value: "go",
+    label: "Go",
+    script: "go mod download && go run .",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/go/go-original.svg",
+  },
   {
     value: "minecraft",
     label: "Minecraft Server",
     script: "java -Xms2G -Xmx2G -jar server.jar nogui",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/java/java-original.svg",
   },
-  { value: "other", label: "", script: "" },
+  { value: "other", label: "Other", script: "", icon: "" },
 ];
 
 export default function AddProjectDialog({ onProjectsChange }) {
@@ -48,6 +66,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
     path: "",
     type: "nodejs",
     script: "npm install && npm start",
+    icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
   });
 
   const handleAddProject = async () => {
@@ -62,6 +81,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
           path: "",
           type: "nodejs",
           script: "npm install && npm start",
+          icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
         });
       } catch (error) {
         toast.error(`Failed to add project: ${error.message}`);
@@ -132,6 +152,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
                   ...prev,
                   type: value,
                   script: typeInfo ? typeInfo.script : prev.script,
+                  icon: typeInfo?.icon || prev.icon,
                 }));
               }}
             >
@@ -159,6 +180,81 @@ export default function AddProjectDialog({ onProjectsChange }) {
               }
               placeholder="npm start"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="icon">Icon URL or Path</Label>
+            <motion.div className="flex gap-2 items-center">
+              <motion.div
+                layout
+                transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                className="flex-1 min-w-0"
+              >
+                <Input
+                  id="icon"
+                  value={newProject.icon || ""}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, icon: e.target.value })
+                  }
+                  className="bg-muted/50 focus-visible:ring-1 w-full"
+                  placeholder="https://... or C:\..."
+                />
+              </motion.div>
+              <AnimatePresence initial={false} mode="sync">
+                {newProject.icon && (
+                  <motion.div
+                    layout
+                    className="w-10 h-10 bg-black/20 rounded-md overflow-hidden border border-border flex items-center justify-center relative shrink-0"
+                    role="img"
+                    aria-label="Icon preview"
+                    initial={{ opacity: 0, width: 0, x: -6 }}
+                    animate={{ opacity: 1, width: 40, x: 0 }}
+                    exit={{ opacity: 0, width: 0, x: 6 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 320,
+                      damping: 28,
+                      duration: 0.28,
+                    }}
+                  >
+                    <AnimatePresence initial={false} mode="sync">
+                      <motion.img
+                        src={
+                          newProject.icon.match(/^(https?:\/\/|data:)/)
+                            ? newProject.icon
+                            : `media:///${newProject.icon.replace(/\\/g, "/")}`
+                        }
+                        className="absolute inset-0 w-full h-full object-cover"
+                        alt="Preview"
+                        key={newProject.icon}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.22 }}
+                        style={{ imageRendering: "auto" }}
+                      />
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={async () => {
+                  try {
+                    const file = await API.selectFile();
+                    if (file) {
+                      setNewProject((prev) => ({ ...prev, icon: file }));
+                    }
+                  } catch (e) {
+                    console.error("Failed to select file:", e);
+                  }
+                }}
+                className="w-10 h-10 p-0 flex items-center justify-center shrink-0 cursor-pointer"
+                title="Select Icon"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+            </motion.div>
           </div>
         </div>
         <DialogFooter>
