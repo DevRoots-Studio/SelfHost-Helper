@@ -41,6 +41,10 @@
   --animate-overlay-in: fade-in 0.3s ease-out both;
   --animate-overlay-out: fade-out 0.2s ease-out both;
 
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-down: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-in: fade-in 0.3s ease-out;
+
   @keyframes accordion-down {
     from {
       height: 0;
@@ -57,7 +61,6 @@
       height: 0;
     }
   }
-
   @keyframes dialog-in {
     from {
       opacity: 0;
@@ -98,306 +101,174 @@
       opacity: 0;
     }
   }
+  @keyframes slide-up {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes slide-down {
+    from {
+      transform: translateY(-10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 240 10% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 263.4 70% 50.4%; /* Vibrant Violet */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 64.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 60%;
-
-    --radius: 0.5rem;
-
-    /* Custom focus ring color - vibrant blue */
-    --focus-ring: 217 91% 60%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 263.4 70% 35%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 217 91% 60%;
+    --border: 240 5% 15%;
+    --input: 240 5% 15%;
+    --ring: 263.4 70% 50.4%;
 
-    /* Custom focus ring color - vibrant blue (same for dark mode) */
-    --focus-ring: 217 91% 60%;
+    --radius: 0.75rem;
+    --focus-ring: 263.4 70% 50.4%;
   }
-}
 
-@layer base {
+  /* Global Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
-/* Comprehensive Focus, Selection & Interaction Styling */
-@layer base {
-  /* ============================================
-     BASE RESET - Remove Default Outlines
-     ============================================ */
-  *:focus {
-    outline: none;
-  }
-
-  /* ============================================
-     GLOBAL FOCUS-VISIBLE (Keyboard Navigation)
-     ============================================ */
-  *:focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: 2px;
-    transition: outline-color 0.2s ease-in-out, outline-offset 0.2s ease-in-out,
-      box-shadow 0.2s ease-in-out;
-  }
-
-  /* ============================================
-     ENHANCED INPUT FIELDS FOCUS
-     ============================================ */
-  input:focus,
-  input:focus-visible,
-  textarea:focus,
-  textarea:focus-visible,
-  select:focus,
-  select:focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: 0px;
-    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.12);
-    transition: outline-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out,
-      border-color 0.2s ease-in-out;
-  }
-
-  /* ============================================
-     BUTTON FOCUS WITH GLOW EFFECT
-     ============================================ */
-  button:focus-visible,
-  [role="button"]:focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: 2px;
-    box-shadow: 0 0 0 5px hsl(var(--focus-ring) / 0.18);
-    transition: outline-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out,
-      transform 0.15s ease-in-out;
-  }
-
-  /* ============================================
-     LINK & INTERACTIVE ELEMENT FOCUS
-     ============================================ */
-  a:focus-visible,
-  [role="link"]:focus-visible,
-  [tabindex]:not([tabindex="-1"]):focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: 2px;
-    transition: outline-color 0.2s ease-in-out;
-  }
-
-  /* ============================================
-     DARK MODE FOCUS ENHANCEMENTS
-     ============================================ */
-  .dark input:focus,
-  .dark input:focus-visible,
-  .dark textarea:focus,
-  .dark textarea:focus-visible,
-  .dark select:focus,
-  .dark select:focus-visible {
-    outline-color: hsl(var(--focus-ring));
-    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.25);
-  }
-
-  .dark button:focus-visible,
-  .dark [role="button"]:focus-visible {
-    outline-color: hsl(var(--focus-ring));
-    box-shadow: 0 0 0 5px hsl(var(--focus-ring) / 0.3);
-  }
-
-  /* ============================================
-     SMOOTH HOVER TRANSITIONS
-     ============================================ */
-  button,
-  [role="button"],
-  a,
-  input,
-  textarea,
-  select,
-  [tabindex]:not([tabindex="-1"]) {
-    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out,
-      color 0.2s ease-in-out, transform 0.15s ease-in-out,
-      box-shadow 0.2s ease-in-out;
-  }
-
-  /* ============================================
-     ACTIVE/PRESSED STATE (Click Feedback)
-     ============================================ */
-  button:active,
-  [role="button"]:active {
-    transform: scale(0.97);
-    transition: transform 0.1s ease-in-out;
-  }
-
-  /* ============================================
-     DIALOG & POPOVER FOCUS TRAP
-     ============================================ */
-  [role="dialog"] input:focus,
-  [role="dialog"] textarea:focus,
-  [role="dialog"] select:focus,
-  [role="dialog"] button:focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.15);
-  }
-
-  .dark [role="dialog"] input:focus,
-  .dark [role="dialog"] textarea:focus,
-  .dark [role="dialog"] select:focus,
-  .dark [role="dialog"] button:focus-visible {
-    box-shadow: 0 0 0 4px hsl(var(--focus-ring) / 0.28);
-  }
-}
-
-/* ============================================
-   CUSTOM SELECTION STATES FOR SIDEBAR ITEMS
-   ============================================ */
 @layer components {
-  /* Selected server/project item */
-  .selected-item,
-  [data-selected="true"] {
-    background: linear-gradient(
-      to right,
-      hsl(var(--focus-ring) / 0.15),
-      hsl(var(--focus-ring) / 0.08)
-    ) !important;
-    border-color: hsl(var(--focus-ring) / 0.4) !important;
-    box-shadow: 0 0 0 1px hsl(var(--focus-ring) / 0.2),
-      0 2px 8px hsl(var(--focus-ring) / 0.15);
-    transition: background 0.25s ease-in-out, border-color 0.25s ease-in-out,
-      box-shadow 0.25s ease-in-out, transform 0.2s ease-in-out;
+  .glass {
+    @apply bg-background/60 backdrop-blur-xl border border-white/5;
   }
 
-  .dark .selected-item,
-  .dark [data-selected="true"] {
-    background: linear-gradient(
-      to right,
-      hsl(var(--focus-ring) / 0.25),
-      hsl(var(--focus-ring) / 0.12)
-    ) !important;
-    border-color: hsl(var(--focus-ring) / 0.5) !important;
-    box-shadow: 0 0 0 1px hsl(var(--focus-ring) / 0.3),
-      0 2px 12px hsl(var(--focus-ring) / 0.25);
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden shadow-2xl;
   }
 
-  /* Hover state for selectable items */
-  .selectable-item:hover,
-  [data-selectable="true"]:hover {
-    background: hsl(var(--accent) / 0.6);
-    border-color: hsl(var(--border) / 0.7);
-    transform: translateY(-1px);
-    transition: background 0.2s ease-in-out, border-color 0.2s ease-in-out,
-      transform 0.2s ease-in-out;
+  .interactive-glow {
+    @apply relative overflow-hidden;
   }
-}
-
-/* Custom Scrollbar Styling */
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) transparent;
+  .interactive-glow::after {
+    @apply content-[''] absolute inset-0 bg-primary/20 opacity-0 transition-opacity duration-300;
+  }
+  .interactive-glow:hover::after {
+    @apply opacity-100;
   }
 
-  *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium shadow-lg hover:shadow-primary/20 active:scale-95 transition-all flex items-center gap-2;
   }
 
-  *::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 10px;
+  .btn-secondary {
+    @apply bg-background/60 backdrop-blur-xl border border-white/5 hover:bg-white/10 text-foreground px-4 py-2 rounded-lg font-medium active:scale-95 transition-all flex items-center gap-2;
   }
 
-  *::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    transition: background-color 0.2s ease;
+  .sidebar-item {
+    @apply flex items-center gap-3 p-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden relative min-h-[56px];
+  }
+  .sidebar-item.active {
+    @apply text-primary shadow-lg shadow-primary/5;
+  }
+  /* Default Expanded Active State */
+  .sidebar-item:not(.collapsed).active {
+    @apply bg-primary/10 border border-primary/20;
+  }
+  /* Collapsed Active State - No Border/BG on container, specialized centering handled in JS or here */
+  .sidebar-item.collapsed {
+    @apply justify-center px-0 gap-0;
+  }
+  .sidebar-item.collapsed.active {
+    @apply bg-transparent border-none shadow-none;
   }
 
-  *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-    background-clip: padding-box;
+  .sidebar-item:not(.active):hover {
+    @apply bg-white/5 text-foreground;
   }
 
-  *::-webkit-scrollbar-thumb:active {
-    background: hsl(var(--muted-foreground) / 0.7);
-    background-clip: padding-box;
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
   }
-
-  *::-webkit-scrollbar-corner {
-    background: transparent;
+  .status-dot.running {
+    @apply bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)];
   }
-
-  .dark *::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
+  .status-dot.stopped {
+    @apply bg-zinc-500;
   }
-
-  .dark *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.6);
-  }
-
-  .dark *::-webkit-scrollbar-thumb:active {
-    background: hsl(var(--muted-foreground) / 0.8);
+  .status-dot.error {
+    @apply bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)];
   }
 }
 
-/* Electron Frameless Window Draggability */
+/* Electron Draggability */
 .drag {
   -webkit-app-region: drag;
 }
-
 .no-drag {
   -webkit-app-region: no-drag;
+}
+
+/* Custom Animations */
+.fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+.slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Monaco Overrides */
+.monaco-editor,
+.monaco-editor-background,
+.monaco-editor .margin {
+  background-color: transparent !important;
+}
+
+/* XTerm Overrides */
+.xterm-viewport {
+  background-color: transparent !important;
 }

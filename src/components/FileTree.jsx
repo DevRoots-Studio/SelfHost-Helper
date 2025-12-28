@@ -84,18 +84,18 @@ const FileTreeNode = ({
     <div className="select-none">
       <motion.div
         className={cn(
-          "flex items-center py-1.5 px-2 hover:bg-accent/50 cursor-pointer transition-colors text-sm group",
+          "flex items-center py-1.5 px-2 hover:bg-white/5 cursor-pointer transition-colors text-sm group rounded-lg mx-1",
           isSelected
-            ? "bg-accent text-accent-foreground font-medium"
-            : "text-foreground/80"
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-foreground/70 hover:text-foreground"
         )}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={handleSelect}
         whileHover={{ x: 2 }}
         transition={{ duration: 0.15 }}
       >
         <span
-          className="mr-1.5 flex items-center justify-center w-4 h-4"
+          className="mr-1.5 flex items-center justify-center w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity"
           onClick={isDirectory ? handleToggle : undefined}
         >
           {isDirectory ? (
@@ -103,7 +103,7 @@ const FileTreeNode = ({
               animate={{ rotate: isOpen ? 90 : 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </motion.div>
           ) : (
             <span className="w-4" />
@@ -113,9 +113,9 @@ const FileTreeNode = ({
           {useLucide ? (
             isDirectory ? (
               isOpen ? (
-                <FolderOpen className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+                <FolderOpen className="h-4 w-4 mr-2 text-primary shrink-0" />
               ) : (
-                <Folder className="h-4 w-4 mr-2 text-blue-400 shrink-0" />
+                <Folder className="h-4 w-4 mr-2 text-primary/80 shrink-0" />
               )
             ) : (
               <File className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />

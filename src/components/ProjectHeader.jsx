@@ -16,20 +16,28 @@ export default function ProjectHeader({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
+    <header className="h-16 border-b border-white/5 flex items-center px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
       <div className="flex flex-col no-drag">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+        <h2 className="text-xl font-bold flex items-center gap-3">
           {selectedProject.name}
-          <span
+          <div
             className={cn(
-              "text-xs px-2 py-0.5 rounded-full border uppercase tracking-wider font-bold text-[10px]",
+              "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border shadow-[0_0_10px_inset_transparent]",
               selectedProject.status === "running"
-                ? "border-green-500/30 text-green-500 bg-green-500/10"
-                : "border-red-500/30 text-red-500 bg-red-500/10"
+                ? "border-green-500/30 text-green-400 bg-green-500/10 shadow-[0_0_15px_-3px_rgba(34,197,94,0.4)]"
+                : "border-red-500/30 text-red-400 bg-red-500/10"
             )}
           >
+            <div
+              className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                selectedProject.status === "running"
+                  ? "bg-green-400 animate-pulse"
+                  : "bg-red-400"
+              )}
+            />
             {selectedProject.status || "stopped"}
-          </span>
+          </div>
         </h2>
         {selectedProject.status === "running" && selectedProject.startTime && (
           <Uptime
@@ -53,7 +61,7 @@ export default function ProjectHeader({
                 variant="destructive"
                 size="sm"
                 onClick={() => onStop(selectedProject.id)}
-                className="shadow-lg shadow-red-900/20 active:scale-95 transition-transform cursor-pointer"
+                className="shadow-lg shadow-red-900/20 active:scale-95 transition-all cursor-pointer hover:shadow-red-500/20"
               >
                 <Square className="mr-2 h-4 w-4 fill-current" /> Stop
               </Button>
@@ -61,9 +69,9 @@ export default function ProjectHeader({
                 variant="secondary"
                 size="sm"
                 onClick={() => onRestart(selectedProject.id)}
-                className="active:scale-95 transition-transform cursor-pointer"
+                className="active:scale-95 transition-all cursor-pointer glass hover:bg-white/10 border-white/10"
               >
-                <RefreshCw className="mr-2 h-4 w-4 " /> Restart
+                <RefreshCw className="mr-2 h-4 w-4" /> Restart
               </Button>
             </motion.div>
           ) : (
@@ -76,19 +84,19 @@ export default function ProjectHeader({
             >
               <Button
                 size="sm"
-                className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 text-white active:scale-95 transition-transform cursor-pointer"
+                className="btn-primary"
                 onClick={() => onStart(selectedProject.id)}
               >
-                <Play className="mr-2 h-4 w-4 fill-current " /> Start
+                <Play className="mr-2 h-4 w-4 fill-current" /> Start
               </Button>
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="h-6 w-px bg-border mx-2"></div>
+        <div className="h-6 w-px bg-white/10 mx-2"></div>
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer hover:bg-white/5"
           onClick={() => setIsSettingsOpen(true)}
         >
           <Settings className="h-4 w-4" />
@@ -96,7 +104,7 @@ export default function ProjectHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer hover:bg-red-500/10"
           onClick={() => onDelete(selectedProject.id)}
         >
           <Trash2 className="h-4 w-4" />
@@ -143,7 +151,7 @@ function Uptime({ startTime }) {
   }, [startTime]);
 
   return (
-    <span className="text-xs text-muted-foreground font-mono mt-0.5 ml-0.5">
+    <span className="text-xs text-muted-foreground font-mono mt-1 ml-0.5 opacity-60">
       Uptime: {uptime}
     </span>
   );

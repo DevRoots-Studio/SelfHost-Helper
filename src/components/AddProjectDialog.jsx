@@ -80,7 +80,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-125 bg-card border-border">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Add Project</DialogTitle>
           <DialogDescription>

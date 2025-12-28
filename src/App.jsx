@@ -10,7 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-background text-text">
+      <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background">
         <title>
           {import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}
         </title>

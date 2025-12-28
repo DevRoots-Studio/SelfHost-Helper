@@ -30,8 +30,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const [selectedProjectId, setSelectedProjectId] = useAtom(
     selectedProjectIdAtom
   );
+  const isAddOpen = useAtomValue(isAddProjectModalOpenAtom);
   const setIsAddOpen = useSetAtom(isAddProjectModalOpenAtom);
   const navigate = useNavigate();
+  const [width, setWidth] = useState(72);
+  const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [discordInfo, setDiscordInfo] = useState(null);
   const [discordLoading, setDiscordLoading] = useState(true);
@@ -40,7 +43,49 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
   useEffect(() => {
     fetchDiscordInfo();
+    const savedWidth = localStorage.getItem("sidebarWidth");
+    if (savedWidth) {
+      const w = parseInt(savedWidth);
+      setWidth(w);
+      setIsCollapsed(w < 120);
+    }
   }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return;
+      let newWidth = e.clientX;
+      if (newWidth < 72) newWidth = 72;
+      if (newWidth > 400) newWidth = 400;
+      setWidth(newWidth);
+      setIsCollapsed(newWidth < 120);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      localStorage.setItem("sidebarWidth", width);
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, width]);
+
+  const toggleSidebar = () => {
+    if (width < 120) {
+      setWidth(280);
+      setIsCollapsed(false);
+    } else {
+      setWidth(72);
+      setIsCollapsed(true);
+    }
+  };
 
   const fetchDiscordInfo = async () => {
     try {
@@ -71,251 +116,261 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
   return (
     <motion.aside
-      className="bg-muted/20 border-r border-border flex flex-col backdrop-blur-xl relative overflow-x-hidden"
+      className="bg-transparent border-r border-white/5 flex flex-col backdrop-blur-xl relative overflow-hidden group/sidebar"
       initial={false}
-      animate={{ width: isCollapsed ? "64px" : "288px" }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
+      animate={{ width: width }}
+      transition={{
+        type: "spring",
+        stiffness: 400,
+        damping: 30,
+        duration: 0.1,
+      }}
     >
+      {/* Resizer Handle */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+      />
       <div
         className={cn(
-          "flex items-center bg-card/50 drag",
-          isCollapsed ? "justify-center px-2 py-4" : "justify-between p-4"
+          "flex items-center shrink-0 drag h-16 transition-all duration-300",
+          width < 120 ? "justify-center px-0" : "justify-between px-4"
         )}
       >
-        <AnimatePresence mode="wait">
-          {!isCollapsed ? (
-            <motion.h1
-              key="expanded"
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="font-bold text-lg tracking-tight truncate flex-1 min-w-0"
-            >
-              SelfHost
-            </motion.h1>
-          ) : null}
-        </AnimatePresence>
+        <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+          <AnimatePresence>
+            {width >= 120 && (
+              <motion.h1
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="font-bold text-lg tracking-tight"
+              >
+                SelfHost
+              </motion.h1>
+            )}
+          </AnimatePresence>
+        </div>
 
-        <div className="flex items-center gap-2 shrink-0 no-drag">
-          {!isCollapsed && (
+        <div className="flex items-center gap-1 shrink-0 no-drag">
+          {width >= 120 && (
             <Button
               size="icon"
               variant="ghost"
               onClick={() => setIsAddOpen(true)}
-              className="hover:bg-primary/20 hover:text-primary cursor-pointer"
+              className="hover:bg-primary/20 hover:text-primary cursor-pointer w-8 h-8"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
             </Button>
           )}
           <Button
             size="icon"
             variant="ghost"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="w-10 h-10 p-2 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+            onClick={() => toggleSidebar()}
+            className="w-8 h-8 p-0 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
           >
-            {isCollapsed ? (
-              <ChevronRight className="h-5 w-5" />
+            {width < 120 ? (
+              <ChevronRight className="h-4 w-4" />
             ) : (
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             )}
           </Button>
         </div>
 
         <AddProjectDialog onProjectsChange={onProjectsChange} />
       </div>
-      {!isCollapsed ? (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2">
-          {projects.map((p) => (
+
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-1">
+        {projects.map((p) => {
+          const isSelected = selectedProject?.id === p.id;
+          return (
             <div
               key={p.id}
               onClick={() => setSelectedProjectId(p.id)}
               className={cn(
-                "group p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all border border-transparent select-none",
-                selectedProject?.id === p.id
-                  ? "border-[hsl(217,91%,60%)] shadow-[0_0_0_1px_hsl(217,91%,60%,0.2),0_2px_8px_hsl(217,91%,60%,0.15)] dark:shadow-[0_0_0_1px_hsl(217,91%,60%,0.3),0_2px_12px_hsl(217,91%,60%,0.25)]" +
-                      " " +
-                      "bg-[linear-gradient(to_right,hsl(217,91%,60%,0.15),hsl(217,91%,60%,0.08))] dark:bg-[linear-gradient(to_right,hsl(217,91%,60%,0.25),hsl(217,91%,60%,0.12))]"
-                  : "hover:bg-accent/50 hover:border-border/50"
+                "sidebar-item group relative transition-all duration-200",
+                width < 120 ? "collapsed" : "",
+                isSelected ? "active" : "hover:bg-white/5",
+                // Centering handled by .collapsed in CSS, but explicit justified-center ensures it too
+                width < 120
+                  ? "justify-center px-0 py-2 border-none bg-transparent"
+                  : "px-3 py-2.5"
               )}
+              title={width < 120 ? p.name : undefined}
             >
-              <div className="flex flex-col min-w-0">
-                <span className="font-medium truncate">{p.name}</span>
-                <span className="text-xs text-muted-foreground truncate opacity-70">
-                  {p.path}
-                </span>
-              </div>
-              <motion.div
+              {/* Icon Container */}
+              <div
                 className={cn(
-                  "shrink-0 w-2.5 h-2.5 rounded-full",
-                  p.status === "running" ? "bg-green-500" : "bg-red-500/20"
+                  "relative shrink-0 flex items-center justify-center transition-all duration-300",
+                  width < 120 ? "w-10 h-10" : "w-10 h-10"
                 )}
-                animate={{
-                  scale: p.status === "running" ? [1, 1.2, 1] : 1,
-                  opacity: p.status === "running" ? [0.8, 1, 0.8] : 0.5,
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: p.status === "running" ? Infinity : 0,
-                  ease: "easeInOut",
-                }}
-                style={{
-                  boxShadow:
-                    p.status === "running"
-                      ? "0 0 8px rgba(34, 197, 94, 0.5), 0 0 16px rgba(34, 197, 94, 0.3)"
-                      : "none",
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 flex flex-col items-center gap-2">
-          {projects.map((p) => (
-            <motion.button
-              key={p.id}
-              onClick={() => setSelectedProjectId(p.id)}
-              className={cn(
-                "w-10 h-10 rounded-lg cursor-pointer flex items-center justify-center transition-all border-2 select-none relative group",
-                selectedProject?.id === p.id
-                  ? "bg-[hsl(217,91%,60%,0.15)] dark:bg-[hsl(217,91%,60%,0.25)] border-[hsl(217,91%,60%)] shadow-[0_0_0_1px_hsl(217,91%,60%,0.3),0_4px_12px_hsl(217,91%,60%,0.25)] scale-110"
-                  : "bg-muted/30 border-border/50 hover:bg-accent/50 hover:border-border hover:scale-105"
-              )}
-              whileHover={{ scale: 1.1, duration: 0.1 }}
-              whileTap={{ scale: 0.95 }}
-              title={p.name}
-            >
-              {p.icon ? (
-                <div className="w-8 h-8 rounded overflow-hidden flex items-center justify-center m-auto">
-                  <img
-                    src={`media:///${p.icon.replace(/\\/g, "/")}`}
-                    alt={p.name}
-                    className="w-full h-full object-cover"
+              >
+                {p.icon ? (
+                  <div
+                    className={cn(
+                      "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
+                      width < 120
+                        ? "w-10 h-10 rounded-xl"
+                        : "w-8 h-8 rounded-md"
+                    )}
+                  >
+                    <img
+                      src={`media:///${p.icon.replace(/\\/g, "/")}`}
+                      alt={p.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
+                      width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8"
+                    )}
+                  >
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+
+                {/* Collapsed Selected Ring */}
+                {width < 120 && isSelected && (
+                  <motion.div
+                    layoutId="selected-ring"
+                    className="absolute inset-0 rounded-xl border-2 border-primary shadow-[0_0_15px_rgba(124,58,237,0.4)]"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
+                )}
+              </div>
+
+              {/* Text Content (Hidden when narrow) */}
+              {width >= 120 && (
+                <div
+                  className={cn(
+                    "flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left"
+                  )}
+                >
+                  <span className="font-medium truncate text-sm">{p.name}</span>
+                  <span className="text-xs opacity-50 truncate text-muted-foreground">
+                    {p.path}
+                  </span>
                 </div>
-              ) : (
-                <span className="font-bold text-sm text-foreground">
-                  {p.name.charAt(0).toUpperCase()}
-                </span>
               )}
-              {p.status === "running" && (
-                <motion.div
-                  className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.8, 1, 0.8],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  style={{
-                    boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
-                  }}
-                />
-              )}
-            </motion.button>
-          ))}
-        </div>
-      )}
-      <div className="p-4  bg-card/30 space-y-2 ">
-        <AnimatePresence mode="wait">
+
+              {/* Status Dot */}
+              <div
+                className={cn(
+                  "absolute transition-all duration-300 flex items-center justify-center",
+                  width < 120
+                    ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
+                    : "relative right-auto top-auto ml-auto transform-none"
+                )}
+              >
+                {p.status === "running" && (
+                  <div className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                  </div>
+                )}
+                {p.status === "error" && (
+                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                )}
+                {(!p.status || p.status === "stopped") && width >= 120 && (
+                  <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="p-4 bg-card/30 space-y-2 mt-auto">
+        <AnimatePresence mode="popLayout">
           {isCollapsed ? (
-            <div className="flex justify-center items-center mb-2">
-              <motion.button
-                key="discord-collapsed"
-                layoutId="discord-card"
-                transition={{
-                  layout: { type: "spring", stiffness: 200, damping: 30 },
-                  opacity: { duration: 0.15 },
+            <motion.div
+              key="discord-collapsed"
+              layoutId="discord-card-container"
+              className="flex justify-center"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            >
+              <Button
+                variant="ghost"
+                className="w-10 h-10 rounded-lg p-0 flex items-center justify-center shrink-0"
+                onClick={() => {
+                  setWidth(280);
+                  setIsCollapsed(false);
                 }}
-                className="w-10 h-10 rounded-lg bg-muted/30 border border-border/50 hover:bg-accent/50 flex items-center justify-center shrink-0 cursor-pointer"
-                onClick={() => setIsCollapsed(false)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
               >
                 {getDiscordAvatarUrl() ? (
                   <img
                     src={getDiscordAvatarUrl()}
-                    alt={discordInfo?.guild?.name || "Discord Server"}
-                    className="w-8 h-8 rounded object-cover block"
+                    alt="Discord"
+                    className="w-8 h-8 rounded-md object-cover"
                   />
                 ) : (
-                  <MessageCircle className="h-5 w-5 text-foreground block" />
+                  <MessageCircle className="h-5 w-5" />
                 )}
-              </motion.button>
-            </div>
+              </Button>
+            </motion.div>
           ) : (
             <motion.div
               key="discord-expanded"
-              layoutId="discord-card"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{
-                layout: { type: "spring", stiffness: 200, damping: 32 },
-                opacity: { duration: 0.2 },
-              }}
-              className="mb-2 overflow-hidden rounded-lg border border-border"
+              layoutId="discord-card-container"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="overflow-hidden rounded-xl border border-white/10 bg-black/20"
             >
               <div
-                className="relative p-4 bg-muted/20 group"
+                className="relative p-4 bg-cover bg-center"
                 style={{
                   backgroundImage: getDiscordBannerUrl()
                     ? `url(${getDiscordBannerUrl()})`
                     : undefined,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
                 }}
               >
-                <div className="absolute inset-0 bg-background/60 backdrop-blur-md" />
-
-                <div className="relative z-10">
-                  <div className="flex items-start gap-3 mb-3">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                <div className="relative z-10 space-y-3">
+                  <div className="flex items-center gap-3">
                     {getDiscordAvatarUrl() ? (
                       <img
                         src={getDiscordAvatarUrl()}
-                        alt={discordInfo?.guild?.name || "Discord Server"}
-                        className="w-16 h-16 rounded-lg border-2 border-border/50 shadow-lg shrink-0"
+                        alt="Discord"
+                        className="w-12 h-12 rounded-lg border border-white/10 shadow-lg"
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-900/20 shrink-0">
-                        <MessageCircle className="text-white h-8 w-8" />
+                      <div className="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
+                        <MessageCircle className="text-white h-6 w-6" />
                       </div>
                     )}
-
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-base mb-1 truncate">
-                        {discordLoading
-                          ? "Loading..."
-                          : discordInfo?.guild?.name || "DivRoots Studio"}
+                      <h3 className="font-bold text-sm truncate text-white">
+                        {discordInfo?.guild?.name || "Join Community"}
                       </h3>
-                      {discordInfo && (
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {discordInfo.approximate_member_count?.toLocaleString() ||
-                              "—"}{" "}
-                            members
-                          </span>
-                          {discordInfo.approximate_presence_count !==
-                            undefined && (
-                            <span className="flex items-center gap-1 text-green-500">
-                              <div className="w-2 h-2 bg-green-500 rounded-full" />
-                              {discordInfo.approximate_presence_count?.toLocaleString() ||
-                                "—"}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 text-xs text-zinc-400 mt-1">
+                        <span className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          {discordInfo?.approximate_presence_count?.toLocaleString() ||
+                            "-"}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {discordInfo?.approximate_member_count?.toLocaleString() ||
+                            "-"}{" "}
+                          Members
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-                    size="sm"
-                    onClick={async () =>
-                      await API.openExternal(
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-medium"
+                    onClick={() =>
+                      API.openExternal(
                         `https://discord.gg/${DISCORD_INVITE_CODE}`
                       )
                     }
@@ -328,59 +383,27 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           )}
         </AnimatePresence>
 
-        <motion.div
-          layout
-          transition={{
-            layout: { type: "spring", stiffness: 250, damping: 30 },
-          }}
-          className={isCollapsed ? "flex justify-center" : ""}
-        >
-          <motion.div
-            layoutId="settings-button"
-            transition={{
-              layout: { type: "spring", stiffness: 400, damping: 30 },
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+        <motion.div layout>
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/settings")}
+            className={cn(
+              "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground",
+              isCollapsed ? "justify-center px-0" : "justify-start px-3"
+            )}
           >
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/settings")}
-              className={cn(
-                "text-muted-foreground hover:text-foreground cursor-pointer flex items-center border",
-
-                isCollapsed
-                  ? "w-10 h-10 items-center justify-center p-2"
-                  : "w-full justify-start px-3 py-2 gap-2"
-              )}
-            >
-              <motion.div
-                layout
-                transition={{ duration: 0.15 }}
-                className="flex items-center justify-center"
+            <Settings className="h-4 w-4 shrink-0" />
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, x: -5 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -5 }}
+                className="truncate"
               >
-                <Settings
-                  className={cn(
-                    isCollapsed ? "h-5 w-5" : "h-4 w-4",
-                    !isCollapsed && "mr-2"
-                  )}
-                />
-              </motion.div>
-
-              <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -6 }}
-                    transition={{ duration: 0.1 }}
-                  >
-                    Settings
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Button>
-          </motion.div>
+                Settings
+              </motion.span>
+            )}
+          </Button>
         </motion.div>
       </div>
     </motion.aside>

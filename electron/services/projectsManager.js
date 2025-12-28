@@ -198,7 +198,7 @@ export const startProject = async (id) => {
 
     child.stdout.on("data", (data) => {
       const text = data.toString();
-      if (!runningRuntimes[id].supervisorType) {
+      if (runningRuntimes[id] && !runningRuntimes[id].supervisorType) {
         runningRuntimes[id].supervisorType = detectSupervisorFromOutput(text);
       }
       sendLog(id, data, "stdout");

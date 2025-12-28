@@ -159,8 +159,8 @@ export default function LogViewer({ projectId, status, onSendInput }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black/95 text-white font-mono text-sm rounded-lg overflow-hidden border border-border/20 shadow-inner">
-      <div className="flex-1 relative p-3 bg-black">
+    <div className="flex flex-col h-full bg-[#0a0a0c] text-white font-mono text-sm shadow-inner relative z-0">
+      <div className="flex-1 relative p-3 bg-[#0a0a0c] overflow-hidden">
         {logs.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30 select-none pointer-events-none">
             <TerminalIcon className="h-10 w-10 mb-2" />
@@ -173,13 +173,13 @@ export default function LogViewer({ projectId, status, onSendInput }) {
         />
       </div>
 
-      <div className="p-2 bg-muted/10 border-t border-white/10 flex gap-2">
+      <div className="p-2 bg-white/5 border-t border-white/5 flex gap-2 backdrop-blur-md">
         <div className="relative flex-1">
-          <span className="absolute left-2 top-2.5 text-green-500 font-bold pointer-events-none">
+          <span className="absolute left-3 top-2.5 text-green-500 font-bold pointer-events-none select-none">
             $
           </span>
           <input
-            className="w-full bg-transparent border-none text-white focus:ring-0 pl-6 h-10 font-mono text-sm placeholder:text-white/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-black/40 border border-white/5 rounded-lg text-white focus:ring-1 focus:ring-primary pl-8 h-10 font-mono text-sm placeholder:text-white/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -194,7 +194,7 @@ export default function LogViewer({ projectId, status, onSendInput }) {
         <Button
           size="icon"
           variant="ghost"
-          className="h-10 w-10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30"
+          className="h-10 w-10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30 rounded-lg border border-transparent hover:border-white/10 transition-all"
           onClick={handleSend}
           disabled={status !== "running"}
         >
