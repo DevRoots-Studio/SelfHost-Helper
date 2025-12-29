@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FileCode, Save, FolderOpen, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,46 @@ export default function EditorView({
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
 
+  // File tree resize state and ref
+  const treeRef = useRef(null);
+  const [treeWidth, setTreeWidth] = useState(() => {
+    const saved = localStorage.getItem("editorFileTreeWidth");
+    return saved ? parseInt(saved, 10) : 256; // default 256px (w-64)
+  });
+  const [isTreeResizing, setIsTreeResizing] = useState(false);
+  const TREE_MIN = 200;
+  const TREE_MAX = 600;
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!isTreeResizing || !treeRef.current) return;
+      const rect = treeRef.current.getBoundingClientRect();
+      let newWidth = e.clientX - rect.left;
+      if (newWidth < TREE_MIN) newWidth = TREE_MIN;
+      if (newWidth > TREE_MAX) newWidth = TREE_MAX;
+      setTreeWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      if (!isTreeResizing) return;
+      setIsTreeResizing(false);
+      localStorage.setItem("editorFileTreeWidth", String(treeWidth));
+      document.body.style.userSelect = "";
+    };
+
+    if (isTreeResizing) {
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+    };
+  }, [isTreeResizing, treeWidth]);
+
   useEffect(() => {
     if (initialFile) {
       if (initialFile !== currentFile) {
@@ -128,7 +168,7 @@ export default function EditorView({
     }
   };
 
-  const handleSaveFile = async () => {
+  const handleSaveFile = useCallback(async () => {
     if (currentFile && editorContent !== undefined) {
       try {
         const success = await API.writeFile(currentFile, editorContent);
@@ -141,12 +181,35 @@ export default function EditorView({
         toast.error(`Error saving file: ${err.message}`);
       }
     }
-  };
+  }, [currentFile, editorContent]);
+
+  // Bind Ctrl/Cmd+S to save the current file (capture phase to prevent browser default)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const isSave =
+        (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
+      if (isSave) {
+        e.preventDefault();
+        handleSaveFile();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [handleSaveFile]);
 
   return (
     <div className="h-full flex text-sm">
       {/* Editor Sidebar (File Tree) */}
-      <div className="w-64 border-r border-white/5 flex flex-col">
+      <div ref={treeRef} className="relative border-r border-white/5 flex flex-col" style={{ width: treeWidth }}>
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 z-50"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsTreeResizing(true);
+          }}
+        />
         <div className="h-12 flex items-center px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-white/5 shadow-sm shrink-0">
           Explorer
         </div>

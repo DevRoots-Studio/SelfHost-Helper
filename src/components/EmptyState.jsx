@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 export default function EmptyState({ onAddProject }) {
   return (
     <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col bg-transparent relative z-0">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
       <div className="p-8 mb-8  shadow-primary/10 animate-in fade-in zoom-in duration-700">
         <Terminal className="h-20 w-20 opacity-80 text-primary drop-shadow-[0_0_15px_rgba(124,58,237,0.3)]" />
       </div>

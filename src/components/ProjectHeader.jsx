@@ -84,7 +84,7 @@ export default function ProjectHeader({
             >
               <Button
                 size="sm"
-                className="btn-primary"
+                className="btn-primary cursor-pointer"
                 onClick={() => onStart(selectedProject.id)}
               >
                 <Play className="mr-2 h-4 w-4 fill-current" /> Start

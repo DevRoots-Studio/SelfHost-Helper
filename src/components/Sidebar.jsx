@@ -379,7 +379,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
             variant="ghost"
             onClick={() => navigate("/settings")}
             className={cn(
-              "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground",
+              "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer",
               isCollapsed ? "justify-center px-0" : "justify-start px-3"
             )}
           >
