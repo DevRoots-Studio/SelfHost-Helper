@@ -194,7 +194,7 @@ export default function Dashboard() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
       <Sidebar onProjectsChange={loadProjects} />
 
-      <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative">
+      <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative overflow-hidden">
         {selectedProject ? (
           <>
             <ProjectHeader

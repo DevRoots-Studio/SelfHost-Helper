@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Terminal as TerminalIcon, Send } from "lucide-react";
+import { Terminal as TerminalIcon, Send, BrushCleaning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Terminal } from "@xterm/xterm";
@@ -7,6 +7,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { toast } from "react-toastify";
 
 import { useAtomValue } from "jotai";
 import { logsAtom } from "@/store/atoms";
@@ -157,6 +158,11 @@ export default function LogViewer({ projectId, status, onSendInput }) {
       }
     }
   };
+  const handleClear = () => {
+    lastLogIndexRef.current = 0;
+    xtermRef.current.clear();
+    toast.success("Terminal cleared");
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0c] text-white font-mono text-sm shadow-inner relative z-0">
@@ -199,6 +205,16 @@ export default function LogViewer({ projectId, status, onSendInput }) {
           disabled={status !== "running"}
         >
           <Send className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className=" absolute top-4 right-4 cursor-pointer">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClear}
+          className="cursor-pointer"
+        >
+          <BrushCleaning className="h-4 w-4" />
         </Button>
       </div>
     </div>

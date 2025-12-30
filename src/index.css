@@ -210,7 +210,7 @@
   }
 
   .sidebar-item {
-    @apply flex items-center gap-3 p-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden relative min-h-[56px] border-2 border-transparent box-border hover:scale-105 active:scale-95;
+    @apply flex items-center gap-3 p-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer relative min-h-[56px] border-2 border-transparent box-border hover:scale-105 active:scale-95;
   }
   .sidebar-item.active {
     @apply text-primary shadow-lg shadow-primary/5 scale-100 border-primary;
@@ -271,4 +271,46 @@
 /* XTerm Overrides */
 .xterm-viewport {
   background-color: transparent !important;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  /* Ensure text doesn't overflow on smaller screens */
+  body {
+    font-size: 14px;
+  }
+
+  .sidebar-item {
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Further adjustments for very narrow screens */
+  body {
+    font-size: 13px;
+  }
+
+  /* Make buttons and interactive elements slightly smaller */
+  button {
+    font-size: 0.875rem;
+  }
+
+  /* Ensure cards and containers don't overflow */
+  .glass-card,
+  .glass {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Mobile-like adjustments */
+  body {
+    font-size: 12px;
+  }
+
+  /* Stack elements vertically if needed */
+  .flex {
+    flex-wrap: wrap;
+  }
 }

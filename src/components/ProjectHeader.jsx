@@ -16,13 +16,13 @@ export default function ProjectHeader({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    <header className="h-16 flex items-center px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag pr-[140px]">
-      <div className="flex flex-col no-drag">
-        <h2 className="text-xl font-bold flex items-center gap-3">
-          {selectedProject.name}
+    <header className="h-auto min-h-[64px] flex items-center px-4 md:px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag py-2 flex-wrap gap-2  md:pr-[140px]">
+      <div className="flex flex-col no-drag min-w-0">
+        <h2 className="text-lg md:text-xl font-bold flex items-center gap-2 md:gap-3 flex-wrap">
+          <span className="truncate">{selectedProject.name}</span>
           <div
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border shadow-[0_0_10px_inset_transparent]",
+              "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border shadow-[0_0_10px_inset_transparent] shrink-0",
               selectedProject.status === "running"
                 ? "border-green-500/30 text-green-400 bg-green-500/10 shadow-[0_0_15px_-3px_rgba(34,197,94,0.4)]"
                 : "border-red-500/30 text-red-400 bg-red-500/10"
@@ -46,7 +46,7 @@ export default function ProjectHeader({
           />
         )}
       </div>
-      <div className="flex items-center space-x-2 no-drag">
+      <div className="flex items-center space-x-2 no-drag flex-wrap gap-2">
         <AnimatePresence mode="wait">
           {selectedProject.status === "running" ? (
             <motion.div
