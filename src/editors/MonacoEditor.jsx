@@ -12,7 +12,7 @@ const MonacoEditor = ({
   };
 
   return (
-    <div className="h-full w-full rounded-md overflow-hidden border">
+    <div className="h-full w-full overflow-hidden">
       <Editor
         height="100%"
         width="100%"

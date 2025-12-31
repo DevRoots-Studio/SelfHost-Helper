@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { Project } from "../../database/models/Project.js";
 import { Op } from "sequelize";
 import pidusage from "pidusage";
+import chalk from "chalk";
 import {
   getProjectPids,
   killProjectGroup,
@@ -198,7 +199,7 @@ export const startProject = async (id) => {
 
     child.stdout.on("data", (data) => {
       const text = data.toString();
-      if (!runningRuntimes[id].supervisorType) {
+      if (runningRuntimes[id] && !runningRuntimes[id].supervisorType) {
         runningRuntimes[id].supervisorType = detectSupervisorFromOutput(text);
       }
       sendLog(id, data, "stdout");
@@ -206,7 +207,7 @@ export const startProject = async (id) => {
     child.stderr.on("data", (data) => sendLog(id, data, "stderr"));
 
     child.on("close", async (code) => {
-      console.log(`Project ${id} shell exited with code ${code}`);
+      console.log(`Project ${id} shell exited with code ${code}\n`);
       const runtime = runningRuntimes[id];
 
       // If no supervisor, or if the whole group is gone, mark as stopped
@@ -281,17 +282,21 @@ export const stopProject = async (id) => {
   const runtime = runningRuntimes[id];
   if (!runtime) return { success: false, message: "Not running" };
 
-  await killProjectGroup(runtime.child.pid, runtime.platform);
+  const code = await killProjectGroup(runtime.child, runtime.platform);
   delete runningRuntimes[id];
 
   try {
     await Project.update({ pid: null }, { where: { id } });
-  } catch (_err) {
-    // Ignored
-  }
+  } catch (_err) {}
 
+  sendLog(
+    id,
+    chalk.red(`Project ${id} shell exited with code ${code}\n`),
+    "stdout"
+  );
   sendStatus(id, "stopped");
-  return { success: true };
+
+  return { success: true, code };
 };
 
 //============================{Restarts a Project}=============================

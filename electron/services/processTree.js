@@ -132,29 +132,41 @@ export async function getProjectProcessInfo(rootPid, platform) {
 /**
  * Robustly kill a project group.
  */
-export async function killProjectGroup(rootPid, platform) {
+
+export async function killProjectGroup(child, platform, timeout = 5000) {
   return new Promise((resolve) => {
+    let finished = false;
+
+    const done = (code) => {
+      if (finished) return;
+      finished = true;
+      resolve(code);
+    };
+
+    const timer = setTimeout(() => {
+      if (platform === "win32") {
+        exec(`taskkill /pid ${child.pid} /f /t`, () => done(1));
+      } else {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {}
+        done(1);
+      }
+    }, timeout);
+
+    child.once("close", () => {
+      clearTimeout(timer);
+      done(0);
+    });
+
     if (platform === "win32") {
-      // /T kills the entire tree, /F is force
-      exec(`taskkill /pid ${rootPid} /f /t`, (_err) => {
-        resolve();
-      });
+      exec(`taskkill /pid ${child.pid} /t`);
     } else {
       try {
-        // Send SIGTERM to process group (negative rootPid)
-        process.kill(-rootPid, "SIGTERM");
-
-        // Timeout for SIGKILL
-        setTimeout(() => {
-          try {
-            process.kill(-rootPid, "SIGKILL");
-          } catch (_e) {
-            // Group might be gone
-          }
-          resolve();
-        }, 2000);
-      } catch (_e) {
-        resolve();
+        process.kill(-child.pid, "SIGTERM");
+      } catch {
+        clearTimeout(timer);
+        done(0);
       }
     }
   });

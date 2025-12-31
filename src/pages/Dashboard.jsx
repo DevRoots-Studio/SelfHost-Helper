@@ -194,7 +194,7 @@ export default function Dashboard() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
       <Sidebar onProjectsChange={loadProjects} />
 
-      <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative">
+      <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative overflow-hidden">
         {selectedProject ? (
           <>
             <ProjectHeader
@@ -209,7 +209,7 @@ export default function Dashboard() {
             <div className="flex-1 flex flex-col min-h-0">
               <ViewTabs viewMode={viewMode} onViewModeChange={setViewMode} />
 
-              <div className="flex-1 overflow-hidden relative">
+              <div className="flex-1 overflow-hidden relative bg-muted/40 backdrop-blur-md">
                 {viewMode === "logs" ? (
                   <div className="h-full p-0">
                     <LogViewer

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FileCode, Save, FolderOpen, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,46 @@ export default function EditorView({
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
 
+  // File tree resize state and ref
+  const treeRef = useRef(null);
+  const [treeWidth, setTreeWidth] = useState(() => {
+    const saved = localStorage.getItem("editorFileTreeWidth");
+    return saved ? parseInt(saved, 10) : 256; // default 256px (w-64)
+  });
+  const [isTreeResizing, setIsTreeResizing] = useState(false);
+  const TREE_MIN = 200;
+  const TREE_MAX = 600;
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!isTreeResizing || !treeRef.current) return;
+      const rect = treeRef.current.getBoundingClientRect();
+      let newWidth = e.clientX - rect.left;
+      if (newWidth < TREE_MIN) newWidth = TREE_MIN;
+      if (newWidth > TREE_MAX) newWidth = TREE_MAX;
+      setTreeWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      if (!isTreeResizing) return;
+      setIsTreeResizing(false);
+      localStorage.setItem("editorFileTreeWidth", String(treeWidth));
+      document.body.style.userSelect = "";
+    };
+
+    if (isTreeResizing) {
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+    };
+  }, [isTreeResizing, treeWidth]);
+
   useEffect(() => {
     if (initialFile) {
       if (initialFile !== currentFile) {
@@ -128,7 +168,7 @@ export default function EditorView({
     }
   };
 
-  const handleSaveFile = async () => {
+  const handleSaveFile = useCallback(async () => {
     if (currentFile && editorContent !== undefined) {
       try {
         const success = await API.writeFile(currentFile, editorContent);
@@ -141,13 +181,36 @@ export default function EditorView({
         toast.error(`Error saving file: ${err.message}`);
       }
     }
-  };
+  }, [currentFile, editorContent]);
+
+  // Bind Ctrl/Cmd+S to save the current file (capture phase to prevent browser default)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const isSave =
+        (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
+      if (isSave) {
+        e.preventDefault();
+        handleSaveFile();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [handleSaveFile]);
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex text-sm">
       {/* Editor Sidebar (File Tree) */}
-      <div className="w-64 border-r border-border bg-card/30 flex flex-col">
-        <div className="p-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/20">
+      <div ref={treeRef} className="relative border-r border-white/5 flex flex-col" style={{ width: treeWidth }}>
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 z-50"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsTreeResizing(true);
+          }}
+        />
+        <div className="h-12 flex items-center px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-white/5 shadow-sm shrink-0">
           Explorer
         </div>
         <div className="flex-1 overflow-hidden">
@@ -163,26 +226,26 @@ export default function EditorView({
         </div>
       </div>
       {/* Editor Main */}
-      <div className="flex-1 flex flex-col bg-background">
-        <div className="p-2 flex items-center justify-between text-xs border-b border-border bg-muted/20 h-10">
-          <div className="flex items-center space-x-2 flex-1 px-2">
+      <div className="flex-1 flex flex-col bg-transparent relative z-0">
+        <div className="px-4 h-12 flex items-center justify-between text-xs border-b border-white/5 z-10 shadow-sm shrink-0">
+          <div className="flex items-center space-x-2 flex-1 min-w-0">
             {currentFile ? (
-              <span className="flex items-center text-muted-foreground">
-                <FileCode className="h-3 w-3 mr-2" />
+              <span className="flex items-center text-foreground font-medium truncate">
+                <FileCode className="h-4 w-4 mr-2 text-primary opacity-80" />
                 {currentFile.replace(projectPath, "")}
               </span>
             ) : (
-              <span className="opacity-50">Select a file to edit</span>
+              <span className="opacity-40 italic">Select a file to edit</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-2">
             <Button
               size="sm"
-              className="h-7 text-xs cursor-pointer"
+              className="h-8 text-xs cursor-pointer gap-1.5 btn-primary shadow-sm"
               onClick={handleSaveFile}
               disabled={!currentFile}
             >
-              <Save className="h-3 w-3 mr-1" /> Save
+              <Save className="h-3.5 w-3.5" /> Save
             </Button>
           </div>
         </div>
@@ -206,7 +269,9 @@ export default function EditorView({
             ) : fileLoadError ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
                 <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
-                <p className="text-sm text-destructive mb-2">{fileLoadError}</p>
+                <p className="text-sm text-destructive mb-4 text-center">
+                  {fileLoadError}
+                </p>
                 <Button
                   size="sm"
                   variant="outline"
@@ -230,9 +295,12 @@ export default function EditorView({
               />
             )
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
-              <FolderOpen className="h-10 w-10 mb-2" />
-              <p>Select a file from the explorer</p>
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-30">
+              <FolderOpen className="h-16 w-16 mb-4 stroke-[1.5]" />
+              <p className="text-lg font-medium">No File Selected</p>
+              <p className="text-xs">
+                Select a file from the explorer to start editing
+              </p>
             </div>
           )}
         </div>

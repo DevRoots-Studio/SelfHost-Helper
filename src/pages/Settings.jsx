@@ -69,7 +69,7 @@ export default function Settings() {
             General
           </h2>
 
-          <div className="p-6 bg-secondary/30 rounded-lg border border-white/10">
+          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <Label
@@ -78,7 +78,7 @@ export default function Settings() {
                 >
                   Launch on Startup
                 </Label>
-                <p className="text-sm text-white/60">
+                <p className="text-sm text-muted-foreground">
                   Automatically start SelfHost Helper when your computer boots
                   up.
                 </p>
@@ -98,21 +98,25 @@ export default function Settings() {
             About
           </h2>
 
-          <div className="p-6 bg-secondary/30 rounded-lg border border-white/10">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
-                <Terminal className="text-white h-7 w-7" />
+          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-32 bg-primary/20 blur-[100px] rounded-full pointer-events-none -mr-16 -mt-16 opacity-50 group-hover:opacity-70 transition-opacity" />
+
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-14 h-14 bg-gradient-to-br from-primary to-violet-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
+                <Terminal className="text-white h-8 w-8" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">SelfHost Helper</h3>
-                <p className="text-sm text-white/60">
+                <h3 className="font-bold text-xl tracking-tight">
+                  SelfHost Helper
+                </h3>
+                <p className="text-sm text-muted-foreground">
                   Version {appVersion || "Loading..."}
                 </p>
               </div>
             </div>
-            <p className="text-white/80">
+            <p className="text-muted-foreground relative z-10 max-w-lg leading-relaxed">
               Manage and monitor your self-hosted Node.js applications with
-              ease.
+              ease. Built with Electron, React, and passion.
             </p>
           </div>
         </section>
