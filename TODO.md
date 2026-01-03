@@ -1,4 +1,7 @@
-### Core Features:
+# SelfHost Helper Development Roadmap
+
+1:
+2: ## Core Features
 
 - [x] Project-specific editor state (last opened file)
 - [x] Material Icon Theme integration
@@ -12,7 +15,7 @@
 - [x] Robust System Tray implementation with real-time controls
 - [x] Application-wide notification system (react-toastify)
 
-### UX\UI Features:
+## UX/UI Features
 
 - [x] more animations 🫦🫦 (Transitioned to frameless + Framer Motion)
 - [x] better colors (Glassmorphism + Material Icons)
@@ -21,6 +24,12 @@
 - [x] automatic script suggestions with dependency installation
 - [x] dynamic app version display
 - [x] update the app's logo
-- [/] process tree visualization (Backend implemented for resource aggregation)
+- [x] Windows Job Object integration for bulletproof process cleanup
+- [x] Input debouncing for smooth UI experience
+- [x] cross-partition media loading fixes (v2)
+- [x] process tree visualization (Backend implemented for resource aggregation)
 - [ ] resource usage history/graphs
 - [ ] alerts for high CPU/RAM usage
+- [ ] auto-update system for the application
+- [ ] backup/restore for project configurations
+- [ ] plugin system or custom shell hooks

@@ -152,3 +152,6 @@ temp.csv
 Servers/**/node_modules/
 Servers/**/package-lock.json
 release-dev
+electron/job/build/
+electron/job/node_modules/
+electron/job/package-lock.json

@@ -1,0 +1,13 @@
+{
+  "name": "job-addon",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "node-addon-api": "^8.5.0"
+  },
+  "scripts": {
+    "build": "node-gyp rebuild",
+    "install": "node-gyp rebuild"
+  }
+}
