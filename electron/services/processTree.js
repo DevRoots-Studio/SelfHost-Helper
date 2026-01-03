@@ -144,14 +144,7 @@ export async function killProjectGroup(child, platform, timeout = 5000) {
     };
 
     const timer = setTimeout(() => {
-      if (platform === "win32") {
-        exec(`taskkill /pid ${child.pid} /f /t`, () => done(1));
-      } else {
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {}
-        done(1);
-      }
+      done(1);
     }, timeout);
 
     child.once("close", () => {
@@ -160,14 +153,19 @@ export async function killProjectGroup(child, platform, timeout = 5000) {
     });
 
     if (platform === "win32") {
-      exec(`taskkill /pid ${child.pid} /t`);
-    } else {
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch {
+      // Force kill the entire tree immediately
+      exec(`taskkill /pid ${child.pid} /f /t`, () => {
         clearTimeout(timer);
         done(0);
+      });
+    } else {
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // Ignore
       }
+      clearTimeout(timer);
+      done(0);
     }
   });
 }

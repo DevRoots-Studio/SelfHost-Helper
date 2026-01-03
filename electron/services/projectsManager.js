@@ -10,6 +10,7 @@ import {
 } from "./processTree.js";
 import path from "path";
 import fs from "fs";
+import { assignPid } from "../job/index.js";
 
 const runningRuntimes = {};
 const logHistory = {};
@@ -181,6 +182,11 @@ export const startProject = async (id) => {
       detached: process.platform !== "win32",
     });
 
+    // Windows-only: Assign to Job Object to ensure cleanup on exit/crash
+    if (process.platform === "win32") {
+      assignPid(child.pid);
+    }
+
     const startTime = new Date();
     runningRuntimes[id] = {
       child,
@@ -291,7 +297,7 @@ export const stopProject = async (id) => {
 
   sendLog(
     id,
-    chalk.red(`Project ${id} shell exited with code ${code}\n`),
+    chalk.red(`Project ${id} terminated with exit code ${code}\n`),
     "stdout"
   );
   sendStatus(id, "stopped");

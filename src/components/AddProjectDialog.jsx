@@ -69,6 +69,15 @@ export default function AddProjectDialog({ onProjectsChange }) {
     icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
   });
 
+  const [iconPreview, setIconPreview] = useState(newProject.icon);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIconPreview(newProject.icon);
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [newProject.icon]);
+
   const handleAddProject = async () => {
     if (newProject.name.trim() && newProject.path && newProject.script.trim()) {
       try {
@@ -200,7 +209,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
                 />
               </motion.div>
               <AnimatePresence initial={false} mode="sync">
-                {newProject.icon && (
+                {iconPreview && (
                   <motion.div
                     layout
                     className="w-10 h-10 bg-black/20 rounded-md overflow-hidden border border-border flex items-center justify-center relative shrink-0"
@@ -219,13 +228,13 @@ export default function AddProjectDialog({ onProjectsChange }) {
                     <AnimatePresence initial={false} mode="sync">
                       <motion.img
                         src={
-                          newProject.icon.match(/^(https?:\/\/|data:)/)
-                            ? newProject.icon
-                            : `media:///${newProject.icon.replace(/\\/g, "/")}`
+                          iconPreview.match(/^(https?:\/\/|data:)/)
+                            ? iconPreview
+                            : `media:///${iconPreview.replace(/\\/g, "/")}`
                         }
                         className="absolute inset-0 w-full h-full object-cover"
                         alt="Preview"
-                        key={newProject.icon}
+                        key={iconPreview}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

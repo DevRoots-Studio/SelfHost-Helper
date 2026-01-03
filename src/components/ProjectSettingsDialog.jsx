@@ -63,6 +63,14 @@ export default function ProjectSettingsDialog({
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [iconPreview, setIconPreview] = useState(formData.icon);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIconPreview(formData.icon);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData.icon]);
 
   useEffect(() => {
     if (project) {
@@ -299,7 +307,7 @@ export default function ProjectSettingsDialog({
                   />
                 </motion.div>
                 <AnimatePresence initial={false} mode="sync">
-                  {formData.icon && (
+                  {iconPreview && (
                     <motion.div
                       layout
                       className="w-9 h-9 bg-secondary rounded overflow-hidden border border-border flex items-center justify-center relative shrink-0"
@@ -319,10 +327,14 @@ export default function ProjectSettingsDialog({
                     >
                       <AnimatePresence initial={false} mode="sync">
                         <motion.img
-                          src={`media:///${formData.icon.replace(/\\/g, "/")}`}
+                          src={
+                            iconPreview.match(/^(https?:\/\/|data:)/)
+                              ? iconPreview
+                              : `media:///${iconPreview.replace(/\\/g, "/")}`
+                          }
                           className="absolute inset-0 w-full h-full object-contain object-center"
                           alt={`${formData.name || "Project"} icon preview`}
-                          key={formData.icon}
+                          key={iconPreview}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}

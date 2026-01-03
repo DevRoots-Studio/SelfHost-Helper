@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.6.6",
+  "version": "0.7.0",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -18,6 +18,9 @@
     "appId": "com.selfhosthelper.app",
     "productName": "SelfHost Helper",
     "asar": true,
+    "asarUnpack": [
+      "**/job.node"
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -27,7 +30,18 @@
       "!**/*.md",
       "!**/node_modules/*/{test,tests,example,examples}",
       "!**/node_modules/.bin",
-      "!**/node_modules/**/README.md"
+      "!**/node_modules/**/README.md",
+      "!electron/job/src",
+      "!electron/job/build/obj",
+      "!electron/job/binding.gyp",
+      "!electron/job/package-lock.json",
+      "!electron/job/node_modules",
+      "!electron/job/build/Makefile",
+      "!electron/job/build/*.target.mk",
+      "!electron/job/build/*.vcxproj*",
+      "!electron/job/build/*.sln",
+      "!electron/job/build/binding.sln",
+      "!electron/job/build/job.vcxproj"
     ],
     "directories": {
       "output": "release"
@@ -99,6 +113,7 @@
     "framer-motion": "latest",
     "jotai": "^2.16.1",
     "lucide-react": "latest",
+    "node-addon-api": "^8.5.0",
     "pg-hstore": "^2.3.4",
     "pidusage": "^4.0.1",
     "react": "latest",

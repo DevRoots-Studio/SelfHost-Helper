@@ -96,58 +96,73 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.whenReady().then(async () => {
-  protocol.handle("media", (request) => {
+  protocol.handle("media", async (request) => {
     try {
-      const parsedUrl = new URL(request.url);
-
-      // On Windows, if the URL is media:///C:/path, pathname is /C:/path
-      // If the browser parsed "C" as hostname, hostname is c, pathname is /path
-
+      const url = new URL(request.url);
       let filePath;
 
-      if (parsedUrl.hostname === "app") {
-        // Handle media://app/path/to/asset
-        const relativePath = decodeURIComponent(parsedUrl.pathname);
-        // Try multiple bases for dev flexibility
-        const appPath = app.getAppPath();
-        const cwd = process.cwd();
-
-        let targetPath = path.join(appPath, relativePath);
-        if (!fs.existsSync(targetPath)) {
-          console.warn(
-            `[Media Protocol] File not found at app path: ${targetPath}. Trying CWD.`
-          );
-          targetPath = path.join(cwd, relativePath);
+      if (url.hostname === "app") {
+        const relativePath = decodeURIComponent(url.pathname);
+        filePath = path.join(app.getAppPath(), relativePath);
+        if (!fs.existsSync(filePath)) {
+          filePath = path.join(process.cwd(), relativePath);
         }
-        filePath = targetPath;
-      } else if (parsedUrl.hostname && parsedUrl.hostname.length === 1) {
-        // Drive letter was interpreted as hostname (e.g. media://c/path)
-        filePath = `${parsedUrl.hostname}:${decodeURIComponent(
-          parsedUrl.pathname
-        )}`;
       } else {
-        // Standard path (e.g. media:///C:/path) -> pathname is /C:/path
-        const pathname = decodeURIComponent(parsedUrl.pathname);
-        if (process.platform === "win32" && /^\/[a-zA-Z]:/.test(pathname)) {
-          filePath = pathname.slice(1);
+        // Handle media://G/path, media:///G:/path, media:///G/path
+        let rawPath = decodeURIComponent(url.pathname);
+        let hostname = url.hostname;
+
+        if (hostname && hostname.length === 1 && /^[a-zA-Z]$/.test(hostname)) {
+          // If hostname is "G", and rawPath is "/Minecraft server/image.png"
+          filePath = path.join(`${hostname}:`, rawPath);
+        } else if (process.platform === "win32") {
+          // If rawPath is "/G:/Minecraft server image.png"
+          if (/^\/[a-zA-Z]:/.test(rawPath)) {
+            filePath = rawPath.slice(1);
+          } else if (/^\/[a-zA-Z]\//.test(rawPath)) {
+            // Case: /G/path
+            filePath = rawPath.charAt(1) + ":" + rawPath.slice(2);
+          } else {
+            filePath = rawPath;
+          }
         } else {
-          filePath = pathname;
+          filePath = rawPath;
         }
       }
 
-      if (!fs.existsSync(filePath)) {
-        console.error(
-          `[Media Protocol] File NOT found: ${filePath} (Original URL: ${request.url})`
-        );
-        return new Response("Not Found", { status: 404 });
+      filePath = path.normalize(filePath);
+      // Remove any surrounding quotes that might have been pasted
+      filePath = filePath.replace(/^["']|["']$/g, "").trim();
+
+      try {
+        await fs.promises.access(filePath, fs.constants.R_OK);
+      } catch (e) {
+        return new Response("File not found", { status: 404 });
       }
 
-      const fileUrl = pathToFileURL(filePath).href;
+      const buffer = await fs.promises.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".ico": "image/x-icon",
+        ".svg": "image/svg+xml",
+        ".bmp": "image/bmp",
+      };
 
-      return net.fetch(fileUrl);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": mimeTypes[ext] || "application/octet-stream",
+          "Cache-Control": "public, max-age=3600",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
     } catch (e) {
-      console.error("Protocol Error:", e);
-      return new Response("Not Found", { status: 404 });
+      console.error("[Media Protocol] Error:", e);
+      return new Response("Internal Error", { status: 500 });
     }
   });
 
@@ -224,8 +239,22 @@ app.on("before-quit", async (e) => {
   if (isShuttingDown) return;
   e.preventDefault();
   isShuttingDown = true;
-  await stopAllProjects();
-  app.quit();
+
+  console.log("Shutting down... performing fast cleanup.");
+
+  try {
+    const { stopAllProjects } = await import("./services/projectsManager.js");
+    const { Project } = await import("../database/models/Project.js");
+
+    // Fast kill all running projects
+    await stopAllProjects();
+    // Fast clear all PIDs in DB
+    await Project.update({ pid: null }, { where: {} });
+  } catch (err) {
+    console.error("Cleanup error during shutdown:", err);
+  } finally {
+    app.quit();
+  }
 });
 
 app.on("window-all-closed", () => {

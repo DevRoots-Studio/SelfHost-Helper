@@ -59,6 +59,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("window:unmaximize", subscription);
     return () => ipcRenderer.removeListener("window:unmaximize", subscription);
   },
+  onShutdown: (callback) => {
+    const subscription = () => callback();
+    ipcRenderer.on("app:shutting-down", subscription);
+    return () => ipcRenderer.removeListener("app:shutting-down", subscription);
+  },
 
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
