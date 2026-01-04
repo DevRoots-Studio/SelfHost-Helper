@@ -13,6 +13,7 @@ import {
   getProjectStats,
   getProjectStartTime,
   notifyProjectListChanged,
+  clearProjectLogs,
 } from "../services/projectsManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
 
@@ -23,7 +24,9 @@ const appLauncher = new AutoLaunch({
 
 export const registerHandlers = () => {
   ipcMain.handle("projects:getAll", async () => {
-    const projects = await Project.findAll();
+    const projects = await Project.findAll({
+      order: [["order", "ASC"]],
+    });
     const runningIds = getRunningProjects();
     return projects.map((p) => ({
       ...p.toJSON(),
@@ -42,6 +45,7 @@ export const registerHandlers = () => {
     const project = await Project.findByPk(id);
     if (project) {
       await stopProject(id);
+      clearProjectLogs(id);
       await project.destroy();
       notifyProjectListChanged();
       return true;
@@ -58,6 +62,14 @@ export const registerHandlers = () => {
       return project;
     }
     return null;
+  });
+
+  ipcMain.handle("projects:reorder", async (_, orders) => {
+    for (const item of orders) {
+      await Project.update({ order: item.order }, { where: { id: item.id } });
+    }
+    notifyProjectListChanged();
+    return true;
   });
 
   ipcMain.handle("project:start", async (_, id) => startProject(id));
@@ -123,6 +135,10 @@ export const registerHandlers = () => {
   // Logs
   ipcMain.handle("logs:get", async (_, id) => {
     return getProjectLogs(id);
+  });
+  ipcMain.handle("logs:clear", async (_, id) => {
+    clearProjectLogs(id);
+    return true;
   });
 
   ipcMain.handle("project:getStats", async (_, id) => {

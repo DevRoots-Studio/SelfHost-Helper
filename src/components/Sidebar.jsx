@@ -7,8 +7,10 @@ import {
   ChevronRight,
   MessageCircle,
   Users,
+  GripVertical,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,11 +27,35 @@ import AddProjectDialog from "./AddProjectDialog";
 const API = window.api;
 
 const Sidebar = React.memo(({ onProjectsChange }) => {
-  const projects = useAtomValue(projectsAtom);
+  const [projects, setProjects] = useAtom(projectsAtom);
   const selectedProject = useAtomValue(selectedProjectAtom);
   const [selectedProjectId, setSelectedProjectId] = useAtom(
     selectedProjectIdAtom
   );
+
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
+
+    const items = Array.from(projects);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // Update local state immediately for snappy feel
+    setProjects(items);
+
+    // Prepare orders for backend
+    const orders = items.map((project, index) => ({
+      id: project.id,
+      order: index,
+    }));
+
+    try {
+      await window.api.reorderProjects(orders);
+    } catch (error) {
+      console.error("Failed to save project order:", error);
+      toast.error("Failed to save project order");
+    }
+  };
   const isAddOpen = useAtomValue(isAddProjectModalOpenAtom);
   const setIsAddOpen = useSetAtom(isAddProjectModalOpenAtom);
   const navigate = useNavigate();
@@ -246,111 +272,148 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           <AddProjectDialog onProjectsChange={onProjectsChange} />
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-1">
-          {projects.map((p) => {
-            const isSelected = selectedProject?.id === p.id;
-            return (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="projects">
+            {(provided) => (
               <div
-                key={p.id}
-                onClick={() => setSelectedProjectId(p.id)}
-                className={cn(
-                  "sidebar-item group relative transition-all duration-200",
-                  width < 120 ? "collapsed" : "",
-                  isSelected ? "active" : "hover:bg-white/5",
-                  // Centering now handled by .collapsed in CSS, border styles restored via CSS active class
-                  width < 120 ? "mx-auto" : "px-3 py-2.5"
-                )}
-                title={width < 120 ? p.name : undefined}
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-1"
               >
-                {/* Icon Container */}
-                <div
-                  className={cn(
-                    "relative shrink-0 flex items-center justify-center transition-all duration-300",
-                    width < 120 ? "w-10 h-10" : "w-10 h-10"
-                  )}
-                >
-                  {p.icon ? (
-                    <div
-                      className={cn(
-                        "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
-                        width < 120
-                          ? "w-10 h-10 rounded-xl"
-                          : "w-8 h-8 rounded-md"
-                      )}
+                {projects.map((p, index) => {
+                  const isSelected = selectedProject?.id === p.id;
+                  return (
+                    <Draggable
+                      key={p.id.toString()}
+                      draggableId={p.id.toString()}
+                      index={index}
                     >
-                      <img
-                        src={
-                          p.icon.match(/^(https?:\/\/|data:)/)
-                            ? p.icon
-                            : (() => {
-                                // Normalize Windows paths: convert backslashes to forward slashes
-                                const normalizedPath = p.icon.replace(
-                                  /\\/g,
-                                  "/"
-                                );
-                                // For Windows absolute paths like "C:/..." or "G:/...", use media:///
-                                // The triple slash ensures the path is treated as an absolute path
-                                return `media:///${normalizedPath}`;
-                              })()
-                        }
-                        alt={p.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className={cn(
-                        "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
-                        width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8"
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          onClick={() => setSelectedProjectId(p.id)}
+                          className={cn(
+                            "sidebar-item group relative transition-all duration-200",
+                            width < 120 ? "collapsed" : "",
+                            isSelected ? "active" : "hover:bg-white/5",
+                            width < 120 ? "mx-auto" : "px-3 py-2.5",
+                            snapshot.isDragging &&
+                              "opacity-50 ring-2 ring-primary bg-primary/10"
+                          )}
+                          title={width < 120 ? p.name : undefined}
+                        >
+                          {/* Drag Handle */}
+                          {width >= 120 && (
+                            <div
+                              {...provided.dragHandleProps}
+                              className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 hover:opacity-100 transition-opacity p-1 cursor-grab active:cursor-grabbing"
+                            >
+                              <GripVertical className="h-3 w-3" />
+                            </div>
+                          )}
+
+                          {/* Icon Container */}
+                          <div
+                            className={cn(
+                              "relative shrink-0 flex items-center justify-center transition-all duration-300",
+                              width < 120 ? "w-10 h-10" : "w-10 h-10"
+                            )}
+                            {...(width < 120 ? provided.dragHandleProps : {})}
+                          >
+                            {p.icon ? (
+                              <div
+                                className={cn(
+                                  "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
+                                  width < 120
+                                    ? "w-10 h-10 rounded-xl"
+                                    : "w-8 h-8 rounded-md"
+                                )}
+                              >
+                                <img
+                                  src={
+                                    p.icon.match(/^(https?:\/\/|data:)/)
+                                      ? p.icon
+                                      : (() => {
+                                          const normalizedPath = p.icon.replace(
+                                            /\\/g,
+                                            "/"
+                                          );
+                                          // The triple slash ensures the path is treated as an absolute path
+                                          // Add a cache-buster query param using the project's updatedAt or a generic one
+                                          return `media:///${normalizedPath}?t=${
+                                            new Date(p.updatedAt).getTime() ||
+                                            Date.now()
+                                          }`;
+                                        })()
+                                  }
+                                  alt={p.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div
+                                className={cn(
+                                  "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
+                                  width < 120
+                                    ? "w-10 h-10 rounded-xl"
+                                    : "w-8 h-8"
+                                )}
+                              >
+                                {p.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Text Content (Hidden when narrow) */}
+                          {width >= 120 && (
+                            <div
+                              className={cn(
+                                "flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left"
+                              )}
+                            >
+                              <span className="font-medium truncate text-sm">
+                                {p.name}
+                              </span>
+                              <span className="text-xs opacity-50 truncate text-muted-foreground">
+                                {p.path}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Status Dot */}
+                          <div
+                            className={cn(
+                              "absolute transition-all duration-300 flex items-center justify-center",
+                              width < 120
+                                ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
+                                : "relative right-auto top-auto ml-auto transform-none"
+                            )}
+                          >
+                            {p.status === "running" && (
+                              <div className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                              </div>
+                            )}
+                            {p.status === "error" && (
+                              <div className="h-2 w-2 rounded-full bg-red-500" />
+                            )}
+                            {(!p.status || p.status === "stopped") &&
+                              width >= 120 && (
+                                <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                              )}
+                          </div>
+                        </div>
                       )}
-                    >
-                      {p.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-
-                {/* Text Content (Hidden when narrow) */}
-                {width >= 120 && (
-                  <div
-                    className={cn(
-                      "flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left"
-                    )}
-                  >
-                    <span className="font-medium truncate text-sm">
-                      {p.name}
-                    </span>
-                    <span className="text-xs opacity-50 truncate text-muted-foreground">
-                      {p.path}
-                    </span>
-                  </div>
-                )}
-
-                {/* Status Dot */}
-                <div
-                  className={cn(
-                    "absolute transition-all duration-300 flex items-center justify-center",
-                    width < 120
-                      ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
-                      : "relative right-auto top-auto ml-auto transform-none"
-                  )}
-                >
-                  {p.status === "running" && (
-                    <div className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                    </div>
-                  )}
-                  {p.status === "error" && (
-                    <div className="h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                  {(!p.status || p.status === "stopped") && width >= 120 && (
-                    <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
-                  )}
-                </div>
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </Droppable>
+        </DragDropContext>
         <div className="p-4 bg-card/30 space-y-2 mt-auto">
           <AnimatePresence mode="wait">
             {isCollapsed ? (

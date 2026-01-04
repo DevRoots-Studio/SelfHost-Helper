@@ -38,7 +38,6 @@ export const initProjectModel = (sequelize) => {
             // If the stored value is corrupted, return an empty object and log a warning
             // This prevents the app from throwing when reading malformed env data
             // during runtime while preserving the raw value in the DB.
-            // eslint-disable-next-line no-console
             console.warn(
               `Project.env contains invalid JSON for project id=${this.id}:`,
               e
@@ -66,6 +65,14 @@ export const initProjectModel = (sequelize) => {
       icon: {
         type: DataTypes.STRING,
         allowNull: true,
+      },
+      order: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      uuid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
       },
     },
     {
