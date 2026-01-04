@@ -8,7 +8,7 @@ import "@xterm/xterm/css/xterm.css";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { logsAtom } from "@/store/atoms";
 
 export default function LogViewer({ projectId, status, onSendInput }) {
@@ -156,6 +156,18 @@ export default function LogViewer({ projectId, status, onSendInput }) {
         setInput(history[newIndex]);
       }
     }
+  };
+  const setAllLogs = useSetAtom(logsAtom);
+
+  const handleClear = () => {
+    lastLogIndexRef.current = 0;
+    xtermRef.current.clear();
+    setAllLogs((prev) => ({
+      ...prev,
+      [projectId]: [],
+    }));
+    window.api.clearLogs(projectId);
+    toast.success("Terminal cleared");
   };
 
   return (

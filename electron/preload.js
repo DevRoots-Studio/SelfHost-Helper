@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("api", {
   watchFolder: (folderPath) => ipcRenderer.invoke("watcher:watch", folderPath),
 
   getLogs: (id) => ipcRenderer.invoke("logs:get", id),
+  clearLogs: (id) => ipcRenderer.invoke("logs:clear", id),
 
   isAutoLaunchEnabled: () => ipcRenderer.invoke("app:isAutoLaunchEnabled"),
   enableAutoLaunch: () => ipcRenderer.invoke("app:enableAutoLaunch"),
@@ -20,6 +21,7 @@ contextBridge.exposeInMainWorld("api", {
   addProject: (project) => ipcRenderer.invoke("projects:add", project),
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
+  reorderProjects: (orders) => ipcRenderer.invoke("projects:reorder", orders),
 
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   selectFile: () => ipcRenderer.invoke("dialog:openFile"),
@@ -37,6 +39,12 @@ contextBridge.exposeInMainWorld("api", {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("project:status", subscription);
     return () => ipcRenderer.removeListener("project:status", subscription);
+  },
+  onProjectsChange: (callback) => {
+    const subscription = () => callback();
+    ipcRenderer.on("projects:list-changed", subscription);
+    return () =>
+      ipcRenderer.removeListener("projects:list-changed", subscription);
   },
   onFileChange: (callback) => {
     const subscription = (_, data) => callback(data);

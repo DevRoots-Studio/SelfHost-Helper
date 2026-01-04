@@ -1,4 +1,39 @@
+> release "v0.7.5"
+
+- **Interactive Server Reordering**: Implemented drag-and-drop server reordering in the sidebar for a fully customizable workspace.
+- **Persistent Ordering System**: Added a new `order` database column to ensure your custom server arrangements are saved permanently.
+- **Improved Log Isolation & Purging**:
+  - Fixed Console Clear to permanently purge logs from both frontend and backend buffers.
+  - Automatic log history cleanup on project deletion to eliminate data leakage between servers when IDs are recycled.
+- **Real-Time Sidebar Sync**:
+  - Added a backend-to-frontend event system (`projects:list-changed`) that triggers instant sidebar updates when server names or settings change.
+  - Implemented automatic cache-busting for server icons to ensure visual updates appear immediately without app restarts.
+- **Database Resilience**:
+  - Integrated persistent UUIDs for every project to ensure robust identification and prevent state collisions.
+  - Added a smart post-sync migration engine to safely update existing production databases with new required fields without data loss.
+
+> release "v0.7.0"
+
+- **Bulletproof Process Cleanup (Windows Job Objects)**:
+  - Developed and integrated a native C++ module to leverage Windows Job Objects.
+  - Guaranteed termination: All child and descendant processes are now hardware-terminated by the OS if the main application exits or crashes.
+  - No more Orphans: Completely eliminates the possibility of orphaned processes or "zombies" on Windows.
+- **Robust Media & Icon Engine**:
+  - Rewrote the `media://` protocol handler for 100% reliability across all Windows drive letters (G:, D:, etc.).
+  - Added support for multiple path formats (encoded, raw, and hostname-based) to ensure cross-partition icons load every time.
+  - Enhanced MIME type detection for expanded image format support (.bmp, .tiff, etc.).
+- **UI Responsiveness & Performance**:
+  - **Input Debouncing**: Added intelligent debouncing (400ms) to icon and path inputs. Prevents UI "freezing" by waiting for the user to finish typing before attempting to load or validate files.
+  - **Fast Exit Logic**: Streamlined the application shutdown sequence for a snappier feel while safely cleaning up database states.
+- **Improved Windows Native Integration**:
+  - Implemented ASAR-aware native module loading for seamless production builds.
+  - Added smart path sanitization for pasted file paths (stripping quotes and trailing slashes).
+- **Bug Fixes & Stability**:
+  - Resolved `net::ERR_FILE_NOT_FOUND` when accessing icons on non-system partitions.
+  - Fixed a critical issue where rapid typing in settings could cause the main process to hang.
+
 > release "v0.5.0"
+
 - **State Management Overhaul (Jotai)**:
   - Migrated entire frontend to Jotai atoms for robust global state management.
   - Significant performance gains by eliminating redundant re-renders in the project list and status updates.

@@ -61,6 +61,9 @@ export default function Dashboard() {
         });
       }
     );
+    const cleanupList = API.onProjectsChange(() => {
+      loadProjects();
+    });
     const cleanupLogs = API.onLog(({ projectId, data, type, timestamp }) => {
       setLogs((prev) => ({
         ...prev,
@@ -70,6 +73,7 @@ export default function Dashboard() {
 
     return () => {
       cleanupStatus();
+      cleanupList();
       cleanupLogs();
     };
   }, []);
@@ -159,6 +163,16 @@ export default function Dashboard() {
         toast.warning("Project removed");
         loadProjects();
         if (selectedProjectId === id) setSelectedProjectId(null);
+        setLogs((prev) => {
+          const newLogs = { ...prev };
+          delete newLogs[id];
+          return newLogs;
+        });
+        setProjectEditorStates((prev) => {
+          const newStates = { ...prev };
+          delete newStates[id];
+          return newStates;
+        });
       } else {
         toast.error("Failed to remove project");
       }

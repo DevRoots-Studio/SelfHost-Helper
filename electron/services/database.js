@@ -1,6 +1,7 @@
 import { Sequelize } from "sequelize";
 import path from "path";
 import { app } from "electron";
+import crypto from "crypto";
 
 // Ensure userData path is used for the DB file so it persists
 // Only available after app is ready, but we call initializeDatabase after app ready.
@@ -34,6 +35,24 @@ export const initializeDatabase = async () => {
 
     await sequelize.sync({ alter: true });
     console.log("Database synced");
+
+    // Post-sync fix for SQLite: Ensure all projects have a UUID and an Order
+    const { Project } = await import("../../database/models/Project.js");
+    const projects = await Project.findAll();
+    for (const project of projects) {
+      let needsSave = false;
+      if (!project.uuid) {
+        project.uuid = crypto.randomUUID();
+        needsSave = true;
+      }
+      if (project.order === null || project.order === undefined) {
+        project.order = 0;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await project.save();
+      }
+    }
   } catch (error) {
     console.error("Unable to connect to the database:", error);
   }

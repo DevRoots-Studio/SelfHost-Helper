@@ -11,6 +11,8 @@
 - [ ] the ability to start the application minimized in the system tray
 - [x] Robust System Tray implementation with real-time controls
 - [x] Application-wide notification system (react-toastify)
+- [x] Persistent UUIDs per project for collision-free identification
+- [x] Backend log history purging on clear/delete
 
 ### UX\UI Features:
 
@@ -21,6 +23,12 @@
 - [x] automatic script suggestions with dependency installation
 - [x] dynamic app version display
 - [x] update the app's logo
-- [/] process tree visualization (Backend implemented for resource aggregation)
+- [x] Windows Job Object integration for bulletproof process cleanup
+- [x] Input debouncing for smooth UI experience
+- [x] cross-partition media loading fixes (v2)
+- [x] process tree visualization (Backend implemented for resource aggregation)
+- [x] Interactive Sidebar Reordering (Drag and Drop)
+- [x] Real-time Sidebar Sync & Cache-busting icons
+- [x] Persistent server custom ordering
 - [ ] resource usage history/graphs
 - [ ] alerts for high CPU/RAM usage
