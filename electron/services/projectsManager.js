@@ -29,6 +29,13 @@ export const onProjectListChange = (callback) => {
 
 export const notifyProjectListChanged = () => {
   listListeners.forEach((cb) => cb());
+  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    global.mainWindow.webContents.send("projects:list-changed");
+  }
+};
+
+export const clearProjectLogs = (id) => {
+  delete logHistory[id];
 };
 
 //============================{Sends Logs to the Front-end}=============================
