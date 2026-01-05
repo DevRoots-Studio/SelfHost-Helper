@@ -1,5 +1,6 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import logger from "./logger.js";
 
 const execAsync = promisify(exec);
 
@@ -16,6 +17,9 @@ async function getAllWindowsProcesses() {
     // ConvertTo-Json might return a single object or an array
     const data = JSON.parse(stdout);
     const rawList = Array.isArray(data) ? data : [data];
+    logger.debug(
+      `[processTree] Found ${rawList.length} total system processes.`
+    );
 
     return rawList.map((p) => ({
       pid: p.ProcessId,
@@ -23,7 +27,7 @@ async function getAllWindowsProcesses() {
       commandLine: p.CommandLine || "",
     }));
   } catch (_err) {
-    console.error(`[processTree] Failed to get Windows processes:`, _err);
+    logger.error(`[processTree] Failed to get Windows processes:`, _err);
     return [];
   }
 }
@@ -60,6 +64,9 @@ function buildTree(allProcs, rootPid) {
     }
   }
 
+  logger.debug(
+    `[processTree] Built tree for root PID ${rootPid}. Tree size: ${tree.length}`
+  );
   return tree;
 }
 
@@ -75,6 +82,10 @@ async function getUnixGroupPids(pgid) {
       .filter((line) => line)
       .map((line) => parseInt(line, 10));
   } catch (_err) {
+    logger.error(
+      `[processTree] Error fetching Unix group PIDs for PGID ${pgid}:`,
+      _err
+    );
     return [];
   }
 }
@@ -153,16 +164,29 @@ export async function killProjectGroup(child, platform, timeout = 5000) {
     });
 
     if (platform === "win32") {
-      // Force kill the entire tree immediately
-      exec(`taskkill /pid ${child.pid} /f /t`, () => {
+      logger.info(
+        `[processTree] Executing taskkill for PID ${child.pid} (tree=true)`
+      );
+      exec(`taskkill /pid ${child.pid} /f /t`, (err) => {
+        if (err)
+          logger.warn(
+            `[processTree] taskkill warning for PID ${child.pid}:`,
+            err.message
+          );
         clearTimeout(timer);
         done(0);
       });
     } else {
       try {
+        logger.info(
+          `[processTree] Sending SIGKILL to process group ${-child.pid}`
+        );
         process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // Ignore
+      } catch (err) {
+        logger.warn(
+          `[processTree] SIGKILL failed for group ${-child.pid}:`,
+          err.message
+        );
       }
       clearTimeout(timer);
       done(0);

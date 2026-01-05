@@ -6,6 +6,7 @@ import { registerHandlers } from "./ipc/handlers.js";
 import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
 import { stopAllProjects } from "./services/projectsManager.js";
+import logger from "./services/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,7 +56,7 @@ async function createWindow() {
     try {
       await mainWindow.loadURL("http://localhost:5173");
     } catch (e) {
-      console.log("Waiting for Vite server...");
+      logger.info("Waiting for Vite server...");
       setTimeout(() => mainWindow.loadURL("http://localhost:5173"), 2000);
     }
     mainWindow.webContents.openDevTools();
@@ -69,10 +70,12 @@ async function createWindow() {
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
+      logger.debug("[Window] Intercepted close event, hiding to tray.");
       event.preventDefault();
       mainWindow.hide();
       return false;
     }
+    logger.info("[Window] Closing for real (isQuitting=true).");
   });
 
   mainWindow.on("maximize", () => {
@@ -95,7 +98,11 @@ if (process.env.NODE_ENV === "development") {
   app.setPath("userData", app.getPath("userData") + "-dev");
 }
 
+// Initialize logger early to catch startup issues
+logger.init();
+
 app.whenReady().then(async () => {
+  logger.info("Application starting up (Ready)...");
   protocol.handle("media", async (request) => {
     try {
       const url = new URL(request.url);
@@ -142,6 +149,7 @@ app.whenReady().then(async () => {
 
       const buffer = await fs.promises.readFile(filePath);
       const ext = path.extname(filePath).toLowerCase();
+      logger.debug(`[Protocol:Media] Serving file: ${filePath} (${ext})`);
       const mimeTypes = {
         ".png": "image/png",
         ".jpg": "image/jpeg",
@@ -161,7 +169,7 @@ app.whenReady().then(async () => {
         },
       });
     } catch (e) {
-      console.error("[Media Protocol] Error:", e);
+      logger.error("[Media Protocol] Error:", e);
       return new Response("Internal Error", { status: 500 });
     }
   });
@@ -193,6 +201,7 @@ app.whenReady().then(async () => {
   const { updateTrayMenu } = await import("./tray/tray.js");
 
   const refreshTray = async () => {
+    logger.debug("[Tray] Refreshing menu state.");
     const projects = await Project.findAll();
     const runningIds = getRunningProjects();
     updateTrayMenu(
@@ -240,7 +249,7 @@ app.on("before-quit", async (e) => {
   e.preventDefault();
   isShuttingDown = true;
 
-  console.log("Shutting down... performing fast cleanup.");
+  logger.info("Shutting down... performing fast cleanup.");
 
   try {
     const { stopAllProjects } = await import("./services/projectsManager.js");
@@ -251,8 +260,9 @@ app.on("before-quit", async (e) => {
     // Fast clear all PIDs in DB
     await Project.update({ pid: null }, { where: {} });
   } catch (err) {
-    console.error("Cleanup error during shutdown:", err);
+    logger.error("Cleanup error during shutdown:", err);
   } finally {
+    logger.info("Cleanup complete. Quitting.");
     app.quit();
   }
 });

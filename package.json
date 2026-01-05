@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",

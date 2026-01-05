@@ -16,6 +16,7 @@ import {
   clearProjectLogs,
 } from "../services/projectsManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
+import logger from "../services/logger.js";
 
 const appLauncher = new AutoLaunch({
   name: "SelfHost Helper",
@@ -23,6 +24,36 @@ const appLauncher = new AutoLaunch({
 });
 
 export const registerHandlers = () => {
+  // Helper to log all IPC calls
+  const originalHandle = ipcMain.handle.bind(ipcMain);
+  ipcMain.handle = (channel, listener) => {
+    return originalHandle(channel, async (event, ...args) => {
+      logger.debug(
+        `[IPC:Handle] ${channel} called with args:`,
+        JSON.stringify(args).slice(0, 500)
+      );
+      try {
+        const result = await listener(event, ...args);
+        logger.debug(`[IPC:Handle] ${channel} success.`);
+        return result;
+      } catch (err) {
+        logger.error(`[IPC:Handle] ${channel} error:`, err);
+        throw err;
+      }
+    });
+  };
+
+  const originalOn = ipcMain.on.bind(ipcMain);
+  ipcMain.on = (channel, listener) => {
+    return originalOn(channel, (event, ...args) => {
+      logger.debug(
+        `[IPC:On] ${channel} received:`,
+        JSON.stringify(args).slice(0, 500)
+      );
+      return listener(event, ...args);
+    });
+  };
+
   ipcMain.handle("projects:getAll", async () => {
     const projects = await Project.findAll({
       order: [["order", "ASC"]],
@@ -37,6 +68,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("projects:add", async (_, projectData) => {
     const project = await Project.create(projectData);
+    logger.info(`Project added: ${project.name} (ID: ${project.id})`);
     notifyProjectListChanged();
     return project;
   });
@@ -44,6 +76,7 @@ export const registerHandlers = () => {
   ipcMain.handle("projects:delete", async (_, id) => {
     const project = await Project.findByPk(id);
     if (project) {
+      logger.info(`Deleting project: ${project.name} (ID: ${id})`);
       await stopProject(id);
       clearProjectLogs(id);
       await project.destroy();
@@ -84,7 +117,7 @@ export const registerHandlers = () => {
       const content = await fs.readFile(filePath, "utf-8");
       return content;
     } catch (e) {
-      console.error("Error reading file:", filePath, e);
+      logger.error(`Error reading file ${filePath}:`, e);
       const errorMessage = e.message || e.toString() || "Unknown error";
       throw new Error(`Failed to read file: ${errorMessage}`);
     }
@@ -95,7 +128,7 @@ export const registerHandlers = () => {
       await fs.writeFile(filePath, content, "utf-8");
       return true;
     } catch (e) {
-      console.error(e);
+      logger.error(`Error writing file ${filePath}:`, e);
       throw e;
     }
   });
@@ -241,7 +274,7 @@ export const registerHandlers = () => {
       await shell.openExternal(url);
       return true;
     } catch (error) {
-      console.error("Failed to open external URL:", error);
+      logger.error(`Failed to open external URL ${url}:`, error);
       return false;
     }
   });

@@ -2,6 +2,7 @@ import { Sequelize } from "sequelize";
 import path from "path";
 import { app } from "electron";
 import crypto from "crypto";
+import logger from "./logger.js";
 
 // Ensure userData path is used for the DB file so it persists
 // Only available after app is ready, but we call initializeDatabase after app ready.
@@ -14,7 +15,7 @@ export const initializeDatabase = async () => {
       ? path.join(userDataPath, "projects-dev.sqlite")
       : path.join(userDataPath, "projects.sqlite");
 
-  console.log("Database path:", dbPath);
+  logger.info("Database path:", dbPath);
 
   sequelize = new Sequelize({
     dialect: "sqlite",
@@ -24,7 +25,7 @@ export const initializeDatabase = async () => {
 
   try {
     await sequelize.authenticate();
-    console.log("Connection has been established successfully.");
+    logger.info("Database connection has been established successfully.");
 
     // Import models manually or via a loader
     // We will import and init them here
@@ -34,7 +35,7 @@ export const initializeDatabase = async () => {
     initProjectModel(sequelize);
 
     await sequelize.sync({ alter: true });
-    console.log("Database synced");
+    logger.info("Database synced");
 
     // Post-sync fix for SQLite: Ensure all projects have a UUID and an Order
     const { Project } = await import("../../database/models/Project.js");
@@ -54,7 +55,7 @@ export const initializeDatabase = async () => {
       }
     }
   } catch (error) {
-    console.error("Unable to connect to the database:", error);
+    logger.error("Unable to connect to the database:", error);
   }
 };
 

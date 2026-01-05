@@ -11,6 +11,7 @@ import {
 import path from "path";
 import fs from "fs";
 import { assignPid } from "../job/index.js";
+import logger from "./logger.js";
 
 const runningRuntimes = {};
 const logHistory = {};
@@ -28,8 +29,8 @@ export const onProjectListChange = (callback) => {
 };
 
 export const notifyProjectListChanged = () => {
-  listListeners.forEach((cb) => cb());
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    logger.debug(`[ProjectsManager] Notifying renderer: projects:list-changed`);
     global.mainWindow.webContents.send("projects:list-changed");
   }
 };
@@ -57,6 +58,9 @@ const sendLog = (projectId, data, type = "stdout") => {
 
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
+      logger.debug(
+        `[ProjectsManager] Forwarding log to UI: Project ${projectId} (${type})`
+      );
       global.mainWindow.webContents.send("project:log", logEntry);
     } catch (error) {
       // Window might be destroyed during shutdown, ignore silently
@@ -68,6 +72,9 @@ const sendLog = (projectId, data, type = "stdout") => {
 const sendStatus = (projectId, status, extraData = {}) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
+      logger.info(
+        `[ProjectsManager] Status Change: Project ${projectId} -> ${status}`
+      );
       global.mainWindow.webContents.send("project:status", {
         projectId,
         status,
@@ -93,7 +100,7 @@ export const checkZombieProcesses = async () => {
     if (project.pid) {
       const isAlive = await isProcessGroupAlive(project.pid, process.platform);
       if (isAlive) {
-        console.warn(
+        logger.warn(
           `Zombie process group found for project ${project.name} (PID: ${project.pid})`
         );
 
@@ -104,7 +111,7 @@ export const checkZombieProcesses = async () => {
           });
         }, 2000);
       } else {
-        console.log(`Cleaning up stale PID for project ${project.name}`);
+        logger.info(`Cleaning up stale PID for project ${project.name}`);
         project.pid = null;
         await project.save();
         sendStatus(project.id, "stopped");
@@ -140,6 +147,9 @@ export const writeToProcess = (id, data) => {
   if (child.stdin) {
     const toWrite = data.endsWith("\n") ? data : data + "\n";
     try {
+      logger.debug(
+        `[ProjectsManager] Writing stdin to project ${id}: ${toWrite.trim()}`
+      );
       child.stdin.write(toWrite);
       sendLog(id, `> ${toWrite}`, "stdin");
       return true;
@@ -169,9 +179,25 @@ export const startProject = async (id) => {
   const commandStr = project.script || "npm start";
   const resolvedScript = resolveNpmScript(project.path, commandStr);
 
-  console.log(
+  logger.info(
     `Starting project ${id}: ${commandStr} (resolved: ${resolvedScript}) in ${project.path}`
   );
+
+  // Safety: check if there's an existing process tree for this project already
+  if (project.pid) {
+    const alivePids = await getProjectPids(project.pid, process.platform);
+    if (alivePids.length > 0) {
+      logger.warn(
+        `Project ${id} has an existing process tree (PIDs: ${alivePids.join(
+          ","
+        )}). Preventing double-start.`
+      );
+      return {
+        success: false,
+        message: "Project processes already detectable in system.",
+      };
+    }
+  }
 
   try {
     const child = spawn(commandStr, {
@@ -220,28 +246,30 @@ export const startProject = async (id) => {
     child.stderr.on("data", (data) => sendLog(id, data, "stderr"));
 
     child.on("close", async (code) => {
-      console.log(`Project ${id} shell exited with code ${code}\n`);
+      logger.info(`Project ${id} shell exited with code ${code}`);
       const runtime = runningRuntimes[id];
+      if (!runtime) return;
 
-      // If no supervisor, or if the whole group is gone, mark as stopped
+      // Check if any processes are still alive in the tree
       const pids = await getProjectPids(child.pid, process.platform);
-      if (pids.length === 0 || !runtime.supervisorType) {
-        delete runningRuntimes[id];
-        try {
-          await Project.update({ pid: null }, { where: { id } });
-        } catch (err) {
-          console.error("Failed to clear PID from DB", err);
-        }
-        sendStatus(id, "stopped");
+      logger.debug(
+        `Project ${id} shell closed. Surviving PIDs: ${pids.length}`
+      );
+
+      if (pids.length === 0) {
+        logger.info(
+          `Project ${id} has no leaves left. Marking as STOPPED (Exit code: ${code}).`
+        );
+        await cleanupProjectRuntime(id);
       } else {
-        console.log(
-          `Supervisor detected for project ${id}, keeping status as running even if shell closed.`
+        logger.info(
+          `Project ${id} shell closed but processes remain. System will continue monitoring.`
         );
       }
     });
 
     child.on("error", (err) => {
-      console.error(`Failed to start project ${id}`, err);
+      logger.error(`Failed to start project ${id}:`, err);
       sendLog(id, `Failed to start: ${err.message}`, "error");
       delete runningRuntimes[id];
       sendStatus(id, "error");
@@ -326,7 +354,7 @@ export const restartProject = async (id) => {
 export const startAllProjects = async () => {
   try {
     const projects = await Project.findAll();
-    console.log(`Starting all ${projects.length} projects...`);
+    logger.info(`Starting all ${projects.length} projects...`);
     const promises = projects.map((project) => {
       if (!runningRuntimes[project.id]) {
         return startProject(project.id);
@@ -335,14 +363,14 @@ export const startAllProjects = async () => {
     });
     await Promise.all(promises);
   } catch (error) {
-    console.error("Failed to start all projects:", error);
+    logger.error("Failed to start all projects:", error);
   }
 };
 
 //============================{Stops All Projects at Once}=============================
 export const stopAllProjects = async () => {
   const ids = Object.keys(runningRuntimes);
-  console.log(`Stopping all ${ids.length} running projects...`);
+  logger.info(`Stopping all ${ids.length} running projects...`);
   const promises = ids.map((id) => stopProject(id));
   await Promise.all(promises);
 };
@@ -378,7 +406,7 @@ export const getProjectStats = async (id) => {
         const detected = detectSupervisor(info.commandLine);
         if (detected) {
           runtime.supervisorType = detected;
-          console.log(
+          logger.info(
             `Dynamically detected supervisor ${detected} for project ${id} from process tree.`
           );
           break;
@@ -418,7 +446,7 @@ export const getProjectStats = async (id) => {
 
     return result;
   } catch (err) {
-    console.error(`Failed to get stats for project ${id}:`, err);
+    logger.error(`Failed to get stats for project ${id}:`, err);
     return {
       id,
       startTime: runtime.startTime,
@@ -434,16 +462,64 @@ export const startAutoStartProjects = async () => {
   try {
     const projects = await Project.findAll({ where: { autoStart: true } });
     if (projects.length > 0) {
-      console.log(`Found ${projects.length} projects to auto-start.`);
-      // Start sequentially to avoid resource spikes, or use Promise.all for speed
+      logger.info(
+        `[ProjectsManager] Found ${projects.length} auto-start projects.`
+      );
       for (const project of projects) {
         // Check if already running (redundant if app just started, but good practice)
         if (!runningRuntimes[project.id]) {
-          await startProject(project.id);
+          logger.info(
+            `[ProjectsManager] Auto-starting project: ${project.name}`
+          );
+          await startProject(project.id).catch((err) =>
+            logger.error(`Auto-start failed for ${project.name}:`, err)
+          );
         }
       }
     }
   } catch (error) {
-    console.error("Failed to auto-start projects:", error);
+    logger.error("Failed to auto-start projects:", error);
   }
 };
+
+//============================{Background Health Monitoring}=============================
+
+const cleanupProjectRuntime = async (id) => {
+  delete runningRuntimes[id];
+  try {
+    await Project.update({ pid: null }, { where: { id } });
+  } catch (err) {
+    logger.error(`Failed to clear PID from DB for project ${id}:`, err);
+  }
+  sendStatus(id, "stopped");
+};
+
+/**
+ * Periodically checks all 'running' projects to see if they are actually alive.
+ * This handles cases where the root shell died but children remained,
+ * and then those children eventually died.
+ */
+const startStatusPoller = () => {
+  setInterval(async () => {
+    const runningIds = Object.keys(runningRuntimes);
+    for (const id of runningIds) {
+      const runtime = runningRuntimes[id];
+      if (!runtime) continue;
+
+      try {
+        const pids = await getProjectPids(runtime.child.pid, runtime.platform);
+        if (pids.length === 0) {
+          logger.info(
+            `Health Poller: Project ${id} has no active processes. Cleaning up.`
+          );
+          await cleanupProjectRuntime(id);
+        }
+      } catch (err) {
+        logger.error(`Health Poller error for project ${id}:`, err);
+      }
+    }
+  }, 5000); // Check every 5 seconds
+};
+
+// Start the poller immediately
+startStatusPoller();

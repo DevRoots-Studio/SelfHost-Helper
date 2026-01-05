@@ -1,4 +1,5 @@
 import chokidar from "chokidar";
+import logger from "./logger.js";
 
 const watchers = {};
 
@@ -22,10 +23,11 @@ export const watchFolder = (folderPath) => {
     .on("unlinkDir", (path) => notifyChange("unlinkDir", path));
 
   watchers[folderPath] = watcher;
-  console.log(`Started watching ${folderPath}`);
+  logger.info(`[FilesWatcher] Started watching ${folderPath}`);
 };
 
 const notifyChange = (event, filePath) => {
+  logger.debug(`[FilesWatcher] Change detected: [${event}] ${filePath}`);
   if (global.mainWindow) {
     global.mainWindow.webContents.send("file:change", { event, filePath });
   }
@@ -34,6 +36,7 @@ const notifyChange = (event, filePath) => {
 //============================{Stops a WatchDog on a Specific Directory}=============================
 export const stopWatching = async (folderPath) => {
   if (watchers[folderPath]) {
+    logger.info(`[FilesWatcher] Stopping watch on ${folderPath}`);
     await watchers[folderPath].close();
     delete watchers[folderPath];
   }
