@@ -64,17 +64,42 @@ export default function Dashboard() {
     const cleanupList = API.onProjectsChange(() => {
       loadProjects();
     });
+    const appendLogs = (projectId, logEntries) => {
+      setLogs((prev) => {
+        const currentLogs = prev[projectId] || [];
+        const newLogs = [...currentLogs, ...logEntries];
+        // Enforce 1000 line limit in UI as well
+        if (newLogs.length > 1000) {
+          return {
+            ...prev,
+            [projectId]: newLogs.slice(newLogs.length - 1000),
+          };
+        }
+        return {
+          ...prev,
+          [projectId]: newLogs,
+        };
+      });
+    };
+
     const cleanupLogs = API.onLog(({ projectId, data, type, timestamp }) => {
-      setLogs((prev) => ({
-        ...prev,
-        [projectId]: [...(prev[projectId] || []), { data, type, timestamp }],
+      appendLogs(projectId, [{ data, type, timestamp }]);
+    });
+
+    const cleanupLogsBatch = API.onLogsBatch(({ projectId, logs }) => {
+      const formattedLogs = logs.map(({ data, type, timestamp }) => ({
+        data,
+        type,
+        timestamp,
       }));
+      appendLogs(projectId, formattedLogs);
     });
 
     return () => {
       cleanupStatus();
       cleanupList();
       cleanupLogs();
+      cleanupLogsBatch();
     };
   }, []);
 

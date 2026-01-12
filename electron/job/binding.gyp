@@ -12,6 +12,9 @@
       "defines": [
         "NAPI_DISABLE_CPP_EXCEPTIONS"
       ],
+      "libraries": [
+        "Psapi.lib"
+      ],
       "msvs_settings": {
         "VCCLCompilerTool": {
           "AdditionalOptions": [

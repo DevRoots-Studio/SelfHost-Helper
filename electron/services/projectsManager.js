@@ -10,8 +10,11 @@ import {
 } from "./processTree.js";
 import path from "path";
 import fs from "fs";
-import { assignPid } from "../job/index.js";
+import { createJob, assignPid } from "../job/index.js";
 import logger from "./logger.js";
+import os from "os";
+
+const numCPUs = os.cpus().length;
 
 const runningRuntimes = {};
 const logHistory = {};
@@ -40,6 +43,22 @@ export const clearProjectLogs = (id) => {
 };
 
 //============================{Sends Logs to the Front-end}=============================
+const logQueues = {};
+
+const flushLogQueue = (projectId) => {
+  if (logQueues[projectId] && logQueues[projectId].length > 0) {
+    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+      try {
+        global.mainWindow.webContents.send("project:logs-batch", {
+          projectId,
+          logs: logQueues[projectId],
+        });
+      } catch (err) {}
+    }
+    logQueues[projectId] = [];
+  }
+};
+
 const sendLog = (projectId, data, type = "stdout") => {
   const logEntry = {
     projectId,
@@ -53,18 +72,21 @@ const sendLog = (projectId, data, type = "stdout") => {
   }
   logHistory[projectId].push(logEntry);
   if (logHistory[projectId].length > 1000) {
-    logHistory[projectId].shift(); // Keep last 1000 log line
+    logHistory[projectId].shift();
   }
 
-  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
-    try {
-      logger.debug(
-        `[ProjectsManager] Forwarding log to UI: Project ${projectId} (${type})`
-      );
-      global.mainWindow.webContents.send("project:log", logEntry);
-    } catch (error) {
-      // Window might be destroyed during shutdown, ignore silently
-    }
+  // Batching: instead of immediate send, add to queue
+  if (!logQueues[projectId]) {
+    logQueues[projectId] = [];
+  }
+  logQueues[projectId].push(logEntry);
+
+  // If queue is too big or it's been a while, flush it
+  if (logQueues[projectId].length >= 50) {
+    flushLogQueue(projectId);
+  } else if (logQueues[projectId].length === 1) {
+    // Start a timer for the first item in the batch
+    setTimeout(() => flushLogQueue(projectId), 100);
   }
 };
 
@@ -90,26 +112,57 @@ const sendStatus = (projectId, status, extraData = {}) => {
 };
 
 export const checkZombieProcesses = async () => {
-  const projects = await Project.findAll({
-    where: {
-      pid: { [Op.ne]: null },
-    },
-  });
+  const projects = await Project.findAll();
 
   for (const project of projects) {
+    // On Windows, try to recover the Job Object by name
+    if (process.platform === "win32") {
+      const jobName = `Global\\SelfHostHelper_Project_${project.uuid}`;
+      const existingJob = createJob(jobName);
+
+      if (existingJob) {
+        try {
+          const stats = existingJob.getStats();
+          if (stats.activeProcesses > 0) {
+            logger.info(
+              `[ProjectsManager] Recovered running project via Job Object: ${project.name}`
+            );
+
+            // Re-establish runtime without a child object (since we don't have the handle)
+            // But we have the job, which is enough for stats and killing.
+            runningRuntimes[project.id] = {
+              job: existingJob,
+              startTime: project.updatedAt || new Date(),
+              platform: process.platform,
+              isRecovered: true,
+              child: { pid: project.pid || 0, killed: false }, // Mock child for compatibility
+            };
+
+            sendStatus(project.id, "running", {
+              startTime: runningRuntimes[project.id].startTime,
+              isRecovered: true,
+            });
+            continue;
+          } else {
+            existingJob.close();
+          }
+        } catch (err) {
+          existingJob.close();
+        }
+      }
+    }
+
+    // Fallback if not Windows or Job recovery failed
     if (project.pid) {
       const isAlive = await isProcessGroupAlive(project.pid, process.platform);
       if (isAlive) {
         logger.warn(
           `Zombie process group found for project ${project.name} (PID: ${project.pid})`
         );
-
-        setTimeout(() => {
-          sendStatus(project.id, "zombie", {
-            message: "Improper Shutdown Detected",
-            pid: project.pid,
-          });
-        }, 2000);
+        sendStatus(project.id, "zombie", {
+          message: "Improper Shutdown Detected",
+          pid: project.pid,
+        });
       } else {
         logger.info(`Cleaning up stale PID for project ${project.name}`);
         project.pid = null;
@@ -184,19 +237,26 @@ export const startProject = async (id) => {
   );
 
   // Safety: check if there's an existing process tree for this project already
-  if (project.pid) {
-    const alivePids = await getProjectPids(project.pid, process.platform);
-    if (alivePids.length > 0) {
-      logger.warn(
-        `Project ${id} has an existing process tree (PIDs: ${alivePids.join(
-          ","
-        )}). Preventing double-start.`
-      );
-      return {
-        success: false,
-        message: "Project processes already detectable in system.",
-      };
+  if (runningRuntimes[id]) {
+    return { success: false, message: "Project is already running/active." };
+  }
+
+  const existingPids = await getProjectPids(project.pid, process.platform);
+  if (existingPids.length > 0) {
+    logger.warn(`Project ${id} has orphans. Attempting cleanup before start.`);
+    // If it's Windows, we can use the Job to kill everything fast
+    if (process.platform === "win32") {
+      const jobName = `Global\\SelfHostHelper_Project_${project.uuid}`;
+      const job = createJob(jobName);
+      if (job) {
+        job.terminate();
+        job.close();
+      }
+    } else {
+      await killProjectGroup({ pid: project.pid }, process.platform);
     }
+    // Wait a bit for OS to cleanup
+    await new Promise((r) => setTimeout(r, 500));
   }
 
   try {
@@ -215,11 +275,6 @@ export const startProject = async (id) => {
       detached: process.platform !== "win32",
     });
 
-    // Windows-only: Assign to Job Object to ensure cleanup on exit/crash
-    if (process.platform === "win32") {
-      assignPid(child.pid);
-    }
-
     const startTime = new Date();
     runningRuntimes[id] = {
       child,
@@ -227,6 +282,17 @@ export const startProject = async (id) => {
       platform: process.platform,
       supervisorType: detectSupervisor(resolvedScript),
     };
+
+    // Windows-only: Assign to Named Job Object
+    if (process.platform === "win32") {
+      const jobName = `Global\\SelfHostHelper_Project_${project.uuid}`;
+      const projectJob = createJob(jobName);
+      if (projectJob) {
+        projectJob.assignProcess(child.pid);
+        runningRuntimes[id].job = projectJob;
+      }
+      assignPid(child.pid);
+    }
 
     project.pid = child.pid;
     await project.save();
@@ -250,13 +316,23 @@ export const startProject = async (id) => {
       const runtime = runningRuntimes[id];
       if (!runtime) return;
 
-      // Check if any processes are still alive in the tree
-      const pids = await getProjectPids(child.pid, process.platform);
-      logger.debug(
-        `Project ${id} shell closed. Surviving PIDs: ${pids.length}`
-      );
+      // Reliability: Check if any processes remain
+      let pidsCount = 0;
+      if (runtime.platform === "win32" && runtime.job) {
+        try {
+          const stats = runtime.job.getStats();
+          pidsCount = stats.activeProcesses;
+        } catch (err) {
+          logger.error(`Failed to get job stats during close for ${id}:`, err);
+        }
+      } else {
+        const pids = await getProjectPids(child.pid, process.platform);
+        pidsCount = pids.length;
+      }
 
-      if (pids.length === 0) {
+      logger.debug(`Project ${id} shell closed. Surviving PIDs: ${pidsCount}`);
+
+      if (pidsCount === 0) {
         logger.info(
           `Project ${id} has no leaves left. Marking as STOPPED (Exit code: ${code}).`
         );
@@ -324,6 +400,15 @@ export const stopProject = async (id) => {
   if (!runtime) return { success: false, message: "Not running" };
 
   const code = await killProjectGroup(runtime.child, runtime.platform);
+
+  if (runtime.job) {
+    try {
+      runtime.job.close();
+    } catch (err) {
+      logger.error(`Failed to close job for project ${id}:`, err);
+    }
+  }
+
   delete runningRuntimes[id];
 
   try {
@@ -382,6 +467,45 @@ export const getProjectStats = async (id) => {
   if (!runtime) return null;
 
   try {
+    // On Windows, use the highly efficient Job Object statistics
+    if (runtime.platform === "win32" && runtime.job) {
+      const stats = runtime.job.getStats();
+      const now = Date.now();
+      let cpuPercent = 0;
+
+      if (runtime.lastStats) {
+        const deltaUser = stats.totalUserTime - runtime.lastStats.totalUserTime;
+        const deltaKernel =
+          stats.totalKernelTime - runtime.lastStats.totalKernelTime;
+        const deltaTime = now - runtime.lastStats.timestamp;
+
+        if (deltaTime > 0) {
+          // Convert deltaTime (ms) to 100ns units (multiply by 10,000)
+          const deltaTimeUnits = deltaTime * 10000;
+          cpuPercent = (deltaUser + deltaKernel) / deltaTimeUnits / numCPUs;
+          cpuPercent = Math.max(0, cpuPercent * 100);
+        }
+      }
+
+      runtime.lastStats = {
+        totalUserTime: stats.totalUserTime,
+        totalKernelTime: stats.totalKernelTime,
+        timestamp: now,
+      };
+
+      return {
+        id,
+        startTime: runtime.startTime,
+        uptime: now - runtime.startTime.getTime(),
+        cpu: cpuPercent,
+        memory: stats.memory,
+        timestamp: now,
+        pidsCount: stats.activeProcesses,
+        supervisorType: runtime.supervisorType,
+      };
+    }
+
+    // Fallback for Unix or if Job is not available
     const procInfo = await getProjectProcessInfo(
       runtime.child.pid,
       runtime.platform
@@ -400,15 +524,12 @@ export const getProjectStats = async (id) => {
       };
     }
 
-    // Dynamic Supervisor Check: if not already detected, look at command lines of children
+    // Dynamic Supervisor Check (keep existing logic)
     if (!runtime.supervisorType) {
       for (const info of procInfo) {
         const detected = detectSupervisor(info.commandLine);
         if (detected) {
           runtime.supervisorType = detected;
-          logger.info(
-            `Dynamically detected supervisor ${detected} for project ${id} from process tree.`
-          );
           break;
         }
       }
@@ -427,13 +548,10 @@ export const getProjectStats = async (id) => {
         }
       }
     } catch (err) {
-      console.warn(
-        `[projectsManager] pidusage failed for some PIDs of project ${id}:`,
-        err.message
-      );
+      logger.warn(`[projectsManager] pidusage failed for project ${id}`);
     }
 
-    const result = {
+    return {
       id,
       startTime: runtime.startTime,
       uptime: Date.now() - runtime.startTime.getTime(),
@@ -443,17 +561,9 @@ export const getProjectStats = async (id) => {
       pidsCount: procInfo.length,
       supervisorType: runtime.supervisorType,
     };
-
-    return result;
   } catch (err) {
     logger.error(`Failed to get stats for project ${id}:`, err);
-    return {
-      id,
-      startTime: runtime.startTime,
-      uptime: Date.now() - runtime.startTime.getTime(),
-      cpu: 0,
-      memory: 0,
-    };
+    return null;
   }
 };
 
@@ -485,6 +595,17 @@ export const startAutoStartProjects = async () => {
 //============================{Background Health Monitoring}=============================
 
 const cleanupProjectRuntime = async (id) => {
+  const runtime = runningRuntimes[id];
+  if (runtime && runtime.job) {
+    try {
+      runtime.job.close();
+    } catch (err) {
+      logger.error(
+        `Failed to close job for project ${id} during cleanup:`,
+        err
+      );
+    }
+  }
   delete runningRuntimes[id];
   try {
     await Project.update({ pid: null }, { where: { id } });
@@ -507,8 +628,19 @@ const startStatusPoller = () => {
       if (!runtime) continue;
 
       try {
-        const pids = await getProjectPids(runtime.child.pid, runtime.platform);
-        if (pids.length === 0) {
+        let hasActiveProcesses = false;
+        if (runtime.platform === "win32" && runtime.job) {
+          const stats = runtime.job.getStats();
+          hasActiveProcesses = stats.activeProcesses > 0;
+        } else {
+          const pids = await getProjectPids(
+            runtime.child.pid,
+            runtime.platform
+          );
+          hasActiveProcesses = pids.length > 0;
+        }
+
+        if (!hasActiveProcesses) {
           logger.info(
             `Health Poller: Project ${id} has no active processes. Cleaning up.`
           );
