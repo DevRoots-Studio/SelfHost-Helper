@@ -15,11 +15,13 @@ class Logger {
     const userDataPath = app.getPath("userData");
     this.logFile = path.join(userDataPath, "main.log");
 
-    // Ensure directory exists (though appData usually does)
     const dir = path.dirname(this.logFile);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+
+    // Use a writable stream for better performance than appendFileSync
+    this.stream = fs.createWriteStream(this.logFile, { flags: "a" });
 
     this.write(`\n--- Log Session Started: ${new Date().toISOString()} ---\n`);
     this.initialized = true;
@@ -35,11 +37,12 @@ class Logger {
   }
 
   write(message) {
-    if (!this.logFile) return;
-    try {
-      fs.appendFileSync(this.logFile, message + "\n");
-    } catch (err) {
-      console.error("Failed to write to main.log:", err);
+    const output = message + "\n";
+    if (this.stream) {
+      this.stream.write(output);
+    } else {
+      // Fallback if not yet initialized
+      console.log(output);
     }
   }
 

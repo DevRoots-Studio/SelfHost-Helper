@@ -10,24 +10,50 @@ const execAsync = promisify(exec);
  */
 async function getAllWindowsProcesses() {
   try {
-    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CommandLine | ConvertTo-Json -Compress"`;
+    // WMIC is significantly faster than PowerShell for listing processes
+    // format:csv includes a header line and uses commas.
+    const cmd = `wmic process get processid,parentprocessid,commandline /format:csv`;
     const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
     if (!stdout.trim()) return [];
 
-    // ConvertTo-Json might return a single object or an array
-    const data = JSON.parse(stdout);
-    const rawList = Array.isArray(data) ? data : [data];
+    const lines = stdout.trim().split("\n");
+    const processes = [];
+
+    // Skip header line (Node,CommandLine,ParentProcessId,ProcessId)
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // CSV format: Node, CommandLine, ParentProcessId, ProcessId
+      // We need to be careful with commas in command lines
+      const parts = line.split(",");
+      if (parts.length < 4) continue;
+
+      const pid = parseInt(parts[parts.length - 1], 10);
+      const ppid = parseInt(parts[parts.length - 2], 10);
+      // Command line is everything between the first comma and the second-to-last comma
+      const commandLine = parts.slice(1, parts.length - 2).join(",");
+
+      if (!isNaN(pid) && !isNaN(ppid)) {
+        processes.push({
+          pid: pid,
+          parentPid: ppid,
+          commandLine: commandLine.replace(/^"|"$/g, ""),
+        });
+      }
+    }
+
     logger.debug(
-      `[processTree] Found ${rawList.length} total system processes.`
+      `[processTree] Found ${processes.length} total system processes using WMIC.`
     );
 
-    return rawList.map((p) => ({
-      pid: p.ProcessId,
-      parentPid: p.ParentProcessId,
-      commandLine: p.CommandLine || "",
-    }));
+    return processes;
   } catch (_err) {
-    logger.error(`[processTree] Failed to get Windows processes:`, _err);
+    logger.error(
+      `[processTree] Failed to get Windows processes via WMIC:`,
+      _err
+    );
+    // Silent fallback to empty list
     return [];
   }
 }

@@ -24,6 +24,7 @@ let jobAddon;
 try {
   if (existsSync(bindingPath)) {
     jobAddon = require(bindingPath);
+    // Default job for global use
     job = new jobAddon.JobObject();
   } else {
     logger.warn("Native job addon not found at:", bindingPath);
@@ -31,6 +32,18 @@ try {
 } catch (error) {
   logger.error("Failed to load native job addon:", error);
 }
+
+export const createJob = (name = null) => {
+  if (jobAddon) {
+    try {
+      return new jobAddon.JobObject(name);
+    } catch (err) {
+      logger.error(`Failed to create JobObject (name: ${name}):`, err);
+      return null;
+    }
+  }
+  return null;
+};
 
 export const assignPid = (pid) => {
   if (job) {

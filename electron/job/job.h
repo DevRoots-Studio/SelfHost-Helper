@@ -12,5 +12,7 @@ private:
     HANDLE jobHandle;
 
     Napi::Value AssignProcess(const Napi::CallbackInfo& info);
+    Napi::Value GetStats(const Napi::CallbackInfo& info);
+    Napi::Value Terminate(const Napi::CallbackInfo& info);
     Napi::Value Close(const Napi::CallbackInfo& info);
 };

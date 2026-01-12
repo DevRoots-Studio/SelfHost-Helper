@@ -35,6 +35,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("project:log", subscription);
     return () => ipcRenderer.removeListener("project:log", subscription);
   },
+  onLogsBatch: (callback) => {
+    const subscription = (_, data) => callback(data);
+    ipcRenderer.on("project:logs-batch", subscription);
+    return () => ipcRenderer.removeListener("project:logs-batch", subscription);
+  },
   onStatusChange: (callback) => {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("project:status", subscription);
