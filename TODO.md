@@ -7,6 +7,9 @@
 - [x] Material Icon Theme integration
 - [x] Update the database model to be able to store more settings and specifically the PID codes for better handling of project instances
 - [x] Zombie process detection and protection
+- [x] Named Job Objects for Process Takeover & Recovery
+- [x] Asynchronous I/O Logging (Stream-based)
+- [x] IPC Log Batching for High-Performance UI
 - [ ] docker support
 - [ ] multiple node.js versions support
 - [ ] backuping and rollback
@@ -33,8 +36,8 @@
 - [x] Interactive Sidebar Reordering (Drag and Drop)
 - [x] Real-time Sidebar Sync & Cache-busting icons
 - [x] Persistent server custom ordering
-- [ ] resource usage history/graphs
-- [ ] alerts for high CPU/RAM usage
+- [x] O(1) Native Resource Monitoring (Job Objects)
+- [ ] resource usage history/graphs (In Progress)
 - [ ] auto-update system for the application
 - [ ] backup/restore for project configurations
 - [ ] plugin system or custom shell hooks

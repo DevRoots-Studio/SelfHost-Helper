@@ -49,12 +49,25 @@ async function getAllWindowsProcesses() {
 
     return processes;
   } catch (_err) {
-    logger.error(
-      `[processTree] Failed to get Windows processes via WMIC:`,
-      _err
-    );
-    // Silent fallback to empty list
-    return [];
+    try {
+      logger.info(
+        "[processTree] WMIC failed or missing, falling back to PowerShell..."
+      );
+      const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CommandLine | ConvertTo-Json -Compress"`;
+      const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
+      if (!stdout.trim()) return [];
+
+      const data = JSON.parse(stdout);
+      const rawList = Array.isArray(data) ? data : [data];
+      return rawList.map((p) => ({
+        pid: p.ProcessId,
+        parentPid: p.ParentProcessId,
+        commandLine: p.CommandLine || "",
+      }));
+    } catch (innerErr) {
+      logger.error(`[processTree] All process scanners failed:`, innerErr);
+      return [];
+    }
   }
 }
 

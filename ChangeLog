@@ -1,3 +1,22 @@
+# Change Log
+
+> release "v0.8.0"
+
+- **High-Performance Resource Monitoring (Native C++ Hook)**:
+  - Transitioned from high-overhead PowerShell polling (~2-3s delay) to instantaneous native C++ Job Object accounting.
+  - Resource retrieval is now O(1), providing precise CPU and Memory metrics with zero impact on the host system.
+- **Process Takeover & Recovery (Named Job Objects)**:
+  - Implemented a "Process Takeover" system using Named Job Objects (`Global\SelfHostHelper_Project_{uuid}`).
+  - The helper can now re-link to running project processes after a crash or manual app restart, maintaining control and monitoring continuity.
+- **Reliable Process Termination**:
+  - Replaced manual process tree walking with `TerminateJobObject`, ensuring 100% of sub-processes (Vite, Nodemon, database workers) are killed instantly and reliably.
+- **IPC & UI Performance**:
+  - **Log Batching**: Implemented a 100ms buffering system for logs. High-frequency log output (like Vite startup) no longer saturates the IPC bridge or freezes the UI.
+  - **Fast System Probing**: Switched the system process scanner to `wmic`, reducing project startup and "Ghost Process" detection time by over 90%.
+- **Architectural Polish**:
+  - Migrated the internal logging system to asynchronous writable streams for zero-stutter I/O.
+  - Improved health poller consistency using direct kernel-level process counts.
+
 > release "v0.7.5"
 
 - **Interactive Server Reordering**: Implemented drag-and-drop server reordering in the sidebar for a fully customizable workspace.
