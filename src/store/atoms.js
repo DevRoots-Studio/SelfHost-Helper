@@ -3,6 +3,9 @@ import { atom } from "jotai";
 // List of all projects
 export const projectsAtom = atom([]);
 
+// List of all categories
+export const categoriesAtom = atom([]);
+
 // The ID of the currently selected project
 export const selectedProjectIdAtom = atom(null);
 
@@ -31,3 +34,4 @@ export const projectEditorStatesAtom = atom({});
 
 // Modal states
 export const isAddProjectModalOpenAtom = atom(false);
+export const isProjectSettingsOpenAtom = atom(false);

@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import AutoLaunch from "auto-launch";
 import { Project } from "../../database/models/Project.js";
+import { Category } from "../../database/models/Category.js";
 import {
   startProject,
   stopProject,
@@ -97,9 +98,58 @@ export const registerHandlers = () => {
     return null;
   });
 
-  ipcMain.handle("projects:reorder", async (_, orders) => {
+  ipcMain.handle("projects:reorder", async (_, { orders, categoryId }) => {
     for (const item of orders) {
-      await Project.update({ order: item.order }, { where: { id: item.id } });
+      const updateData = { order: item.order };
+      // Always update categoryId if provided (can be null for no category)
+      if (categoryId !== undefined) {
+        updateData.categoryId = categoryId;
+      }
+      await Project.update(updateData, { where: { id: item.id } });
+    }
+    notifyProjectListChanged();
+    return true;
+  });
+
+  ipcMain.handle("categories:getAll", async () => {
+    const categories = await Category.findAll({
+      order: [["order", "ASC"]],
+    });
+    return categories.map((c) => c.toJSON());
+  });
+
+  ipcMain.handle("categories:add", async (_, categoryData) => {
+    const category = await Category.create(categoryData);
+    notifyProjectListChanged();
+    return category;
+  });
+
+  ipcMain.handle("categories:update", async (_, categoryData) => {
+    const { id, ...data } = categoryData;
+    const category = await Category.findByPk(id);
+    if (category) {
+      await category.update(data);
+      notifyProjectListChanged();
+      return category;
+    }
+    return null;
+  });
+
+  ipcMain.handle("categories:delete", async (_, id) => {
+    const category = await Category.findByPk(id);
+    if (category) {
+      // Unset categoryId for all projects in this category
+      await Project.update({ categoryId: null }, { where: { categoryId: id } });
+      await category.destroy();
+      notifyProjectListChanged();
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle("categories:reorder", async (_, orders) => {
+    for (const item of orders) {
+      await Category.update({ order: item.order }, { where: { id: item.id } });
     }
     notifyProjectListChanged();
     return true;
@@ -275,6 +325,16 @@ export const registerHandlers = () => {
       return true;
     } catch (error) {
       logger.error(`Failed to open external URL ${url}:`, error);
+      return false;
+    }
+  });
+
+  ipcMain.handle("shell:openPath", async (_, path) => {
+    try {
+      await shell.openPath(path);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to open path ${path}:`, error);
       return false;
     }
   });

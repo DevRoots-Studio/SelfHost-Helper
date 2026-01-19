@@ -29,16 +29,24 @@ export const initializeDatabase = async () => {
 
     // Import models manually or via a loader
     // We will import and init them here
-    const { initProjectModel } = await import(
+    const { initProjectModel, Project } = await import(
       "../../database/models/Project.js"
     );
+    const { initCategoryModel, Category } = await import(
+      "../../database/models/Category.js"
+    );
+
     initProjectModel(sequelize);
+    initCategoryModel(sequelize);
+
+    // Associations
+    Category.hasMany(Project, { foreignKey: "categoryId", as: "projects" });
+    Project.belongsTo(Category, { foreignKey: "categoryId", as: "category" });
 
     await sequelize.sync({ alter: true });
     logger.info("Database synced");
 
     // Post-sync fix for SQLite: Ensure all projects have a UUID and an Order
-    const { Project } = await import("../../database/models/Project.js");
     const projects = await Project.findAll();
     for (const project of projects) {
       let needsSave = false;

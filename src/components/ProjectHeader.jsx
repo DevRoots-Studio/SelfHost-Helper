@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { Play, Square, RefreshCw, Trash2, Settings } from "lucide-react";
+import { Play, Square, RefreshCw, Trash2, Settings, FolderOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
+import { useAtom } from "jotai";
+import { isProjectSettingsOpenAtom } from "@/store/atoms";
 
 export default function ProjectHeader({
   selectedProject,
@@ -13,7 +15,7 @@ export default function ProjectHeader({
   onDelete,
   onUpdate,
 }) {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useAtom(isProjectSettingsOpenAtom);
 
   return (
     <header className="h-auto min-h-[64px] flex items-center px-4 md:px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag py-2 flex-wrap gap-2  md:pr-[140px]">
@@ -97,17 +99,10 @@ export default function ProjectHeader({
           variant="ghost"
           size="icon"
           className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer hover:bg-white/5"
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => window.api.openPath(selectedProject.path)}
+          title="Open in File Explorer"
         >
-          <Settings className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer hover:bg-red-500/10"
-          onClick={() => onDelete(selectedProject.id)}
-        >
-          <Trash2 className="h-4 w-4" />
+          <FolderOpen className="h-4 w-4" />
         </Button>
       </div>
       <ProjectSettingsDialog
