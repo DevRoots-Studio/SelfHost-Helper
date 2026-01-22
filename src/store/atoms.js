@@ -35,3 +35,6 @@ export const projectEditorStatesAtom = atom({});
 // Modal states
 export const isAddProjectModalOpenAtom = atom(false);
 export const isProjectSettingsOpenAtom = atom(false);
+
+// Unsaved changes in projects (filePath -> content)
+export const unsavedChangesAtom = atom({});
