@@ -8,6 +8,11 @@ import {
   MessageCircle,
   Users,
   GripVertical,
+  FolderPlus,
+  FolderOpen,
+  ChevronDown,
+  Trash2,
+  Edit2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -18,69 +23,323 @@ import { useNavigate } from "react-router-dom";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   projectsAtom,
+  categoriesAtom,
   selectedProjectAtom,
   selectedProjectIdAtom,
   isAddProjectModalOpenAtom,
+  isProjectSettingsOpenAtom,
 } from "@/store/atoms";
 import AddProjectDialog from "./AddProjectDialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 
 const API = window.api;
 
 const Sidebar = React.memo(({ onProjectsChange }) => {
   const [projects, setProjects] = useAtom(projectsAtom);
   const selectedProject = useAtomValue(selectedProjectAtom);
-  const [selectedProjectId, setSelectedProjectId] = useAtom(
-    selectedProjectIdAtom
-  );
+  const setSelectedProjectId = useSetAtom(selectedProjectIdAtom);
+
+  const [categories, setCategories] = useAtom(categoriesAtom);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState(() => {
+    const saved = localStorage.getItem("collapsedCategories");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [editProjectName, setEditProjectName] = useState("");
+  const setIsAddOpen = useSetAtom(isAddProjectModalOpenAtom);
+  const setIsProjectSettingsOpen = useSetAtom(isProjectSettingsOpenAtom);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "collapsedCategories",
+      JSON.stringify(collapsedCategories),
+    );
+  }, [collapsedCategories]);
+
+  const toggleCategory = (id) => {
+    setCollapsedCategories((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
 
   const handleDragEnd = async (result) => {
-    if (!result.destination) return;
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
 
-    const items = Array.from(projects);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    // Handle root-level reordering (mixed categories and standalone projects)
+    if (destination.droppableId === "sidebar-content") {
+      const isProject = draggableId.startsWith("project-");
+      const id = parseInt(draggableId.split("-")[1]);
 
-    // Update local state immediately for snappy feel
-    setProjects(items);
+      const combined = [
+        ...categories.map((c) => ({ ...c, isCategory: true })),
+        ...projects
+          .filter((p) => !p.categoryId)
+          .map((p) => ({ ...p, isProject: true })),
+      ].sort((a, b) => a.order - b.order);
 
-    // Prepare orders for backend
-    const orders = items.map((project, index) => ({
-      id: project.id,
-      order: index,
-    }));
+      // Find where it was in the combined list (if it was there)
+      const sourceIndexInCombined = combined.findIndex(
+        (item) =>
+          (isProject && item.isProject && item.id === id) ||
+          (!isProject && item.isCategory && item.id === id),
+      );
 
-    try {
-      await window.api.reorderProjects(orders);
-    } catch (error) {
-      console.error("Failed to save project order:", error);
-      toast.error("Failed to save project order");
+      let moved;
+      if (sourceIndexInCombined !== -1) {
+        // Item was already at root level, move it
+        [moved] = combined.splice(sourceIndexInCombined, 1);
+      } else {
+        // Item was inside a category, get it
+        const project = projects.find((p) => p.id === id);
+        if (!project) return;
+        moved = { ...project, isProject: true, categoryId: null };
+      }
+
+      combined.splice(destination.index, 0, moved);
+
+      // Distribute new orders
+      const newOrders = combined.map((item, index) => ({
+        id: item.id,
+        order: index,
+        isProject: item.isProject,
+      }));
+
+      // Update local state
+      const updatedProjects = projects.map((p) => {
+        const orderInfo = newOrders.find((o) => o.isProject && o.id === p.id);
+        if (p.id === id && isProject) {
+          return { ...p, categoryId: null, order: orderInfo?.order ?? p.order };
+        }
+        if (orderInfo) return { ...p, order: orderInfo.order };
+        return p;
+      });
+
+      const updatedCategories = categories.map((c) => {
+        const orderInfo = newOrders.find((o) => !o.isProject && o.id === c.id);
+        if (orderInfo) return { ...c, order: orderInfo.order };
+        return c;
+      });
+
+      setProjects(updatedProjects);
+      setCategories(updatedCategories);
+
+      // Persist to DB
+      try {
+        const projectOrders = newOrders
+          .filter((o) => o.isProject)
+          .map((o) => ({ id: o.id, order: o.order }));
+        const categoryOrders = newOrders
+          .filter((o) => !o.isProject)
+          .map((o) => ({ id: o.id, order: o.order }));
+
+        if (projectOrders.length > 0) {
+          await API.reorderProjects({
+            orders: projectOrders,
+            categoryId: null,
+          });
+        }
+        if (categoryOrders.length > 0) {
+          await API.reorderCategories(categoryOrders);
+        }
+      } catch (error) {
+        toast.error("Failed to reorder items");
+        onProjectsChange();
+      }
+      return;
+    }
+
+    // Explicitly handle category dragging to prevent errors when dropping over category sub-lists
+    if (draggableId.startsWith("category-")) {
+      return;
+    }
+
+    // Handle moving project into a category or reordering inside one
+    if (draggableId.startsWith("project-")) {
+      const destCategoryId = parseInt(destination.droppableId.split("-")[1]);
+      const projectId = parseInt(draggableId.replace("project-", ""));
+
+      const destProjects = projects
+        .filter((p) => p.categoryId === destCategoryId)
+        .sort((a, b) => a.order - b.order);
+
+      let movedProject = projects.find((p) => p.id === projectId);
+      if (!movedProject) return;
+
+      const filteredDest = destProjects.filter((p) => p.id !== projectId);
+
+      const finalDestProjects = [...filteredDest];
+      finalDestProjects.splice(destination.index, 0, {
+        ...movedProject,
+        categoryId: destCategoryId,
+      });
+
+      const updatedProjects = projects.map((p) => {
+        if (p.id === projectId) return { ...p, categoryId: destCategoryId };
+        return p;
+      });
+
+      setProjects(updatedProjects);
+
+      try {
+        await API.reorderProjects({
+          orders: finalDestProjects.map((p, i) => ({ id: p.id, order: i })),
+          categoryId: destCategoryId,
+        });
+
+        if (source.droppableId !== destination.droppableId) {
+          onProjectsChange();
+        }
+      } catch (error) {
+        toast.error("Failed to move project");
+        onProjectsChange();
+      }
     }
   };
-  const isAddOpen = useAtomValue(isAddProjectModalOpenAtom);
-  const setIsAddOpen = useSetAtom(isAddProjectModalOpenAtom);
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      await API.addCategory({
+        name: newCategoryName.trim(),
+        order: categories.length + projects.filter((p) => !p.categoryId).length,
+      });
+      setNewCategoryName("");
+      setIsAddingCategory(false);
+      onProjectsChange();
+    } catch (error) {
+      toast.error("Failed to add category");
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (confirm("Are you sure? Projects will be moved to Uncategorized.")) {
+      try {
+        await API.deleteCategory(id);
+        onProjectsChange();
+      } catch (error) {
+        toast.error("Failed to delete category");
+      }
+    }
+  };
+
+  const handleUpdateCategory = async (id) => {
+    if (!editCategoryName.trim()) return;
+    try {
+      await API.updateCategory({ id, name: editCategoryName.trim() });
+      setEditingCategoryId(null);
+      setEditCategoryName("");
+      onProjectsChange();
+    } catch (error) {
+      toast.error("Failed to update category");
+    }
+  };
+
+  const handleUpdateProject = async (id) => {
+    if (!editProjectName.trim()) return;
+    try {
+      await API.updateProject({ id, name: editProjectName.trim() });
+      setEditingProjectId(null);
+      setEditProjectName("");
+      onProjectsChange();
+    } catch (error) {
+      toast.error("Failed to rename project");
+    }
+  };
+
+  const handleDeleteProject = async (id) => {
+    if (
+      confirm(
+        "Are you sure? This will remove the project from SelfHost Helper.",
+      )
+    ) {
+      try {
+        await API.deleteProject(id);
+        onProjectsChange();
+      } catch (error) {
+        toast.error("Failed to delete project");
+      }
+    }
+  };
+
+  const openInExplorer = (e, path) => {
+    if (e) e.stopPropagation();
+    API.openPath(path);
+  };
+
+  const renderFolderLogo = (categoryId) => {
+    const categoryProjects = projects.filter(
+      (p) => p.categoryId === categoryId,
+    );
+
+    if (categoryProjects.length > 0) {
+      return (
+        <div className="grid grid-cols-2 gap-0.5 p-1.5 place-items-center">
+          {categoryProjects.slice(0, 4).map((p) => (
+            <div
+              key={p.id}
+              className="w-3.5 h-3.5 rounded-[2px] overflow-hidden bg-white/10"
+            >
+              {p.icon ? (
+                <img
+                  src={
+                    p.icon.match(/^(https?:\/\/|data:)/)
+                      ? p.icon
+                      : `media:///${p.icon.replace(/\\/g, "/")}?t=${new Date(
+                          p.updatedAt,
+                        ).getTime()}`
+                  }
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[6px] font-bold">
+                  {p.name.charAt(0)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return <FolderIcon className="w-5 h-5 text-muted-foreground/40" />;
+  };
+
   const navigate = useNavigate();
   const [width, setWidth] = useState(72);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isOverlayMode, setIsOverlayMode] = useState(
-    typeof window !== "undefined" && window.innerWidth <= 900
+    typeof window !== "undefined" && window.innerWidth <= 900,
   );
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [discordInfo, setDiscordInfo] = useState(null);
-  const [discordLoading, setDiscordLoading] = useState(true);
 
   const DISCORD_INVITE_CODE = "C62mj58Q2D";
 
   useEffect(() => {
     fetchDiscordInfo();
-    // If we're in overlay (narrow) mode, keep the sidebar collapsed by default
     const savedWidth = localStorage.getItem("sidebarWidth");
     if (savedWidth && !isOverlayMode) {
       const w = parseInt(savedWidth);
       setWidth(w);
       setIsCollapsed(w < 120);
     } else if (isOverlayMode) {
-      // enforce collapsed state on narrow screens
       setWidth(72);
       setIsCollapsed(true);
       setIsOverlayOpen(false);
@@ -99,7 +358,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
     const handleMouseUp = () => {
       setIsResizing(false);
-      // Persist width only when not in overlay mode
       if (!isOverlayMode) {
         localStorage.setItem("sidebarWidth", width);
       }
@@ -116,7 +374,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     };
   }, [isResizing, width, isOverlayMode]);
 
-  // Watch for window resize to decide if we should use overlay drawer behavior
   useEffect(() => {
     const handleResize = () => {
       const isNarrow = window.innerWidth <= 900;
@@ -136,7 +393,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   }, []);
 
   const toggleSidebar = () => {
-    // If we're on narrow screens, toggle overlay drawer behavior
     if (isOverlayMode) {
       if (!isOverlayOpen) {
         setWidth(280);
@@ -150,7 +406,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       return;
     }
 
-    // Desktop-like behaviour (existing logic)
     if (width < 120) {
       setWidth(280);
       setIsCollapsed(false);
@@ -162,18 +417,12 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
   const fetchDiscordInfo = async () => {
     try {
-      setDiscordLoading(true);
       const result = await API.getDiscordInfo(DISCORD_INVITE_CODE);
-
       if (result.success) {
         setDiscordInfo(result.data);
-      } else {
-        console.error("Error fetching Discord info:", result.error);
       }
     } catch (error) {
       console.error("IPC error:", error);
-    } finally {
-      setDiscordLoading(false);
     }
   };
 
@@ -187,9 +436,168 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     return `https://cdn.discordapp.com/banners/${discordInfo.guild.id}/${discordInfo.guild.banner}.png?size=1024`;
   };
 
+  const renderProject = (p, index) => {
+    const isSelected = selectedProject?.id === p.id;
+    return (
+      <Draggable
+        key={`project-${p.id}`}
+        draggableId={`project-${p.id}`}
+        index={index}
+      >
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className="outline-none"
+          >
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div
+                  onClick={() => setSelectedProjectId(p.id)}
+                  className={cn(
+                    "sidebar-item group relative transition-all duration-200 select-none",
+                    width < 120 ? "collapsed" : "",
+                    isSelected ? "active" : "hover:bg-white/5",
+                    width < 120 ? "mx-auto" : "px-3 py-2.5",
+                    snapshot.isDragging &&
+                      "opacity-50 ring-2 ring-primary bg-primary/10",
+                  )}
+                  title={width < 120 ? p.name : undefined}
+                >
+                  {width >= 120 && (
+                    <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-opacity p-1">
+                      <GripVertical className="h-3 w-3" />
+                    </div>
+                  )}
+
+                  <div
+                    className={cn(
+                      "relative shrink-0 flex items-center justify-center transition-all duration-300",
+                      width < 120 ? "w-10 h-10" : "w-10 h-10",
+                    )}
+                  >
+                    {p.icon ? (
+                      <div
+                        className={cn(
+                          "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
+                          width < 120
+                            ? "w-10 h-10 rounded-xl"
+                            : "w-8 h-8 rounded-md",
+                        )}
+                      >
+                        <img
+                          src={
+                            p.icon.match(/^(https?:\/\/|data:)/)
+                              ? p.icon
+                              : `media:///${p.icon.replace(/\\/g, "/")}?t=${
+                                  new Date(p.updatedAt).getTime() || Date.now()
+                                }`
+                          }
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
+                          width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8",
+                        )}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+
+                  {width >= 120 && (
+                    <div className="flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left">
+                      <div className="flex items-center gap-2">
+                        {editingProjectId === p.id ? (
+                          <input
+                            autoFocus
+                            className="bg-transparent border-none outline-none text-sm font-medium flex-1 text-primary"
+                            value={editProjectName}
+                            onChange={(e) => setEditProjectName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateProject(p.id);
+                              if (e.key === "Escape") setEditingProjectId(null);
+                            }}
+                            onBlur={() => setEditingProjectId(null)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className="font-medium truncate text-sm flex-1">
+                            {p.name}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs opacity-50 truncate text-muted-foreground">
+                        {p.path}
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    className={cn(
+                      "absolute transition-all duration-300 flex items-center justify-center",
+                      width < 120
+                        ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
+                        : "relative right-auto top-auto ml-auto transform-none",
+                    )}
+                  >
+                    {p.status === "running" && (
+                      <div className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                      </div>
+                    )}
+                    {p.status === "error" && (
+                      <div className="h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                    {(!p.status || p.status === "stopped") && width >= 120 && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                    )}
+                  </div>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onClick={() => {
+                    setSelectedProjectId(p.id);
+                    setIsProjectSettingsOpen(true);
+                  }}
+                >
+                  <Settings className="w-4 h-4 mr-2" /> Settings
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => {
+                    setEditingProjectId(p.id);
+                    setEditProjectName(p.name);
+                  }}
+                >
+                  <Edit2 className="w-4 h-4 mr-2" /> Rename
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => openInExplorer(null, p.path)}>
+                  <FolderOpen className="w-4 h-4 mr-2" /> Open Folder
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => handleDeleteProject(p.id)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete Server
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          </div>
+        )}
+      </Draggable>
+    );
+  };
+
   return (
     <>
-      {/* Backdrop for overlay drawer */}
       {isOverlayMode && isOverlayOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-40"
@@ -206,7 +614,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           "bg-transparent border-r border-white/5 flex flex-col backdrop-blur-xl relative overflow-hidden group/sidebar",
           isOverlayMode && isOverlayOpen
             ? "fixed inset-y-0 left-0 z-50 shadow-xl bg-background/90"
-            : ""
+            : "",
         )}
         initial={false}
         animate={{ width: width }}
@@ -215,7 +623,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           duration: 0.1,
         }}
       >
-        {/* Resizer Handle */}
         <div
           className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50"
           onMouseDown={(e) => {
@@ -226,7 +633,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         <div
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
-            width < 120 ? "justify-center px-0" : "justify-between px-4"
+            width < 120 ? "justify-center px-0" : "justify-between px-4",
           )}
         >
           <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -245,16 +652,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           </div>
 
           <div className="flex items-center gap-1 shrink-0 no-drag">
-            {width >= 120 && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsAddOpen(true)}
-                className="hover:bg-primary/20 hover:text-primary cursor-pointer w-8 h-8"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
             <Button
               size="icon"
               variant="ghost"
@@ -273,148 +670,293 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="projects">
-            {(provided) => (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
               <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-1"
+                className={cn(
+                  "flex-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar",
+                  isCollapsed ? "space-y-3" : "space-y-5",
+                )}
               >
-                {projects.map((p, index) => {
-                  const isSelected = selectedProject?.id === p.id;
-                  return (
-                    <Draggable
-                      key={p.id.toString()}
-                      draggableId={p.id.toString()}
-                      index={index}
+                {isAddingCategory && !isCollapsed && (
+                  <div className="px-2 py-1 bg-white/5 rounded-lg flex items-center gap-2 border border-primary/20">
+                    <input
+                      autoFocus
+                      className="bg-transparent border-none outline-none text-sm flex-1 pl-1"
+                      placeholder="Category Name..."
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddCategory();
+                        if (e.key === "Escape") setIsAddingCategory(false);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setIsAddingCategory(false), 200);
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-6 h-6 hov-primary"
+                      onClick={handleAddCategory}
                     >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          onClick={() => setSelectedProjectId(p.id)}
-                          className={cn(
-                            "sidebar-item group relative transition-all duration-200",
-                            width < 120 ? "collapsed" : "",
-                            isSelected ? "active" : "hover:bg-white/5",
-                            width < 120 ? "mx-auto" : "px-3 py-2.5",
-                            snapshot.isDragging &&
-                              "opacity-50 ring-2 ring-primary bg-primary/10"
-                          )}
-                          title={width < 120 ? p.name : undefined}
-                        >
-                          {/* Drag Handle */}
-                          {width >= 120 && (
-                            <div
-                              {...provided.dragHandleProps}
-                              className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 hover:opacity-100 transition-opacity p-1 cursor-grab active:cursor-grabbing"
-                            >
-                              <GripVertical className="h-3 w-3" />
-                            </div>
-                          )}
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
 
-                          {/* Icon Container */}
-                          <div
-                            className={cn(
-                              "relative shrink-0 flex items-center justify-center transition-all duration-300",
-                              width < 120 ? "w-10 h-10" : "w-10 h-10"
-                            )}
-                            {...(width < 120 ? provided.dragHandleProps : {})}
-                          >
-                            {p.icon ? (
-                              <div
-                                className={cn(
-                                  "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
-                                  width < 120
-                                    ? "w-10 h-10 rounded-xl"
-                                    : "w-8 h-8 rounded-md"
-                                )}
-                              >
-                                <img
-                                  src={
-                                    p.icon.match(/^(https?:\/\/|data:)/)
-                                      ? p.icon
-                                      : (() => {
-                                          const normalizedPath = p.icon.replace(
-                                            /\\/g,
-                                            "/"
-                                          );
-                                          // The triple slash ensures the path is treated as an absolute path
-                                          // Add a cache-buster query param using the project's updatedAt or a generic one
-                                          return `media:///${normalizedPath}?t=${
-                                            new Date(p.updatedAt).getTime() ||
-                                            Date.now()
-                                          }`;
-                                        })()
-                                  }
-                                  alt={p.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div
-                                className={cn(
-                                  "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
-                                  width < 120
-                                    ? "w-10 h-10 rounded-xl"
-                                    : "w-8 h-8"
-                                )}
-                              >
-                                {p.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Text Content (Hidden when narrow) */}
-                          {width >= 120 && (
-                            <div
-                              className={cn(
-                                "flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left"
-                              )}
-                            >
-                              <span className="font-medium truncate text-sm">
-                                {p.name}
-                              </span>
-                              <span className="text-xs opacity-50 truncate text-muted-foreground">
-                                {p.path}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Status Dot */}
-                          <div
-                            className={cn(
-                              "absolute transition-all duration-300 flex items-center justify-center",
-                              width < 120
-                                ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
-                                : "relative right-auto top-auto ml-auto transform-none"
-                            )}
-                          >
-                            {p.status === "running" && (
-                              <div className="relative flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                              </div>
-                            )}
-                            {p.status === "error" && (
-                              <div className="h-2 w-2 rounded-full bg-red-500" />
-                            )}
-                            {(!p.status || p.status === "stopped") &&
-                              width >= 120 && (
-                                <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
-                              )}
-                          </div>
-                        </div>
+                <Droppable droppableId="sidebar-content" type="project">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className={cn(
+                        isCollapsed ? "space-y-3" : "space-y-5",
+                        "min-h-full pb-20 transition-all",
                       )}
-                    </Draggable>
-                  );
-                })}
-                {provided.placeholder}
+                    >
+                      {[
+                        ...categories.map((c) => ({ ...c, isCategory: true })),
+                        ...projects
+                          .filter((p) => !p.categoryId)
+                          .map((p) => ({ ...p, isProject: true })),
+                      ]
+                        .sort((a, b) => a.order - b.order)
+                        .map((item, index) => {
+                          if (item.isProject) {
+                            return renderProject(item, index);
+                          }
+
+                          const category = item;
+                          const isCategoryCollapsed =
+                            collapsedCategories.includes(category.id);
+                          return (
+                            <Draggable
+                              key={`category-${category.id}`}
+                              draggableId={`category-${category.id}`}
+                              index={index}
+                            >
+                              {(providedCat, snapshotCat) => (
+                                <div
+                                  ref={providedCat.innerRef}
+                                  {...providedCat.draggableProps}
+                                  className="outline-none"
+                                >
+                                  <ContextMenu>
+                                    <ContextMenuTrigger asChild>
+                                      <div
+                                        className={cn(
+                                          "transition-all duration-300",
+                                          isCollapsed
+                                            ? cn(
+                                                "mx-auto w-12 rounded-xl overflow-hidden transition-all duration-300",
+                                                isCategoryCollapsed
+                                                  ? "hover:bg-white/5"
+                                                  : "bg-primary/[0.07] shadow-lg ring-1 ring-white/10",
+                                              )
+                                            : cn(
+                                                "rounded-xl border transition-all duration-500",
+                                                isCategoryCollapsed
+                                                  ? "bg-primary/[0.07] border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-lg"
+                                                  : "bg-primary/[0.07] border-primary/20 p-1.5 shadow-2xl shadow-black/40",
+                                              ),
+                                          snapshotCat.isDragging &&
+                                            "opacity-80 scale-95",
+                                        )}
+                                      >
+                                        <div
+                                          className={cn(
+                                            "flex items-center justify-between group/cat",
+                                            !isCollapsed && "px-2 py-1.5",
+                                          )}
+                                        >
+                                          <div
+                                            className={cn(
+                                              "flex items-center gap-2 flex-1 min-w-0 cursor-pointer select-none",
+                                              isCollapsed
+                                                ? "w-12 h-12 justify-center"
+                                                : "",
+                                            )}
+                                            onClick={() =>
+                                              toggleCategory(category.id)
+                                            }
+                                            {...providedCat.dragHandleProps}
+                                          >
+                                            {isCollapsed ? (
+                                              renderFolderLogo(category.id)
+                                            ) : (
+                                              <>
+                                                <div className="opacity-0 group-hover/cat:opacity-30 transition-opacity p-1 -ml-1">
+                                                  <GripVertical className="h-3 w-3" />
+                                                </div>
+                                                <ChevronDown
+                                                  className={cn(
+                                                    "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                                                    isCategoryCollapsed &&
+                                                      "-rotate-90",
+                                                  )}
+                                                />
+                                                {editingCategoryId ===
+                                                category.id ? (
+                                                  <input
+                                                    autoFocus
+                                                    className="bg-transparent border-none outline-none text-xs font-bold uppercase tracking-wider flex-1 text-primary"
+                                                    value={editCategoryName}
+                                                    onChange={(e) =>
+                                                      setEditCategoryName(
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    onKeyDown={(e) => {
+                                                      if (e.key === "Enter")
+                                                        handleUpdateCategory(
+                                                          category.id,
+                                                        );
+                                                    }}
+                                                    onBlur={() =>
+                                                      setEditingCategoryId(null)
+                                                    }
+                                                  />
+                                                ) : (
+                                                  <span
+                                                    className={cn(
+                                                      "text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-300 truncate",
+                                                      isCategoryCollapsed
+                                                        ? "text-muted-foreground/40 group-hover/cat:text-muted-foreground/70"
+                                                        : "text-primary/80",
+                                                    )}
+                                                  >
+                                                    {category.name}
+                                                  </span>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <AnimatePresence initial={false}>
+                                          {!isCategoryCollapsed && (
+                                            <motion.div
+                                              initial={
+                                                snapshotCat.isDragging
+                                                  ? { height: 0, opacity: 0 }
+                                                  : { height: 0, opacity: 0 }
+                                              }
+                                              animate={
+                                                snapshotCat.isDragging
+                                                  ? { height: 0, opacity: 0 }
+                                                  : {
+                                                      height: "auto",
+                                                      opacity: 1,
+                                                    }
+                                              }
+                                              exit={{ height: 0, opacity: 0 }}
+                                              transition={
+                                                snapshotCat.isDragging
+                                                  ? { duration: 0 }
+                                                  : {
+                                                      duration: 0.3,
+                                                      ease: [
+                                                        0.04, 0.62, 0.23, 0.98,
+                                                      ],
+                                                    }
+                                              }
+                                              className="overflow-hidden"
+                                            >
+                                              <Droppable
+                                                droppableId={`cat-${category.id}`}
+                                                type="project"
+                                              >
+                                                {(
+                                                  providedProj,
+                                                  snapshotProj,
+                                                ) => (
+                                                  <div
+                                                    {...providedProj.droppableProps}
+                                                    ref={providedProj.innerRef}
+                                                    className={cn(
+                                                      "space-y-1 min-h-[4px] transition-all duration-300 rounded-lg",
+                                                      snapshotProj.isDraggingOver &&
+                                                        "bg-primary/10",
+                                                      isCollapsed
+                                                        ? "pb-2"
+                                                        : "mt-1.5 mb-1",
+                                                    )}
+                                                  >
+                                                    {projects
+                                                      .filter(
+                                                        (p) =>
+                                                          p.categoryId ===
+                                                          category.id,
+                                                      )
+                                                      .sort(
+                                                        (a, b) =>
+                                                          a.order - b.order,
+                                                      )
+                                                      .map((p, index) =>
+                                                        renderProject(p, index),
+                                                      )}
+                                                    {providedProj.placeholder}
+                                                  </div>
+                                                )}
+                                              </Droppable>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </div>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                      <ContextMenuItem
+                                        onClick={() => {
+                                          setEditingCategoryId(category.id);
+                                          setEditCategoryName(category.name);
+                                        }}
+                                      >
+                                        <Edit2 className="w-4 h-4 mr-2" />{" "}
+                                        Rename Category
+                                      </ContextMenuItem>
+                                      <ContextMenuSeparator />
+                                      <ContextMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() =>
+                                          handleDeleteCategory(category.id)
+                                        }
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />{" "}
+                                        Delete Category
+                                      </ContextMenuItem>
+                                    </ContextMenuContent>
+                                  </ContextMenu>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-            )}
-          </Droppable>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => setIsAddOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Add Server
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => setIsAddingCategory(true)}>
+                <FolderPlus className="w-4 h-4 mr-2" /> Add Category
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </DragDropContext>
-        <div className="p-4 bg-card/30 space-y-2 mt-auto">
+
+        <div
+          className={cn(
+            "bg-card/30 mt-auto",
+            isCollapsed
+              ? "p-3 space-y-3 flex flex-col items-center"
+              : "p-4 space-y-2",
+          )}
+        >
           <AnimatePresence mode="wait">
             {isCollapsed ? (
               <motion.div
@@ -499,7 +1041,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-medium"
                       onClick={() =>
                         API.openExternal(
-                          `https://discord.gg/${DISCORD_INVITE_CODE}`
+                          `https://discord.gg/${DISCORD_INVITE_CODE}`,
                         )
                       }
                     >
@@ -517,7 +1059,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               onClick={() => navigate("/settings")}
               className={cn(
                 "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer",
-                isCollapsed ? "justify-center px-0" : "justify-start px-3"
+                isCollapsed ? "justify-center px-0" : "justify-start px-3",
               )}
             >
               <Settings className="h-4 w-4 shrink-0" />

@@ -21,7 +21,16 @@ contextBridge.exposeInMainWorld("api", {
   addProject: (project) => ipcRenderer.invoke("projects:add", project),
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
-  reorderProjects: (orders) => ipcRenderer.invoke("projects:reorder", orders),
+  reorderProjects: (payload) =>
+    ipcRenderer.invoke("projects:reorder", payload),
+
+  getCategories: () => ipcRenderer.invoke("categories:getAll"),
+  addCategory: (category) => ipcRenderer.invoke("categories:add", category),
+  deleteCategory: (id) => ipcRenderer.invoke("categories:delete", id),
+  updateCategory: (category) =>
+    ipcRenderer.invoke("categories:update", category),
+  reorderCategories: (orders) =>
+    ipcRenderer.invoke("categories:reorder", orders),
 
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   selectFile: () => ipcRenderer.invoke("dialog:openFile"),
@@ -80,6 +89,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
+  openPath: (path) => ipcRenderer.invoke("shell:openPath", path),
   getDiscordInfo: (invitecode) =>
     ipcRenderer.invoke("discord:getInviteInfo", invitecode),
   getProjectStats: (id) => ipcRenderer.invoke("project:getStats", id),

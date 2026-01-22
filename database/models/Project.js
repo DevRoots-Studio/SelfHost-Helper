@@ -74,6 +74,14 @@ export const initProjectModel = (sequelize) => {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
       },
+      categoryId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "Categories",
+          key: "id",
+        },
+      },
     },
     {
       sequelize,

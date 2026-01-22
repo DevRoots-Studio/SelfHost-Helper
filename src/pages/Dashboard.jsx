@@ -28,9 +28,15 @@ export default function Dashboard() {
     atoms.projectEditorStatesAtom
   );
 
-  const loadProjects = async () => {
-    const list = await API.getProjects();
-    setProjects(list);
+  const setCategories = useSetAtom(atoms.categoriesAtom);
+
+  const loadData = async () => {
+    const [projectList, categoryList] = await Promise.all([
+      API.getProjects(),
+      API.getCategories(),
+    ]);
+    setProjects(projectList);
+    setCategories(categoryList);
   };
 
   const loadFileTree = async (path) => {
@@ -41,7 +47,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    loadProjects();
+    loadData();
     const cleanupStatus = API.onStatusChange(
       ({ projectId, status, startTime }) => {
         setProjects((prev) => {
@@ -62,7 +68,7 @@ export default function Dashboard() {
       }
     );
     const cleanupList = API.onProjectsChange(() => {
-      loadProjects();
+      loadData();
     });
     const appendLogs = (projectId, logEntries) => {
       setLogs((prev) => {
@@ -186,7 +192,7 @@ export default function Dashboard() {
       const success = await API.deleteProject(id);
       if (success) {
         toast.warning("Project removed");
-        loadProjects();
+        loadData();
         if (selectedProjectId === id) setSelectedProjectId(null);
         setLogs((prev) => {
           const newLogs = { ...prev };
@@ -231,7 +237,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
-      <Sidebar onProjectsChange={loadProjects} />
+      <Sidebar onProjectsChange={loadData} />
 
       <main className="flex-1 flex flex-col min-w-0 bg-background/50 relative overflow-hidden">
         {selectedProject ? (

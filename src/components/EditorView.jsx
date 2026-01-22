@@ -3,6 +3,8 @@ import { FileCode, Save, FolderOpen, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
+import { useAtom } from "jotai";
+import * as atoms from "@/store/atoms";
 import FileTree from "@/components/FileTree";
 import MonacoEditor from "@/editors/MonacoEditor";
 
@@ -80,6 +82,18 @@ export default function EditorView({
   const [currentFile, setCurrentFile] = useState(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
+  const [unsavedChanges, setUnsavedChanges] = useAtom(atoms.unsavedChangesAtom);
+
+  const editorContentRef = useRef(editorContent);
+  const currentFileRef = useRef(currentFile);
+
+  useEffect(() => {
+    editorContentRef.current = editorContent;
+  }, [editorContent]);
+
+  useEffect(() => {
+    currentFileRef.current = currentFile;
+  }, [currentFile]);
 
   // File tree resize state and ref
   const treeRef = useRef(null);
@@ -130,12 +144,21 @@ export default function EditorView({
       setCurrentFile(null);
       setEditorContent("");
     }
-  }, [projectId]);
+  }, [projectId, initialFile]);
 
   const loadFile = async (filePath) => {
     setIsFileLoading(true);
     setFileLoadError(null);
     setCurrentFile(filePath);
+
+    // If we have unsaved changes for this file, load them instead of reading from disk
+    if (unsavedChanges[filePath] !== undefined) {
+      setEditorContent(unsavedChanges[filePath]);
+      setIsFileLoading(false);
+      onFileSelect?.(filePath);
+      return;
+    }
+
     setEditorContent("");
 
     try {
@@ -169,11 +192,20 @@ export default function EditorView({
   };
 
   const handleSaveFile = useCallback(async () => {
-    if (currentFile && editorContent !== undefined) {
+    const fileToSave = currentFileRef.current;
+    const contentToSave = editorContentRef.current;
+
+    if (fileToSave && contentToSave !== undefined) {
       try {
-        const success = await API.writeFile(currentFile, editorContent);
+        const success = await API.writeFile(fileToSave, contentToSave);
         if (success) {
           toast.success("File saved");
+          // Remove from unsaved changes
+          setUnsavedChanges((prev) => {
+            const next = { ...prev };
+            delete next[fileToSave];
+            return next;
+          });
         } else {
           toast.error("Failed to save file");
         }
@@ -181,7 +213,17 @@ export default function EditorView({
         toast.error(`Error saving file: ${err.message}`);
       }
     }
-  }, [currentFile, editorContent]);
+  }, [setUnsavedChanges]);
+
+  const handleEditorChange = (newContent) => {
+    setEditorContent(newContent);
+    if (currentFile) {
+      setUnsavedChanges((prev) => ({
+        ...prev,
+        [currentFile]: newContent,
+      }));
+    }
+  };
 
   // Bind Ctrl/Cmd+S to save the current file (capture phase to prevent browser default)
   useEffect(() => {
@@ -290,7 +332,8 @@ export default function EditorView({
             ) : (
               <MonacoEditor
                 value={editorContent}
-                onChange={setEditorContent}
+                onChange={handleEditorChange}
+                onSave={handleSaveFile}
                 language={getLanguageFromPath(currentFile)}
               />
             )

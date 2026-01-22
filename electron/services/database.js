@@ -29,16 +29,37 @@ export const initializeDatabase = async () => {
 
     // Import models manually or via a loader
     // We will import and init them here
-    const { initProjectModel } = await import(
+    const { initProjectModel, Project } = await import(
       "../../database/models/Project.js"
     );
-    initProjectModel(sequelize);
+    const { initCategoryModel, Category } = await import(
+      "../../database/models/Category.js"
+    );
 
-    await sequelize.sync({ alter: true });
-    logger.info("Database synced");
+    initProjectModel(sequelize);
+    initCategoryModel(sequelize);
+
+    // Associations
+    Category.hasMany(Project, { foreignKey: "categoryId", as: "projects" });
+    Project.belongsTo(Category, { foreignKey: "categoryId", as: "category" });
+
+    // For SQLite, disable foreign key checks during sync to allow table recreation
+    await sequelize.query("PRAGMA foreign_keys = OFF");
+    try {
+      // Clear any potential stale backup tables left from previous failed syncs
+      await sequelize.query("DROP TABLE IF EXISTS `Categories_backup`").catch(() => {});
+      await sequelize.query("DROP TABLE IF EXISTS `Projects_backup`").catch(() => {});
+      
+      await sequelize.sync({ alter: true });
+      logger.info("Database synced");
+    } catch (syncError) {
+      logger.error("Database sync failed, attempting plain sync:", syncError);
+      await sequelize.sync().catch(e => logger.error("Plain sync also failed:", e));
+    } finally {
+      await sequelize.query("PRAGMA foreign_keys = ON");
+    }
 
     // Post-sync fix for SQLite: Ensure all projects have a UUID and an Order
-    const { Project } = await import("../../database/models/Project.js");
     const projects = await Project.findAll();
     for (const project of projects) {
       let needsSave = false;

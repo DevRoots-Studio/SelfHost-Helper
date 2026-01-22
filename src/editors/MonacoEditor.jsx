@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 const MonacoEditor = ({
   value,
   onChange,
+  onSave,
   language = "javascript",
   theme = "vs-dark",
 }) => {
@@ -38,6 +39,16 @@ const MonacoEditor = ({
               target: monaco.languages.ScriptTarget.ESNext,
             });
           }
+
+          // Add save action (Ctrl/Cmd+S)
+          editor.addAction({
+            id: "save-file",
+            label: "Save File",
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+            run: () => {
+              if (onSave) onSave();
+            },
+          });
         }}
         loading={
           <div className="flex items-center justify-center h-full text-muted-foreground">
