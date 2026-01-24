@@ -146,16 +146,16 @@ export const startTunnel = async (
 
       const tunnelOptions = {
         "--protocol": config.protocol || "http2",
-        "--loglevel": config.loglevel || "info",
+        // "--loglevel": config.loglevel || "info",
       };
 
       if (config.noTLSVerify) {
         tunnelOptions["--no-tls-verify"] = true;
       }
 
-      if (config.connectTimeout) {
-        tunnelOptions["--proxy-connect-timeout"] = config.connectTimeout;
-      }
+      // if (config.connectTimeout) {
+      //   tunnelOptions["--proxy-connect-timeout"] = config.connectTimeout;
+      // }
 
       if (config.httpHostHeader) {
         tunnelOptions["--http-host-header"] = config.httpHostHeader;
@@ -193,7 +193,11 @@ export const startTunnel = async (
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
       currentUrl = `https://${url}`; // Persist URL
       tunnel.url = currentUrl;
-      sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
+      sendTunnelStatus(projectId, {
+        status: "running",
+        url: currentUrl,
+        port: portNum,
+      });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
 
@@ -205,7 +209,11 @@ export const startTunnel = async (
       // NOTE: Authenticated tunnels may not emit a 'url' event.
       // The 'connected' event acts as confirmation that the tunnel is active.
       if (mode === "authenticated") {
-        sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
+        sendTunnelStatus(projectId, {
+          status: "running",
+          url: currentUrl,
+          port: portNum,
+        });
       }
     });
 
