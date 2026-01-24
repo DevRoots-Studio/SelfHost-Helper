@@ -458,6 +458,9 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   className={cn(
                     "sidebar-item group relative transition-all duration-200 select-none",
                     width < 120 ? "collapsed" : "",
+                    width < 120 && !p.categoryId && !isSelected
+                      ? "border-white/5"
+                      : "",
                     isSelected ? "active" : "hover:bg-white/5",
                     width < 120 ? "mx-auto" : "px-3 py-2.5",
                     snapshot.isDragging &&
@@ -751,7 +754,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                             ? cn(
                                                 "mx-auto w-12 rounded-xl overflow-hidden transition-all duration-300",
                                                 isCategoryCollapsed
-                                                  ? "hover:bg-white/5"
+                                                  ? "hover:bg-white/5 border-2 border-white/5"
                                                   : "bg-primary/[0.07] shadow-lg ring-1 ring-white/10",
                                               )
                                             : cn(
