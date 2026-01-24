@@ -123,6 +123,8 @@ export const startTunnel = async (
     sendTunnelStatus(projectId, { status: "connecting" });
     sendTunnelLog(projectId, `Starting ${mode} tunnel to ${targetUrl}...`);
 
+    let currentUrl = null;
+
     if (mode === "quick") {
       // Quick tunnel - no authentication needed
       tunnel = Tunnel.quick(targetUrl);
@@ -172,6 +174,7 @@ export const startTunnel = async (
 
       if (publicHostnameRule) {
         const url = `https://${publicHostnameRule.hostname}`;
+        currentUrl = url; // Persist URL
         logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
         sendTunnelStatus(projectId, { status: "running", url });
         sendTunnelLog(projectId, `Tunnel URL detected: ${url}`, "success");
@@ -183,6 +186,7 @@ export const startTunnel = async (
     // Event: URL available
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
+      currentUrl = url; // Persist URL
       sendTunnelStatus(projectId, { status: "running", url });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
@@ -195,7 +199,7 @@ export const startTunnel = async (
       // NOTE: Authenticated tunnels may not emit a 'url' event.
       // The 'connected' event acts as confirmation that the tunnel is active.
       if (mode === "authenticated") {
-        sendTunnelStatus(projectId, { status: "running" });
+        sendTunnelStatus(projectId, { status: "running", url: currentUrl });
       }
     });
 
