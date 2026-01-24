@@ -186,8 +186,8 @@ export const startTunnel = async (
     // Event: URL available
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
-      currentUrl = url; // Persist URL
-      sendTunnelStatus(projectId, { status: "running", url });
+      currentUrl = `https://${url}`; // Persist URL
+      sendTunnelStatus(projectId, { status: "running", url: currentUrl });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
 
