@@ -1,5 +1,5 @@
 import React from "react";
-import { Terminal, FileCode } from "lucide-react";
+import { Terminal, FileCode, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useAtomValue } from "jotai";
@@ -30,6 +30,17 @@ const ViewTabs = React.memo(({ viewMode, onViewModeChange }) => {
         )}
       >
         <FileCode className="mr-2 h-4 w-4" /> Editor
+      </button>
+      <button
+        onClick={() => onViewModeChange("tunnel")}
+        className={cn(
+          "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent",
+          viewMode === "tunnel"
+            ? "bg-muted/40 text-primary border-white/10 backdrop-blur-md shadow-none"
+            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+        )}
+      >
+        <Cloud className="mr-2 h-4 w-4" /> Tunnel
       </button>
 
       {/* Stats Display */}

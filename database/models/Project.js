@@ -82,6 +82,38 @@ export const initProjectModel = (sequelize) => {
           key: "id",
         },
       },
+      tunnelMode: {
+        type: DataTypes.STRING,
+        defaultValue: "quick",
+      },
+      tunnelPort: {
+        type: DataTypes.INTEGER,
+        defaultValue: 3000,
+      },
+      tunnelToken: {
+        type: DataTypes.STRING,
+        defaultValue: "",
+      },
+      tunnelConfig: {
+        type: DataTypes.TEXT,
+        defaultValue: "{}",
+        get() {
+          const rawValue = this.getDataValue("tunnelConfig");
+          if (!rawValue) return {};
+          try {
+            return JSON.parse(rawValue);
+          } catch (e) {
+            return {};
+          }
+        },
+        set(value) {
+          this.setDataValue("tunnelConfig", JSON.stringify(value));
+        },
+      },
+      autoStartTunnel: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
     },
     {
       sequelize,

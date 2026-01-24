@@ -16,6 +16,13 @@ import {
   notifyProjectListChanged,
   clearProjectLogs,
 } from "../services/projectsManager.js";
+import { 
+  startTunnel, 
+  stopTunnel, 
+  getTunnelLogs, 
+  clearTunnelLogs, 
+  getTunnelStatus 
+} from "../services/tunnelManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
 import logger from "../services/logger.js";
 
@@ -230,6 +237,27 @@ export const registerHandlers = () => {
 
   ipcMain.handle("project:input", async (_, { id, data }) => {
     return writeToProcess(id, data);
+  });
+
+  // Tunnels
+  ipcMain.handle("tunnel:start", async (_, id, options) => {
+    return startTunnel(id, options);
+  });
+
+  ipcMain.handle("tunnel:stop", async (_, id) => {
+    return stopTunnel(id);
+  });
+
+  ipcMain.handle("tunnel:getLogs", async (_, id) => {
+    return getTunnelLogs(id);
+  });
+
+  ipcMain.handle("tunnel:clearLogs", async (_, id) => {
+    return clearTunnelLogs(id);
+  });
+
+  ipcMain.handle("tunnel:getStatus", async (_, id) => {
+    return getTunnelStatus(id);
   });
 
   // Dialogs

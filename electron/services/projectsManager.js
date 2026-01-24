@@ -20,6 +20,7 @@ const runningRuntimes = {};
 const logHistory = {};
 const statusListeners = new Set();
 const listListeners = new Set();
+import { startTunnel } from "./tunnelManager.js";
 
 export const onStatusChange = (callback) => {
   statusListeners.add(callback);
@@ -350,6 +351,19 @@ export const startProject = async (id) => {
       delete runningRuntimes[id];
       sendStatus(id, "error");
     });
+
+    // Auto-start Tunnel if configured
+    if (project.autoStartTunnel) {
+      logger.info(`[ProjectsManager] Auto-starting tunnel for project: ${project.name}`);
+      startTunnel(project.id, {
+        mode: project.tunnelMode || "quick",
+        port: project.tunnelPort || 3000,
+        token: project.tunnelToken || "",
+        config: project.tunnelConfig || {},
+      }).catch(err => {
+        logger.error(`[ProjectsManager] Failed to auto-start tunnel for ${project.name}:`, err);
+      });
+    }
 
     return { success: true };
   } catch (error) {

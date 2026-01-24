@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("api", {
   startProject: (id) => ipcRenderer.invoke("project:start", id),
   stopProject: (id) => ipcRenderer.invoke("project:stop", id),
   restartProject: (id) => ipcRenderer.invoke("project:restart", id),
+  startTunnel: (id, options) => ipcRenderer.invoke("tunnel:start", id, options),
+  stopTunnel: (id) => ipcRenderer.invoke("tunnel:stop", id),
 
   readFile: (filePath) => ipcRenderer.invoke("file:read", filePath),
   writeFile: (filePath, content) =>
@@ -64,6 +66,16 @@ contextBridge.exposeInMainWorld("api", {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("file:change", subscription);
     return () => ipcRenderer.removeListener("file:change", subscription);
+  },
+  onTunnelStatus: (callback) => {
+    const subscription = (_, data) => callback(data);
+    ipcRenderer.on("tunnel:status", subscription);
+    return () => ipcRenderer.removeListener("tunnel:status", subscription);
+  },
+  onTunnelLog: (callback) => {
+    const subscription = (_, data) => callback(data);
+    ipcRenderer.on("tunnel:log", subscription);
+    return () => ipcRenderer.removeListener("tunnel:log", subscription);
   },
 
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
