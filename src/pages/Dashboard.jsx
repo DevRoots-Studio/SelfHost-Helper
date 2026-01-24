@@ -15,18 +15,18 @@ const API = window.api;
 export default function Dashboard() {
   const [projects, setProjects] = useAtom(atoms.projectsAtom);
   const [selectedProjectId, setSelectedProjectId] = useAtom(
-    atoms.selectedProjectIdAtom
+    atoms.selectedProjectIdAtom,
   );
   const selectedProject = useAtomValue(atoms.selectedProjectAtom);
   const setLogs = useSetAtom(atoms.logsAtom);
   const [viewMode, setViewMode] = useAtom(atoms.viewModeAtom);
   const [fileTree, setFileTree] = useAtom(atoms.fileTreeAtom);
   const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(
-    atoms.isFileTreeLoadingAtom
+    atoms.isFileTreeLoadingAtom,
   );
   const setStats = useSetAtom(atoms.statsAtom);
   const [projectEditorStates, setProjectEditorStates] = useAtom(
-    atoms.projectEditorStatesAtom
+    atoms.projectEditorStatesAtom,
   );
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
 
@@ -64,10 +64,10 @@ export default function Dashboard() {
             }
           }
           return prev.map((p) =>
-            p.id === projectId ? { ...p, status, startTime } : p
+            p.id === projectId ? { ...p, status, startTime } : p,
           );
         });
-      }
+      },
     );
     const cleanupList = API.onProjectsChange(() => {
       loadData();
@@ -104,34 +104,48 @@ export default function Dashboard() {
     });
 
     // Tunnel listeners
-    const cleanupTunnelStatus = API.onTunnelStatus(({ projectId, status, url, error }) => {
-      setTunnelState((prev) => ({
-        ...prev,
-        [projectId]: {
-          ...(prev[projectId] || { logs: [] }),
-          status,
-          url,
-          error,
-        },
-      }));
-    });
-
-    const cleanupTunnelLog = API.onTunnelLog(({ projectId, message, type, timestamp }) => {
-      setTunnelState((prev) => {
-        const projectState = prev[projectId] || { status: "stopped", url: null, logs: [] };
-        const newLogs = [...(projectState.logs || []), { message, type, timestamp }];
-        // Limit to 100 logs
-        const trimmedLogs = newLogs.length > 100 ? newLogs.slice(newLogs.length - 100) : newLogs;
-        
-        return {
+    const cleanupTunnelStatus = API.onTunnelStatus(
+      ({ projectId, status, url, error }) => {
+        setTunnelState((prev) => ({
           ...prev,
           [projectId]: {
-            ...projectState,
-            logs: trimmedLogs,
+            ...(prev[projectId] || { logs: [] }),
+            status,
+            url,
+            error,
           },
-        };
-      });
-    });
+        }));
+      },
+    );
+
+    const cleanupTunnelLog = API.onTunnelLog(
+      ({ projectId, message, type, timestamp }) => {
+        setTunnelState((prev) => {
+          const projectState = prev[projectId] || {
+            status: "stopped",
+            url: null,
+            logs: [],
+          };
+          const newLogs = [
+            ...(projectState.logs || []),
+            { message, type, timestamp },
+          ];
+          // Limit to 100 logs
+          const trimmedLogs =
+            newLogs.length > 100
+              ? newLogs.slice(newLogs.length - 100)
+              : newLogs;
+
+          return {
+            ...prev,
+            [projectId]: {
+              ...projectState,
+              logs: trimmedLogs,
+            },
+          };
+        });
+      },
+    );
 
     return () => {
       cleanupStatus();
@@ -166,6 +180,31 @@ export default function Dashboard() {
       if (currentProject) {
         loadFileTree(currentProject.path);
       }
+
+      // Initialize Tunnel State
+      API.getTunnelStatus(selectedProjectId).then((status) => {
+        if (status) {
+          setTunnelState((prev) => ({
+            ...prev,
+            [selectedProjectId]: {
+              ...(prev[selectedProjectId] || { logs: [] }),
+              ...status,
+            },
+          }));
+        }
+      });
+
+      API.getTunnelLogs(selectedProjectId).then((logs) => {
+        if (logs && logs.length > 0) {
+          setTunnelState((prev) => ({
+            ...prev,
+            [selectedProjectId]: {
+              ...(prev[selectedProjectId] || { status: "stopped", url: null }),
+              logs,
+            },
+          }));
+        }
+      });
     } else {
       setStats(null);
     }
@@ -198,7 +237,7 @@ export default function Dashboard() {
     const res = await API.startProject(id);
     if (!res?.success) {
       toast.error(
-        `Failed to start project: ${res?.message || "Unknown error"}`
+        `Failed to start project: ${res?.message || "Unknown error"}`,
       );
     }
   };
@@ -253,7 +292,7 @@ export default function Dashboard() {
     const updated = await API.updateProject(projectData);
     if (updated) {
       setProjects((prev) =>
-        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
       );
       if (!silent) toast.success("Settings saved");
     } else {

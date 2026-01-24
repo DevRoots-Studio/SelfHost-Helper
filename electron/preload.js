@@ -23,8 +23,7 @@ contextBridge.exposeInMainWorld("api", {
   addProject: (project) => ipcRenderer.invoke("projects:add", project),
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
-  reorderProjects: (payload) =>
-    ipcRenderer.invoke("projects:reorder", payload),
+  reorderProjects: (payload) => ipcRenderer.invoke("projects:reorder", payload),
 
   getCategories: () => ipcRenderer.invoke("categories:getAll"),
   addCategory: (category) => ipcRenderer.invoke("categories:add", category),
@@ -108,4 +107,7 @@ contextBridge.exposeInMainWorld("api", {
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
   getAppPath: () => ipcRenderer.invoke("app:getAppPath"),
   joinPath: (...args) => ipcRenderer.invoke("path:join", ...args),
+  clearTunnelLogs: (id) => ipcRenderer.invoke("tunnel:clearLogs", id),
+  getTunnelStatus: (id) => ipcRenderer.invoke("tunnel:getStatus", id),
+  getTunnelLogs: (id) => ipcRenderer.invoke("tunnel:getLogs", id),
 });
