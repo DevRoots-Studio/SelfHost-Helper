@@ -3,8 +3,17 @@
  * Manages tunnel processes for projects using the cloudflared npm package.
  * Supports Quick Tunnel (no auth) and Authenticated Tunnel (with token).
  */
-import { Tunnel, ConfigHandler } from "cloudflared";
+import { Tunnel, ConfigHandler, bin, use } from "cloudflared";
 import logger from "./logger.js";
+
+// Fix for Electron production build where binaries must be unpacked
+if (bin.includes("app.asar") && !bin.includes("app.asar.unpacked")) {
+  const unpackedBin = bin.replace("app.asar", "app.asar.unpacked");
+  use(unpackedBin);
+  logger.info(
+    `[TunnelManager] Redirected cloudflared binary to: ${unpackedBin}`,
+  );
+}
 
 // Store running tunnels by project ID
 const runningTunnels = {};
