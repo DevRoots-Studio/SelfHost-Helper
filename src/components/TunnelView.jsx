@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
+import TunnelLogViewer from "./TunnelLogViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,7 +50,6 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
     httpHostHeader: selectedProject.tunnelConfig?.httpHostHeader || "",
   });
 
-  const logsEndRef = useRef(null);
   const prevStatusRef = useRef(projectTunnelState.status);
 
   // Reset state on project change
@@ -601,40 +601,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
             Clear
           </Button>
         </CardHeader>
-        <CardContent className="p-3 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed custom-scrollbar">
-          {projectTunnelState.logs.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 py-10 italic">
-              No logs available
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {projectTunnelState.logs.map((log, i) => (
-                <div key={i} className="flex gap-3 group">
-                  <span className="text-muted-foreground/40 shrink-0 text-[10px]">
-                    {new Date(log.timestamp).toLocaleTimeString([], {
-                      hour12: false,
-                    })}
-                  </span>
-                  <span
-                    className={cn(
-                      "break-all",
-                      log.type === "error"
-                        ? "text-destructive"
-                        : log.type === "success"
-                        ? "text-green-500"
-                        : log.type === "warn"
-                        ? "text-yellow-500"
-                        : "text-gray-300"
-                    )}
-                  >
-                    {log.message}
-                  </span>
-                </div>
-              ))}
-              <div ref={logsEndRef} />
-            </div>
-          )}
-        </CardContent>
+        <TunnelLogViewer logs={projectTunnelState.logs} />
       </Card>
     </div>
   );
