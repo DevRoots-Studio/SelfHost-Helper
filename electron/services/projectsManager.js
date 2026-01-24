@@ -360,7 +360,7 @@ export const startProject = async (id) => {
       startTunnel(project.id, {
         mode: project.tunnelMode || "quick",
         port: project.tunnelPort || 3000,
-        token: project.tunnelToken || null,
+        token: project.encryptedTunnelToken || null,
         config: project.tunnelConfig || {},
       }).catch((err) => {
         logger.error(
