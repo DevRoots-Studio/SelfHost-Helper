@@ -4,7 +4,7 @@ import logger from "./logger.js";
 /**
  * Encrypts a string using machine-bound key (electron.safeStorage).
  * @param {string} plaintext - The raw string to encrypt.
- * @returns {string|null} - Base64 encoded encrypted string or null on failure.
+ * @returns {string} - Base64 encoded encrypted string, or plaintext if encryption unavailable/failed, or empty string if input is falsy.
  */
 export const encryptSecret = (plaintext) => {
   if (!plaintext) return "";

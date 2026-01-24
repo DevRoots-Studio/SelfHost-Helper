@@ -58,6 +58,31 @@ const sendTunnelLog = (projectId, message, type = "info") => {
 };
 
 /**
+ * Sanitizes sensitive information from log messages
+ */
+const sanitizeLog = (message) => {
+  if (!message || typeof message !== "string") return message;
+
+  // Patterns to redact
+  const patterns = [
+    { regex: /Authorization:\s*[^\s]+/gi, replacement: "Authorization: [REDACTED]" },
+    { regex: /Bearer\s+[^\s]+/gi, replacement: "Bearer [REDACTED]" },
+    { regex: /Cookie:\s*[^\s]+/gi, replacement: "Cookie: [REDACTED]" },
+    { regex: /Set-Cookie:\s*[^\s]+/gi, replacement: "Set-Cookie: [REDACTED]" },
+    { regex: /X-Auth-[a-zA-Z-]*:\s*[^\s]+/gi, replacement: "X-Auth-Header: [REDACTED]" },
+    { regex: /token=[a-zA-Z0-9._-]+/gi, replacement: "token=[REDACTED]" },
+    // Rough pattern for JWT or long Base64 strings (>= 40 chars with minimal spacing)
+    { regex: /[a-zA-Z0-9_-]{40,}/gi, replacement: "[REDACTED]" },
+  ];
+
+  let sanitized = message;
+  for (const { regex, replacement } of patterns) {
+    sanitized = sanitized.replace(regex, replacement);
+  }
+  return sanitized;
+};
+
+/**
  * Start a tunnel for a project
  * @param {number} projectId - Project ID
  * @param {Object} options - Tunnel options
@@ -89,7 +114,7 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     if (mode === "quick") {
       // Quick tunnel - no authentication needed
       tunnel = Tunnel.quick(targetUrl);
-      logger.info(`[TunnelManager] Starting quick tunnel for project ${projectId} on port ${port}`);
+      logger.info(`[TunnelManager] Starting quick tunnel for project ${projectId} on port ${portNum}`);
     } else {
       // Authenticated tunnel with token
       if (!token) {
@@ -141,7 +166,11 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     tunnel.on("stdout", (data) => {
       const message = data.toString().trim();
       if (message) {
-        sendTunnelLog(projectId, message);
+        // Honor config.loglevel for forwarding
+        const currentLogLevel = config.loglevel || "info";
+        if (currentLogLevel === "debug" || !message.toLowerCase().includes("debug")) {
+          sendTunnelLog(projectId, sanitizeLog(message));
+        }
       }
     });
 
@@ -149,7 +178,7 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     tunnel.on("stderr", (data) => {
       const message = data.toString().trim();
       if (message) {
-        sendTunnelLog(projectId, message, "error");
+        sendTunnelLog(projectId, sanitizeLog(message), "error");
       }
     });
 
@@ -157,13 +186,18 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     tunnel.on("error", (error) => {
       logger.error(`[TunnelManager] Project ${projectId} tunnel error:`, error);
       sendTunnelStatus(projectId, { status: "error", error: error.message });
-      sendTunnelLog(projectId, `Error: ${error.message}`, "error");
+      sendTunnelLog(projectId, sanitizeLog(error.message), "error");
     });
 
     // Event: Exit
     tunnel.on("exit", (code, signal) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel exited with code ${code}`);
-      delete runningTunnels[projectId];
+      
+      // Verification of instance to prevent double-deletion / race conditions
+      if (runningTunnels[projectId] === tunnel) {
+        delete runningTunnels[projectId];
+      }
+      
       sendTunnelStatus(projectId, { status: "stopped" });
       sendTunnelLog(projectId, `Tunnel stopped (exit code: ${code})`);
     });
@@ -248,8 +282,12 @@ export const stopAllTunnels = () => {
   
   for (const projectId of projectIds) {
     try {
-      runningTunnels[projectId].stop();
-      delete runningTunnels[projectId];
+      const tunnel = runningTunnels[projectId];
+      if (tunnel) {
+        tunnel.stopping = true;
+        tunnel.stop();
+        // Entry is deleted in the 'exit' handler
+      }
     } catch (error) {
       logger.error(`[TunnelManager] Failed to stop tunnel for project ${projectId}:`, error);
     }

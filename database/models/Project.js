@@ -103,6 +103,10 @@ export const initProjectModel = (sequelize) => {
           try {
             return JSON.parse(rawValue);
           } catch (e) {
+            console.warn(
+              `Project.tunnelConfig contains invalid JSON for project id=${this.id}:`,
+              e
+            );
             return {};
           }
         },
