@@ -36,9 +36,15 @@ export const registerHandlers = () => {
   const originalHandle = ipcMain.handle.bind(ipcMain);
   ipcMain.handle = (channel, listener) => {
     return originalHandle(channel, async (event, ...args) => {
+      let loggedArgs = args;
+      if (channel === "tunnel:start" && args.length > 1 && args[1]?.token) {
+        // Redact token in tunnel:start options
+        loggedArgs = [args[0], { ...args[1], token: "[REDACTED]" }];
+      }
+
       logger.debug(
         `[IPC:Handle] ${channel} called with args:`,
-        JSON.stringify(args).slice(0, 500)
+        JSON.stringify(loggedArgs).slice(0, 500)
       );
       try {
         const result = await listener(event, ...args);

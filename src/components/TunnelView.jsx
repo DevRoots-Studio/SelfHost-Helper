@@ -36,7 +36,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
 
   const [mode, setMode] = useState(selectedProject.tunnelMode || "quick");
   const [port, setPort] = useState(selectedProject.tunnelPort || 3000);
-  const [token, setToken] = useState(selectedProject.tunnelToken || "");
+  const [token, setToken] = useState(selectedProject.encryptedTunnelToken || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [autoStart, setAutoStart] = useState(selectedProject.autoStartTunnel || false);
@@ -50,15 +50,25 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
   });
 
   const logsEndRef = useRef(null);
-
-  useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [projectTunnelState.logs]);
-
-  // Show toast when tunnel starts/stops
   const prevStatusRef = useRef(projectTunnelState.status);
+
+  // Reset state on project change
+  useEffect(() => {
+    setMode(selectedProject.tunnelMode || "quick");
+    setPort(selectedProject.tunnelPort || 3000);
+    setToken(selectedProject.encryptedTunnelToken || "");
+    setShowAdvanced(false);
+    setShowHelp(false);
+    setAutoStart(selectedProject.autoStartTunnel || false);
+    setConfig({
+      protocol: selectedProject.tunnelConfig?.protocol || "http2",
+      loglevel: selectedProject.tunnelConfig?.loglevel || "info",
+      noTLSVerify: selectedProject.tunnelConfig?.noTLSVerify || false,
+      connectTimeout: selectedProject.tunnelConfig?.connectTimeout || "30s",
+      httpHostHeader: selectedProject.tunnelConfig?.httpHostHeader || "",
+    });
+    prevStatusRef.current = projectTunnelState.status;
+  }, [selectedProject.id]);
   useEffect(() => {
     if (prevStatusRef.current !== "running" && projectTunnelState.status === "running") {
       toast.success("Tunnel established successfully!");
@@ -73,7 +83,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
       ...selectedProject,
       tunnelMode: mode,
       tunnelPort: port,
-      tunnelToken: token,
+      encryptedTunnelToken: token,
       tunnelConfig: config,
       autoStartTunnel: autoStart,
     };
@@ -81,6 +91,13 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
   };
 
   const handleStart = async () => {
+    // Port validation
+    const portNum = parseInt(port);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      toast.error("Please enter a valid port number (1-65535)");
+      return;
+    }
+
     if (mode === "authenticated" && !token.trim()) {
       toast.error("Cloudflare Tunnel Token is required for authenticated mode");
       return;
@@ -91,7 +108,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
 
     const res = await window.api.startTunnel(selectedProject.id, {
       mode,
-      port,
+      port: portNum,
       token,
       config,
     });
@@ -570,7 +587,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
             variant="ghost"
             size="sm"
             className="h-7 text-[10px] text-muted-foreground hover:text-foreground"
-            onClick={() => {
+            onClick={async () => {
+              await window.api.clearTunnelLogs(selectedProject.id);
               setTunnelState((prev) => ({
                 ...prev,
                 [selectedProject.id]: {

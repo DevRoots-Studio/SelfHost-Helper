@@ -72,9 +72,16 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     return { success: false, message: "Tunnel already running" };
   }
 
+  // Port validation
+  const portNum = parseInt(port);
+  if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+    sendTunnelStatus(projectId, { status: "error" });
+    return { success: false, message: "Invalid port" };
+  }
+
   try {
     let tunnel;
-    const targetUrl = `http://localhost:${port}`;
+    const targetUrl = `http://localhost:${portNum}`;
 
     sendTunnelStatus(projectId, { status: "connecting" });
     sendTunnelLog(projectId, `Starting ${mode} tunnel to ${targetUrl}...`);

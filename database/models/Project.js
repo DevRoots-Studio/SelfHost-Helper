@@ -90,7 +90,7 @@ export const initProjectModel = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 3000,
       },
-      tunnelToken: {
+      encryptedTunnelToken: {
         type: DataTypes.STRING,
         defaultValue: "",
       },
@@ -118,6 +118,29 @@ export const initProjectModel = (sequelize) => {
     {
       sequelize,
       modelName: "Project",
+      hooks: {
+        beforeSave: async (project) => {
+          if (project.changed("encryptedTunnelToken")) {
+            const { encryptSecret } = await import("../../electron/services/secretStore.js");
+            project.encryptedTunnelToken = encryptSecret(project.encryptedTunnelToken);
+          }
+        },
+        afterFind: async (results) => {
+          if (!results) return;
+          const { decryptSecret } = await import("../../electron/services/secretStore.js");
+          const decrypt = (project) => {
+            if (project.encryptedTunnelToken) {
+              project.setDataValue("encryptedTunnelToken", decryptSecret(project.encryptedTunnelToken));
+            }
+          };
+
+          if (Array.isArray(results)) {
+            results.forEach(decrypt);
+          } else {
+            decrypt(results);
+          }
+        },
+      },
     }
   );
 };
