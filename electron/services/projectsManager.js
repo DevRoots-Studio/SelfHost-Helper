@@ -295,11 +295,7 @@ export const startProject = async (id) => {
       assignPid(child.pid);
     }
 
-    project.pid = child.pid;
-    await project.save();
-
-    project.pid = child.pid;
-    await project.save();
+    await Project.update({ pid: child.pid }, { where: { id: project.id } });
 
     sendStatus(id, "running", { startTime });
 
