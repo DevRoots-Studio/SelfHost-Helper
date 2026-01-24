@@ -561,6 +561,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                               onClick={() =>
                                 copyToClipboard(projectTunnelState.url)
                               }
+                              disabled={!projectTunnelState.url}
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
@@ -569,6 +570,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-primary transition-all rounded-md"
                               onClick={() => openUrl(projectTunnelState.url)}
+                              disabled={!projectTunnelState.url}
                             >
                               <ExternalLink className="h-4 w-4" />
                             </Button>

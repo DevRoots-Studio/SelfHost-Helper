@@ -358,12 +358,20 @@ export const startProject = async (id) => {
         port: project.tunnelPort || 3000,
         token: project.encryptedTunnelToken || null,
         config: project.tunnelConfig || {},
-      }).catch((err) => {
-        logger.error(
-          `[ProjectsManager] Failed to auto-start tunnel for ${project.name}:`,
-          err,
-        );
-      });
+      })
+        .then((result) => {
+          if (result && result.success === false) {
+            logger.error(
+              `[ProjectsManager] Failed to auto-start tunnel for ${project.name}: ${result.message}`,
+            );
+          }
+        })
+        .catch((err) => {
+          logger.error(
+            `[ProjectsManager] Failed to auto-start tunnel for ${project.name}:`,
+            err,
+          );
+        });
     }
 
     return { success: true };

@@ -69,14 +69,17 @@ const sanitizeLog = (message) => {
   // Patterns to redact
   const patterns = [
     {
-      regex: /Authorization:\s*[^\s]+/gi,
+      regex: /Authorization:\s*([^\r\n;]+)/gi,
       replacement: "Authorization: [REDACTED]",
     },
-    { regex: /Bearer\s+[^\s]+/gi, replacement: "Bearer [REDACTED]" },
-    { regex: /Cookie:\s*[^\s]+/gi, replacement: "Cookie: [REDACTED]" },
-    { regex: /Set-Cookie:\s*[^\s]+/gi, replacement: "Set-Cookie: [REDACTED]" },
+    { regex: /Bearer\s+([^\r\n;]+)/gi, replacement: "Bearer [REDACTED]" },
+    { regex: /Cookie:\s*([^\r\n;]+)/gi, replacement: "Cookie: [REDACTED]" },
     {
-      regex: /X-Auth-[a-zA-Z-]*:\s*[^\s]+/gi,
+      regex: /Set-Cookie:\s*([^\r\n;]+)/gi,
+      replacement: "Set-Cookie: [REDACTED]",
+    },
+    {
+      regex: /X-Auth-[a-zA-Z-]*:\s*([^\r\n;]+)/gi,
       replacement: "X-Auth-Header: [REDACTED]",
     },
     { regex: /token=[a-zA-Z0-9._-]+/gi, replacement: "token=[REDACTED]" },
@@ -143,16 +146,16 @@ export const startTunnel = async (
 
       const tunnelOptions = {
         "--protocol": config.protocol || "http2",
-        // "--loglevel": config.loglevel || "info",
+        "--loglevel": config.loglevel || "info",
       };
 
       if (config.noTLSVerify) {
         tunnelOptions["--no-tls-verify"] = true;
       }
 
-      // if (config.connectTimeout) {
-      //   tunnelOptions["--connect-timeout"] = config.connectTimeout;
-      // }
+      if (config.connectTimeout) {
+        tunnelOptions["--proxy-connect-timeout"] = config.connectTimeout;
+      }
 
       if (config.httpHostHeader) {
         tunnelOptions["--http-host-header"] = config.httpHostHeader;
@@ -175,6 +178,7 @@ export const startTunnel = async (
       if (publicHostnameRule) {
         const url = `https://${publicHostnameRule.hostname}`;
         currentUrl = url; // Persist URL
+        tunnel.url = url;
         logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
         sendTunnelStatus(projectId, { status: "running", url, port: portNum });
         sendTunnelLog(projectId, `Tunnel URL detected: ${url}`, "success");
@@ -188,6 +192,7 @@ export const startTunnel = async (
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
       currentUrl = `https://${url}`; // Persist URL
+      tunnel.url = currentUrl;
       sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
