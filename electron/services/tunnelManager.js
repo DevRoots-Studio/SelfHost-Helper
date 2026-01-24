@@ -3,7 +3,7 @@
  * Manages tunnel processes for projects using the cloudflared npm package.
  * Supports Quick Tunnel (no auth) and Authenticated Tunnel (with token).
  */
-import { Tunnel } from "cloudflared";
+import { Tunnel, ConfigHandler } from "cloudflared";
 import logger from "./logger.js";
 
 // Store running tunnels by project ID
@@ -163,6 +163,21 @@ export const startTunnel = async (
     }
 
     // Store the tunnel instance early so it can be stopped while connecting
+    // Config Parser for Auth Tunnels
+    const configHandler = new ConfigHandler(tunnel);
+    configHandler.on("config", ({ config }) => {
+      // Look for the first ingress rule that has a hostname
+      const ingress = config.ingress || [];
+      const publicHostnameRule = ingress.find((rule) => rule.hostname);
+
+      if (publicHostnameRule) {
+        const url = `https://${publicHostnameRule.hostname}`;
+        logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
+        sendTunnelStatus(projectId, { status: "running", url });
+        sendTunnelLog(projectId, `Tunnel URL detected: ${url}`, "success");
+      }
+    });
+
     runningTunnels[projectId] = tunnel;
 
     // Event: URL available
