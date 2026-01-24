@@ -20,6 +20,7 @@ const runningRuntimes = {};
 const logHistory = {};
 const statusListeners = new Set();
 const listListeners = new Set();
+import { startTunnel } from "./tunnelManager.js";
 
 export const onStatusChange = (callback) => {
   statusListeners.add(callback);
@@ -95,7 +96,7 @@ const sendStatus = (projectId, status, extraData = {}) => {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
       logger.info(
-        `[ProjectsManager] Status Change: Project ${projectId} -> ${status}`
+        `[ProjectsManager] Status Change: Project ${projectId} -> ${status}`,
       );
       global.mainWindow.webContents.send("project:status", {
         projectId,
@@ -125,7 +126,7 @@ export const checkZombieProcesses = async () => {
           const stats = existingJob.getStats();
           if (stats.activeProcesses > 0) {
             logger.info(
-              `[ProjectsManager] Recovered running project via Job Object: ${project.name}`
+              `[ProjectsManager] Recovered running project via Job Object: ${project.name}`,
             );
 
             // Re-establish runtime without a child object (since we don't have the handle)
@@ -157,7 +158,7 @@ export const checkZombieProcesses = async () => {
       const isAlive = await isProcessGroupAlive(project.pid, process.platform);
       if (isAlive) {
         logger.warn(
-          `Zombie process group found for project ${project.name} (PID: ${project.pid})`
+          `Zombie process group found for project ${project.name} (PID: ${project.pid})`,
         );
         sendStatus(project.id, "zombie", {
           message: "Improper Shutdown Detected",
@@ -201,7 +202,7 @@ export const writeToProcess = (id, data) => {
     const toWrite = data.endsWith("\n") ? data : data + "\n";
     try {
       logger.debug(
-        `[ProjectsManager] Writing stdin to project ${id}: ${toWrite.trim()}`
+        `[ProjectsManager] Writing stdin to project ${id}: ${toWrite.trim()}`,
       );
       child.stdin.write(toWrite);
       sendLog(id, `> ${toWrite}`, "stdin");
@@ -210,7 +211,7 @@ export const writeToProcess = (id, data) => {
       sendLog(
         id,
         `Failed to write to process stdin: ${err.message}\n`,
-        "stderr"
+        "stderr",
       );
       return false;
     }
@@ -233,7 +234,7 @@ export const startProject = async (id) => {
   const resolvedScript = resolveNpmScript(project.path, commandStr);
 
   logger.info(
-    `Starting project ${id}: ${commandStr} (resolved: ${resolvedScript}) in ${project.path}`
+    `Starting project ${id}: ${commandStr} (resolved: ${resolvedScript}) in ${project.path}`,
   );
 
   // Safety: check if there's an existing process tree for this project already
@@ -294,11 +295,7 @@ export const startProject = async (id) => {
       assignPid(child.pid);
     }
 
-    project.pid = child.pid;
-    await project.save();
-
-    project.pid = child.pid;
-    await project.save();
+    await Project.update({ pid: child.pid }, { where: { id: project.id } });
 
     sendStatus(id, "running", { startTime });
 
@@ -334,12 +331,12 @@ export const startProject = async (id) => {
 
       if (pidsCount === 0) {
         logger.info(
-          `Project ${id} has no leaves left. Marking as STOPPED (Exit code: ${code}).`
+          `Project ${id} has no leaves left. Marking as STOPPED (Exit code: ${code}).`,
         );
         await cleanupProjectRuntime(id);
       } else {
         logger.info(
-          `Project ${id} shell closed but processes remain. System will continue monitoring.`
+          `Project ${id} shell closed but processes remain. System will continue monitoring.`,
         );
       }
     });
@@ -350,6 +347,32 @@ export const startProject = async (id) => {
       delete runningRuntimes[id];
       sendStatus(id, "error");
     });
+
+    // Auto-start Tunnel if configured
+    if (project.autoStartTunnel) {
+      logger.info(
+        `[ProjectsManager] Auto-starting tunnel for project: ${project.name}`,
+      );
+      startTunnel(project.id, {
+        mode: project.tunnelMode || "quick",
+        port: project.tunnelPort || 3000,
+        token: project.encryptedTunnelToken || null,
+        config: project.tunnelConfig || {},
+      })
+        .then((result) => {
+          if (result && result.success === false) {
+            logger.error(
+              `[ProjectsManager] Failed to auto-start tunnel for ${project.name}: ${result.message}`,
+            );
+          }
+        })
+        .catch((err) => {
+          logger.error(
+            `[ProjectsManager] Failed to auto-start tunnel for ${project.name}:`,
+            err,
+          );
+        });
+    }
 
     return { success: true };
   } catch (error) {
@@ -418,7 +441,7 @@ export const stopProject = async (id) => {
   sendLog(
     id,
     chalk.red(`Project ${id} terminated with exit code ${code}\n`),
-    "stdout"
+    "stdout",
   );
   sendStatus(id, "stopped");
 
@@ -508,7 +531,7 @@ export const getProjectStats = async (id) => {
     // Fallback for Unix or if Job is not available
     const procInfo = await getProjectProcessInfo(
       runtime.child.pid,
-      runtime.platform
+      runtime.platform,
     );
 
     if (procInfo.length === 0) {
@@ -573,16 +596,16 @@ export const startAutoStartProjects = async () => {
     const projects = await Project.findAll({ where: { autoStart: true } });
     if (projects.length > 0) {
       logger.info(
-        `[ProjectsManager] Found ${projects.length} auto-start projects.`
+        `[ProjectsManager] Found ${projects.length} auto-start projects.`,
       );
       for (const project of projects) {
         // Check if already running (redundant if app just started, but good practice)
         if (!runningRuntimes[project.id]) {
           logger.info(
-            `[ProjectsManager] Auto-starting project: ${project.name}`
+            `[ProjectsManager] Auto-starting project: ${project.name}`,
           );
           await startProject(project.id).catch((err) =>
-            logger.error(`Auto-start failed for ${project.name}:`, err)
+            logger.error(`Auto-start failed for ${project.name}:`, err),
           );
         }
       }
@@ -602,7 +625,7 @@ const cleanupProjectRuntime = async (id) => {
     } catch (err) {
       logger.error(
         `Failed to close job for project ${id} during cleanup:`,
-        err
+        err,
       );
     }
   }
@@ -635,14 +658,14 @@ const startStatusPoller = () => {
         } else {
           const pids = await getProjectPids(
             runtime.child.pid,
-            runtime.platform
+            runtime.platform,
           );
           hasActiveProcesses = pids.length > 0;
         }
 
         if (!hasActiveProcesses) {
           logger.info(
-            `Health Poller: Project ${id} has no active processes. Cleaning up.`
+            `Health Poller: Project ${id} has no active processes. Cleaning up.`,
           );
           await cleanupProjectRuntime(id);
         }

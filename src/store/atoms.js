@@ -38,3 +38,6 @@ export const isProjectSettingsOpenAtom = atom(false);
 
 // Unsaved changes in projects (filePath -> content)
 export const unsavedChangesAtom = atom({});
+
+// Cloudflare Tunnel State (projectId -> { status, url, logs })
+export const tunnelStateAtom = atom({});

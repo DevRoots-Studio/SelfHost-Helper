@@ -253,10 +253,11 @@ app.on("before-quit", async (e) => {
 
   try {
     const { stopAllProjects } = await import("./services/projectsManager.js");
+    const { stopAllTunnels } = await import("./services/tunnelManager.js");
     const { Project } = await import("../database/models/Project.js");
 
-    // Fast kill all running projects
-    await stopAllProjects();
+    // Fast kill all running projects and tunnels
+    await Promise.all([stopAllProjects(), stopAllTunnels()]);
     // Fast clear all PIDs in DB
     await Project.update({ pid: null }, { where: {} });
   } catch (err) {

@@ -43,6 +43,25 @@ export const initializeDatabase = async () => {
     Category.hasMany(Project, { foreignKey: "categoryId", as: "projects" });
     Project.belongsTo(Category, { foreignKey: "categoryId", as: "category" });
 
+    // Migration logic for tunnelToken -> encryptedTunnelToken
+    const queryInterface = sequelize.getQueryInterface();
+    const tableInfo = await queryInterface.describeTable("Projects");
+    if (tableInfo.tunnelToken && !tableInfo.encryptedTunnelToken) {
+      logger.info("Migrating Projects table: renaming tunnelToken to encryptedTunnelToken");
+      await queryInterface.renameColumn("Projects", "tunnelToken", "encryptedTunnelToken");
+      
+      // Re-encryption pass for legacy plaintext tokens
+      const projects = await Project.findAll();
+      for (const project of projects) {
+        if (project.encryptedTunnelToken) {
+          // Explicitly mark as changed to trigger beforeSave encryption hook
+          project.changed("encryptedTunnelToken", true);
+          await project.save();
+        }
+      }
+      logger.info("Migration complete: re-encrypted legacy tunnel tokens.");
+    }
+
     // For SQLite, disable foreign key checks during sync to allow table recreation
     await sequelize.query("PRAGMA foreign_keys = OFF");
     try {

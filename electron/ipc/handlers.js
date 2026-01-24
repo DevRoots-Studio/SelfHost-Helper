@@ -16,6 +16,13 @@ import {
   notifyProjectListChanged,
   clearProjectLogs,
 } from "../services/projectsManager.js";
+import { 
+  startTunnel, 
+  stopTunnel, 
+  getTunnelLogs, 
+  clearTunnelLogs, 
+  getTunnelStatus 
+} from "../services/tunnelManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
 import logger from "../services/logger.js";
 
@@ -29,9 +36,15 @@ export const registerHandlers = () => {
   const originalHandle = ipcMain.handle.bind(ipcMain);
   ipcMain.handle = (channel, listener) => {
     return originalHandle(channel, async (event, ...args) => {
+      let loggedArgs = args;
+      if (channel === "tunnel:start" && args.length > 1 && args[1]?.token) {
+        // Redact token in tunnel:start options
+        loggedArgs = [args[0], { ...args[1], token: "[REDACTED]" }];
+      }
+
       logger.debug(
         `[IPC:Handle] ${channel} called with args:`,
-        JSON.stringify(args).slice(0, 500)
+        JSON.stringify(loggedArgs).slice(0, 500)
       );
       try {
         const result = await listener(event, ...args);
@@ -230,6 +243,27 @@ export const registerHandlers = () => {
 
   ipcMain.handle("project:input", async (_, { id, data }) => {
     return writeToProcess(id, data);
+  });
+
+  // Tunnels
+  ipcMain.handle("tunnel:start", async (_, id, options) => {
+    return startTunnel(id, options);
+  });
+
+  ipcMain.handle("tunnel:stop", async (_, id) => {
+    return stopTunnel(id);
+  });
+
+  ipcMain.handle("tunnel:getLogs", async (_, id) => {
+    return getTunnelLogs(id);
+  });
+
+  ipcMain.handle("tunnel:clearLogs", async (_, id) => {
+    return clearTunnelLogs(id);
+  });
+
+  ipcMain.handle("tunnel:getStatus", async (_, id) => {
+    return getTunnelStatus(id);
   });
 
   // Dialogs
