@@ -57,6 +57,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
   const [autoStart, setAutoStart] = useState(
     selectedProject.autoStartTunnel || false,
   );
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [config, setConfig] = useState({
     protocol: selectedProject.tunnelConfig?.protocol || "http2",
@@ -104,7 +105,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
     const updatedProject = {
       ...selectedProject,
       tunnelMode: mode,
-      tunnelPort: port,
+      tunnelPort: port === "" ? 3000 : port,
       encryptedTunnelToken: token,
       tunnelConfig: config,
       autoStartTunnel: autoStart,
@@ -114,7 +115,9 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
 
   const handleStart = async () => {
     // Port validation
-    const portNum = parseInt(port);
+    const portToCheck = port === "" ? 3000 : port;
+    const portNum = parseInt(portToCheck);
+
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
       toast.error("Please enter a valid port number (1-65535)");
       return;
@@ -125,31 +128,45 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
       return;
     }
 
-    // Save settings silently before starting
-    await handleSave(true);
+    setIsProcessing(true);
+    try {
+      // Save settings silently before starting
+      await handleSave(true);
 
-    const res = await window.api.startTunnel(selectedProject.id, {
-      mode,
-      port: portNum,
-      token,
-      config,
-    });
+      const res = await window.api.startTunnel(selectedProject.id, {
+        mode,
+        port: portNum,
+        token,
+        config,
+      });
 
-    if (!res.success) {
-      toast.error(`Failed to start tunnel: ${res.message}`);
+      if (!res.success) {
+        toast.error(`Failed to start tunnel: ${res.message}`);
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleStop = async () => {
-    const res = await window.api.stopTunnel(selectedProject.id);
-    if (!res.success) {
-      toast.error(`Failed to stop tunnel: ${res.message}`);
+    setIsProcessing(true);
+    try {
+      const res = await window.api.stopTunnel(selectedProject.id);
+      if (!res.success) {
+        toast.error(`Failed to stop tunnel: ${res.message}`);
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.success("URL copied to clipboard");
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success("URL copied to clipboard"))
+      .catch((err) => {
+        console.error("Failed to copy to clipboard:", err);
+        toast.error("Failed to copy URL");
+      });
   };
 
   const openUrl = (url) => {
@@ -256,7 +273,17 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
               <Input
                 type="number"
                 value={port}
-                onChange={(e) => setPort(parseInt(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "") {
+                    setPort("");
+                  } else {
+                    const parsed = parseInt(val);
+                    if (!isNaN(parsed)) {
+                      setPort(parsed);
+                    }
+                  }
+                }}
                 className="bg-black/20 border-white/5 h-11"
                 placeholder="3000"
               />
@@ -444,6 +471,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
               projectTunnelState.status === "error" ? (
                 <Button
                   onClick={handleStart}
+                  disabled={isProcessing}
                   className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all shadow-lg active:scale-95 gap-2"
                 >
                   <Play className="h-4 w-4" /> Start Tunnel
@@ -452,6 +480,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                 <Button
                   onClick={handleStop}
                   variant="destructive"
+                  disabled={isProcessing}
                   className="w-full h-11 font-semibold rounded-xl transition-all shadow-lg active:scale-95 gap-2 cursor-pointer"
                 >
                   <Square className="h-4 w-4" />{" "}
