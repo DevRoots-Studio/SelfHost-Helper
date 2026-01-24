@@ -162,6 +162,17 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
       sendTunnelLog(projectId, `Disconnected: ${id}`, "warn");
     });
 
+    /**
+     * Helper to determine log type from message content
+     */
+    const getLogType = (msg, defaultType) => {
+      const lower = msg.toLowerCase();
+      if (lower.includes(" err ") || lower.includes(" error")) return "error";
+      if (lower.includes(" wrn ") || lower.includes(" warn")) return "warn";
+      if (lower.includes(" inf ") || lower.includes(" info")) return "info";
+      return defaultType;
+    };
+
     // Event: stdout
     tunnel.on("stdout", (data) => {
       const message = data.toString().trim();
@@ -169,7 +180,7 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
         // Honor config.loglevel for forwarding
         const currentLogLevel = config.loglevel || "info";
         if (currentLogLevel === "debug" || !message.toLowerCase().includes("debug")) {
-          sendTunnelLog(projectId, sanitizeLog(message));
+          sendTunnelLog(projectId, sanitizeLog(message), getLogType(message, "info"));
         }
       }
     });
@@ -178,7 +189,8 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     tunnel.on("stderr", (data) => {
       const message = data.toString().trim();
       if (message) {
-        sendTunnelLog(projectId, sanitizeLog(message), "error");
+        // Cloudflared often puts all logs on stderr, parse level
+        sendTunnelLog(projectId, sanitizeLog(message), getLogType(message, "error"));
       }
     });
 
