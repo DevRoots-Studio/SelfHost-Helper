@@ -3,8 +3,17 @@
  * Manages tunnel processes for projects using the cloudflared npm package.
  * Supports Quick Tunnel (no auth) and Authenticated Tunnel (with token).
  */
-import { Tunnel, ConfigHandler } from "cloudflared";
+import { Tunnel, ConfigHandler, bin, use } from "cloudflared";
 import logger from "./logger.js";
+
+// Fix for Electron production build where binaries must be unpacked
+if (bin.includes("app.asar") && !bin.includes("app.asar.unpacked")) {
+  const unpackedBin = bin.replace("app.asar", "app.asar.unpacked");
+  use(unpackedBin);
+  logger.info(
+    `[TunnelManager] Redirected cloudflared binary to: ${unpackedBin}`,
+  );
+}
 
 // Store running tunnels by project ID
 const runningTunnels = {};
@@ -146,16 +155,16 @@ export const startTunnel = async (
 
       const tunnelOptions = {
         "--protocol": config.protocol || "http2",
-        "--loglevel": config.loglevel || "info",
+        // "--loglevel": config.loglevel || "info",
       };
 
       if (config.noTLSVerify) {
         tunnelOptions["--no-tls-verify"] = true;
       }
 
-      if (config.connectTimeout) {
-        tunnelOptions["--proxy-connect-timeout"] = config.connectTimeout;
-      }
+      // if (config.connectTimeout) {
+      //   tunnelOptions["--proxy-connect-timeout"] = config.connectTimeout;
+      // }
 
       if (config.httpHostHeader) {
         tunnelOptions["--http-host-header"] = config.httpHostHeader;
@@ -195,7 +204,11 @@ export const startTunnel = async (
       // Use the URL as is if it already contains the protocol
       currentUrl = url.startsWith("http") ? url : `https://${url}`;
       tunnel.url = currentUrl;
-      sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
+      sendTunnelStatus(projectId, {
+        status: "running",
+        url: currentUrl,
+        port: portNum,
+      });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
 
@@ -207,7 +220,11 @@ export const startTunnel = async (
       // NOTE: Authenticated tunnels may not emit a 'url' event.
       // The 'connected' event acts as confirmation that the tunnel is active.
       if (mode === "authenticated") {
-        sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
+        sendTunnelStatus(projectId, {
+          status: "running",
+          url: currentUrl,
+          port: portNum,
+        });
       }
     });
 

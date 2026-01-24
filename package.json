@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -19,7 +19,8 @@
     "productName": "SelfHost Helper",
     "asar": true,
     "asarUnpack": [
-      "**/job.node"
+      "**/job.node",
+      "**/node_modules/cloudflared/bin/**/*"
     ],
     "files": [
       "dist/**/*",
