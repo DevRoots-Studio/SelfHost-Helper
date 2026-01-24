@@ -453,11 +453,10 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   onClick={handleStop}
                   variant="destructive"
                   className="w-full h-11 font-semibold rounded-xl transition-all shadow-lg active:scale-95 gap-2 cursor-pointer"
-                  disabled={projectTunnelState.status === "connecting"}
                 >
                   <Square className="h-4 w-4" />{" "}
                   {projectTunnelState.status === "connecting"
-                    ? "Connecting..."
+                    ? "Stop Connecting"
                     : "Stop Tunnel"}
                 </Button>
               )}
@@ -500,6 +499,14 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                       <p className="text-muted-foreground text-sm mt-1">
                         Establishing secure connection to Cloudflare edge.
                       </p>
+                      <Button
+                        onClick={handleStop}
+                        variant="outline"
+                        size="sm"
+                        className="mt-4 h-8 text-xs border-primary/20 hover:bg-primary/10"
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   </>
                 ) : projectTunnelState.status === "running" ? (

@@ -23,7 +23,10 @@ const sendTunnelStatus = (projectId, data) => {
         ...data,
       });
     } catch (error) {
-      logger.error(`Failed to send tunnel status for project ${projectId}:`, error);
+      logger.error(
+        `Failed to send tunnel status for project ${projectId}:`,
+        error,
+      );
     }
   }
 };
@@ -65,11 +68,17 @@ const sanitizeLog = (message) => {
 
   // Patterns to redact
   const patterns = [
-    { regex: /Authorization:\s*[^\s]+/gi, replacement: "Authorization: [REDACTED]" },
+    {
+      regex: /Authorization:\s*[^\s]+/gi,
+      replacement: "Authorization: [REDACTED]",
+    },
     { regex: /Bearer\s+[^\s]+/gi, replacement: "Bearer [REDACTED]" },
     { regex: /Cookie:\s*[^\s]+/gi, replacement: "Cookie: [REDACTED]" },
     { regex: /Set-Cookie:\s*[^\s]+/gi, replacement: "Set-Cookie: [REDACTED]" },
-    { regex: /X-Auth-[a-zA-Z-]*:\s*[^\s]+/gi, replacement: "X-Auth-Header: [REDACTED]" },
+    {
+      regex: /X-Auth-[a-zA-Z-]*:\s*[^\s]+/gi,
+      replacement: "X-Auth-Header: [REDACTED]",
+    },
     { regex: /token=[a-zA-Z0-9._-]+/gi, replacement: "token=[REDACTED]" },
     // Rough pattern for JWT or long Base64 strings (>= 40 chars with minimal spacing)
     { regex: /[a-zA-Z0-9_-]{40,}/gi, replacement: "[REDACTED]" },
@@ -91,7 +100,10 @@ const sanitizeLog = (message) => {
  * @param {string} options.token - Cloudflare tunnel token (for authenticated mode)
  * @param {Object} options.config - Advanced config (protocol, loglevel, etc.)
  */
-export const startTunnel = async (projectId, { mode, port, token, config = {} }) => {
+export const startTunnel = async (
+  projectId,
+  { mode, port, token, config = {} },
+) => {
   // Check if tunnel already running
   if (runningTunnels[projectId]) {
     return { success: false, message: "Tunnel already running" };
@@ -114,34 +126,44 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
     if (mode === "quick") {
       // Quick tunnel - no authentication needed
       tunnel = Tunnel.quick(targetUrl);
-      logger.info(`[TunnelManager] Starting quick tunnel for project ${projectId} on port ${portNum}`);
+      logger.info(
+        `[TunnelManager] Starting quick tunnel for project ${projectId} on port ${portNum}`,
+      );
     } else {
       // Authenticated tunnel with token
       if (!token) {
-        sendTunnelStatus(projectId, { status: "error", error: "Token is required for authenticated tunnel" });
+        sendTunnelStatus(projectId, {
+          status: "error",
+          error: "Token is required for authenticated tunnel",
+        });
         return { success: false, message: "Token is required" };
       }
 
       const tunnelOptions = {
         "--protocol": config.protocol || "http2",
-        "--loglevel": config.loglevel || "info",
+        // "--loglevel": config.loglevel || "info",
       };
 
       if (config.noTLSVerify) {
         tunnelOptions["--no-tls-verify"] = true;
       }
 
-      if (config.connectTimeout) {
-        tunnelOptions["--connect-timeout"] = config.connectTimeout;
-      }
+      // if (config.connectTimeout) {
+      //   tunnelOptions["--connect-timeout"] = config.connectTimeout;
+      // }
 
       if (config.httpHostHeader) {
         tunnelOptions["--http-host-header"] = config.httpHostHeader;
       }
 
       tunnel = Tunnel.withToken(token, tunnelOptions);
-      logger.info(`[TunnelManager] Starting authenticated tunnel for project ${projectId}`);
+      logger.info(
+        `[TunnelManager] Starting authenticated tunnel for project ${projectId}`,
+      );
     }
+
+    // Store the tunnel instance early so it can be stopped while connecting
+    runningTunnels[projectId] = tunnel;
 
     // Event: URL available
     tunnel.on("url", (url) => {
@@ -179,8 +201,15 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
       if (message) {
         // Honor config.loglevel for forwarding
         const currentLogLevel = config.loglevel || "info";
-        if (currentLogLevel === "debug" || !message.toLowerCase().includes("debug")) {
-          sendTunnelLog(projectId, sanitizeLog(message), getLogType(message, "info"));
+        if (
+          currentLogLevel === "debug" ||
+          !message.toLowerCase().includes("debug")
+        ) {
+          sendTunnelLog(
+            projectId,
+            sanitizeLog(message),
+            getLogType(message, "info"),
+          );
         }
       }
     });
@@ -190,7 +219,11 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
       const message = data.toString().trim();
       if (message) {
         // Cloudflared often puts all logs on stderr, parse level
-        sendTunnelLog(projectId, sanitizeLog(message), getLogType(message, "error"));
+        sendTunnelLog(
+          projectId,
+          sanitizeLog(message),
+          getLogType(message, "error"),
+        );
       }
     });
 
@@ -203,22 +236,25 @@ export const startTunnel = async (projectId, { mode, port, token, config = {} })
 
     // Event: Exit
     tunnel.on("exit", (code, signal) => {
-      logger.info(`[TunnelManager] Project ${projectId} tunnel exited with code ${code}`);
-      
+      logger.info(
+        `[TunnelManager] Project ${projectId} tunnel exited with code ${code}`,
+      );
+
       // Verification of instance to prevent double-deletion / race conditions
       if (runningTunnels[projectId] === tunnel) {
         delete runningTunnels[projectId];
       }
-      
+
       sendTunnelStatus(projectId, { status: "stopped" });
       sendTunnelLog(projectId, `Tunnel stopped (exit code: ${code})`);
     });
 
-    runningTunnels[projectId] = tunnel;
     return { success: true };
-
   } catch (error) {
-    logger.error(`[TunnelManager] Failed to start tunnel for project ${projectId}:`, error);
+    logger.error(
+      `[TunnelManager] Failed to start tunnel for project ${projectId}:`,
+      error,
+    );
     sendTunnelStatus(projectId, { status: "error", error: error.message });
     sendTunnelLog(projectId, `Failed to start: ${error.message}`, "error");
     return { success: false, message: error.message };
@@ -243,7 +279,10 @@ export const stopTunnel = (projectId) => {
     sendTunnelLog(projectId, "Tunnel stopped by user");
     return { success: true };
   } catch (error) {
-    logger.error(`[TunnelManager] Failed to stop tunnel for project ${projectId}:`, error);
+    logger.error(
+      `[TunnelManager] Failed to stop tunnel for project ${projectId}:`,
+      error,
+    );
     return { success: false, message: error.message };
   }
 };
@@ -291,7 +330,7 @@ export const isTunnelRunning = (projectId) => {
 export const stopAllTunnels = () => {
   const projectIds = Object.keys(runningTunnels);
   logger.info(`[TunnelManager] Stopping all ${projectIds.length} tunnels...`);
-  
+
   for (const projectId of projectIds) {
     try {
       const tunnel = runningTunnels[projectId];
@@ -301,7 +340,10 @@ export const stopAllTunnels = () => {
         // Entry is deleted in the 'exit' handler
       }
     } catch (error) {
-      logger.error(`[TunnelManager] Failed to stop tunnel for project ${projectId}:`, error);
+      logger.error(
+        `[TunnelManager] Failed to stop tunnel for project ${projectId}:`,
+        error,
+      );
     }
   }
 };
