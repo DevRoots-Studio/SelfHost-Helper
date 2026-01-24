@@ -89,12 +89,12 @@ export default function TunnelLogViewer({ logs = [] }) {
       lastLogIndexRef.current = 0;
     }
 
-    // ANSI escape codes for colors
+    // ANSI escape codes for improved colors
     const colors = {
-      info: "\x1b[37m",    // White
-      success: "\x1b[32m", // Green
-      warn: "\x1b[33m",    // Yellow
-      error: "\x1b[31m",   // Red
+      info: "\x1b[96m",    // Bright Cyan (for info)
+      success: "\x1b[92m", // Bright Green
+      warn: "\x1b[93m",    // Bright Yellow
+      error: "\x1b[91m",   // Bright Red
       reset: "\x1b[0m"
     };
 
