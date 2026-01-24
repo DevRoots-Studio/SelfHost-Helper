@@ -176,6 +176,12 @@ export const startTunnel = async (
     tunnel.on("connected", (connection) => {
       const location = connection?.location || "unknown";
       sendTunnelLog(projectId, `Connected to Cloudflare edge: ${location}`);
+
+      // NOTE: Authenticated tunnels may not emit a 'url' event.
+      // The 'connected' event acts as confirmation that the tunnel is active.
+      if (mode === "authenticated") {
+        sendTunnelStatus(projectId, { status: "running" });
+      }
     });
 
     // Event: Disconnected
