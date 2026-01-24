@@ -176,18 +176,19 @@ export const startTunnel = async (
         const url = `https://${publicHostnameRule.hostname}`;
         currentUrl = url; // Persist URL
         logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
-        sendTunnelStatus(projectId, { status: "running", url });
+        sendTunnelStatus(projectId, { status: "running", url, port: portNum });
         sendTunnelLog(projectId, `Tunnel URL detected: ${url}`, "success");
       }
     });
 
+    tunnel.port = portNum; // Store running port
     runningTunnels[projectId] = tunnel;
 
     // Event: URL available
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
       currentUrl = `https://${url}`; // Persist URL
-      sendTunnelStatus(projectId, { status: "running", url: currentUrl });
+      sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
       sendTunnelLog(projectId, `Tunnel established: ${url}`, "success");
     });
 
@@ -199,7 +200,7 @@ export const startTunnel = async (
       // NOTE: Authenticated tunnels may not emit a 'url' event.
       // The 'connected' event acts as confirmation that the tunnel is active.
       if (mode === "authenticated") {
-        sendTunnelStatus(projectId, { status: "running", url: currentUrl });
+        sendTunnelStatus(projectId, { status: "running", url: currentUrl, port: portNum });
       }
     });
 
@@ -322,7 +323,7 @@ export const getTunnelStatus = (projectId) => {
     return { status: "stopped", url: null };
   }
   // Tunnel is running but we might not have URL yet
-  return { status: "running", url: tunnel.url || null };
+  return { status: "running", url: tunnel.url || null, port: tunnel.port };
 };
 
 /**

@@ -576,7 +576,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                         </div>
                         <div className="text-[10px] text-muted-foreground flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-green-500" />
-                          Exposing localhost:{port} to the world
+                          Exposing localhost:
+                          {projectTunnelState.port || port} to the world
                         </div>
                       </div>
                     </div>
@@ -671,14 +672,19 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
             size="sm"
             className="h-7 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
             onClick={async () => {
-              await window.api.clearTunnelLogs(selectedProject.id);
-              setTunnelState((prev) => ({
-                ...prev,
-                [selectedProject.id]: {
-                  ...projectTunnelState,
-                  logs: [],
-                },
-              }));
+              try {
+                await window.api.clearTunnelLogs(selectedProject.id);
+                setTunnelState((prev) => ({
+                  ...prev,
+                  [selectedProject.id]: {
+                    ...projectTunnelState,
+                    logs: [],
+                  },
+                }));
+              } catch (err) {
+                console.error("Failed to clear logs:", err);
+                toast.error("Failed to clear logs");
+              }
             }}
           >
             Clear
