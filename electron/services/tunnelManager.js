@@ -185,7 +185,8 @@ export const startTunnel = async (
       const publicHostnameRule = ingress.find((rule) => rule.hostname);
 
       if (publicHostnameRule) {
-        const url = `https://${publicHostnameRule.hostname}`;
+        const hostname = publicHostnameRule.hostname;
+        const url = hostname.startsWith("http") ? hostname : `https://${hostname}`;
         currentUrl = url; // Persist URL
         tunnel.url = url;
         logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
@@ -200,7 +201,8 @@ export const startTunnel = async (
     // Event: URL available
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
-      currentUrl = `https://${url}`; // Persist URL
+      // Use the URL as is if it already contains the protocol
+      currentUrl = url.startsWith("http") ? url : `https://${url}`;
       tunnel.url = currentUrl;
       sendTunnelStatus(projectId, {
         status: "running",
