@@ -111,8 +111,8 @@
     "auto-launch": "latest",
     "chalk": "^5.6.2",
     "chokidar": "latest",
-    "cloudflared": "latest",
     "class-variance-authority": "latest",
+    "cloudflared": "latest",
     "clsx": "latest",
     "framer-motion": "latest",
     "jotai": "^2.16.1",
@@ -126,6 +126,7 @@
     "react-toastify": "^11.0.5",
     "sequelize": "latest",
     "sqlite3": "latest",
+    "st.db": "^7.2.10",
     "tailwind-merge": "latest"
   }
 }

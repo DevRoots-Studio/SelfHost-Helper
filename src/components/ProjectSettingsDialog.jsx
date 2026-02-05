@@ -60,6 +60,7 @@ export default function ProjectSettingsDialog({
     type: "node",
     description: "",
     icon: "",
+    clearLogsBeforeStart: false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +83,7 @@ export default function ProjectSettingsDialog({
         type: project.type || "node",
         description: project.description || "",
         icon: project.icon || "",
+        clearLogsBeforeStart: project.clearLogsBeforeStart || false,
       });
     }
   }, [project]);
@@ -128,7 +130,7 @@ export default function ProjectSettingsDialog({
   const handleDelete = () => {
     if (
       confirm(
-        `Are you sure you want to delete "${formData.name}"? This cannot be undone.`
+        `Are you sure you want to delete "${formData.name}"? This cannot be undone.`,
       )
     ) {
       onDelete(project.id);
@@ -149,6 +151,7 @@ export default function ProjectSettingsDialog({
       type: project?.type || "node",
       description: project?.description || "",
       icon: project?.icon || "",
+      clearLogsBeforeStart: project?.clearLogsBeforeStart || false,
     });
   };
 
@@ -201,7 +204,7 @@ export default function ProjectSettingsDialog({
                   value={formData.type}
                   onValueChange={(value) => {
                     const typeInfo = PROJECT_TYPES.find(
-                      (t) => t.value === value
+                      (t) => t.value === value,
                     );
                     setFormData((prev) => ({
                       ...prev,
@@ -372,6 +375,30 @@ export default function ProjectSettingsDialog({
                 checked={formData.autoStart}
                 onCheckedChange={(checked) =>
                   setFormData((prev) => ({ ...prev, autoStart: checked }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
+              <div className="space-y-0.5">
+                <Label
+                  htmlFor="clearLogsBeforeStart"
+                  className="text-base cursor-pointer"
+                >
+                  Clear Logs Before Start
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Wipe terminal log history every time this project starts
+                </p>
+              </div>
+              <Switch
+                id="clearLogsBeforeStart"
+                checked={formData.clearLogsBeforeStart}
+                onCheckedChange={(checked) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    clearLogsBeforeStart: checked,
+                  }))
                 }
               />
             </div>

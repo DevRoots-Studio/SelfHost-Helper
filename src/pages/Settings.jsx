@@ -9,12 +9,23 @@ const API = window.api;
 
 export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
+  const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
   const [appVersion, setAppVersion] = useState("");
 
   useEffect(() => {
+    loadSettings();
     loadAutoLaunchStatus();
     loadAppVersion();
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await API.getSettings();
+      setClearLogsBeforeStart(settings.clearLogsBeforeStart);
+    } catch (e) {
+      console.error("Failed to load settings", e);
+    }
+  };
 
   const loadAutoLaunchStatus = async () => {
     try {
@@ -47,6 +58,19 @@ export default function Settings() {
     } catch (e) {
       console.error("Failed to toggle auto-launch", e);
       toast.error("Failed to change auto-launch setting");
+    }
+  };
+
+  const handleClearLogsToggle = async (enabled) => {
+    try {
+      await API.updateSettings({ clearLogsBeforeStart: enabled });
+      setClearLogsBeforeStart(enabled);
+      toast.success(
+        `Clear Logs Before Start ${enabled ? "enabled" : "disabled"} globally`,
+      );
+    } catch (e) {
+      console.error("Failed to toggle clear logs setting", e);
+      toast.error("Failed to update setting");
     }
   };
 
@@ -87,6 +111,25 @@ export default function Settings() {
                 id="auto-launch"
                 checked={autoLaunchEnabled}
                 onCheckedChange={handleAutoLaunchToggle}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-6 border-t border-white/5">
+              <div className="space-y-1">
+                <Label
+                  htmlFor="clear-logs"
+                  className="text-base font-semibold cursor-pointer"
+                >
+                  Clear Terminal Logs Before Start (Global)
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatically clear the logs of any project before it starts.
+                </p>
+              </div>
+              <Switch
+                id="clear-logs"
+                checked={clearLogsBeforeStart}
+                onCheckedChange={handleClearLogsToggle}
               />
             </div>
           </div>

@@ -1,6 +1,5 @@
 import { spawn } from "child_process";
-import { Project } from "../../database/models/Project.js";
-import { Op } from "sequelize";
+import { getProjects, getProjectById, updateProject } from "./database.js";
 import pidusage from "pidusage";
 import chalk from "chalk";
 import {
@@ -13,6 +12,7 @@ import fs from "fs";
 import { createJob, assignPid } from "../job/index.js";
 import logger from "./logger.js";
 import os from "os";
+import settingsService from "./settingsService.js";
 
 const numCPUs = os.cpus().length;
 
@@ -41,6 +41,9 @@ export const notifyProjectListChanged = () => {
 
 export const clearProjectLogs = (id) => {
   delete logHistory[id];
+  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    global.mainWindow.webContents.send("project:logs-cleared", id);
+  }
 };
 
 //============================{Sends Logs to the Front-end}=============================
@@ -113,7 +116,7 @@ const sendStatus = (projectId, status, extraData = {}) => {
 };
 
 export const checkZombieProcesses = async () => {
-  const projects = await Project.findAll();
+  const projects = await getProjects();
 
   for (const project of projects) {
     // On Windows, try to recover the Job Object by name
@@ -166,8 +169,7 @@ export const checkZombieProcesses = async () => {
         });
       } else {
         logger.info(`Cleaning up stale PID for project ${project.name}`);
-        project.pid = null;
-        await project.save();
+        await updateProject({ id: project.id, pid: null });
         sendStatus(project.id, "stopped");
       }
     }
@@ -223,7 +225,7 @@ export const writeToProcess = (id, data) => {
 
 //============================{Starts a Project}=============================
 export const startProject = async (id) => {
-  const project = await Project.findByPk(id);
+  const project = await getProjectById(id);
   if (!project) throw new Error("Project not found");
 
   if (runningRuntimes[id]) {
@@ -258,6 +260,15 @@ export const startProject = async (id) => {
     }
     // Wait a bit for OS to cleanup
     await new Promise((r) => setTimeout(r, 500));
+  }
+
+  // Clear logs if enabled (globally or per-project)
+  const globalClearLogs = await settingsService.get("clearLogsBeforeStart");
+  if (globalClearLogs || project.clearLogsBeforeStart) {
+    logger.info(
+      `[ProjectsManager] Clearing logs for project ${id} before start.`,
+    );
+    clearProjectLogs(id);
   }
 
   try {
@@ -295,7 +306,7 @@ export const startProject = async (id) => {
       assignPid(child.pid);
     }
 
-    await Project.update({ pid: child.pid }, { where: { id: project.id } });
+    await updateProject({ id: project.id, pid: child.pid });
 
     sendStatus(id, "running", { startTime });
 
@@ -435,7 +446,7 @@ export const stopProject = async (id) => {
   delete runningRuntimes[id];
 
   try {
-    await Project.update({ pid: null }, { where: { id } });
+    await updateProject({ id, pid: null });
   } catch (_err) {}
 
   sendLog(
@@ -461,7 +472,7 @@ export const restartProject = async (id) => {
 
 export const startAllProjects = async () => {
   try {
-    const projects = await Project.findAll();
+    const projects = await getProjects();
     logger.info(`Starting all ${projects.length} projects...`);
     const promises = projects.map((project) => {
       if (!runningRuntimes[project.id]) {

@@ -61,6 +61,12 @@ contextBridge.exposeInMainWorld("api", {
     return () =>
       ipcRenderer.removeListener("projects:list-changed", subscription);
   },
+  onLogsCleared: (callback) => {
+    const subscription = (_, projectId) => callback(projectId);
+    ipcRenderer.on("project:logs-cleared", subscription);
+    return () =>
+      ipcRenderer.removeListener("project:logs-cleared", subscription);
+  },
   onFileChange: (callback) => {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("file:change", subscription);
@@ -110,4 +116,6 @@ contextBridge.exposeInMainWorld("api", {
   clearTunnelLogs: (id) => ipcRenderer.invoke("tunnel:clearLogs", id),
   getTunnelStatus: (id) => ipcRenderer.invoke("tunnel:getStatus", id),
   getTunnelLogs: (id) => ipcRenderer.invoke("tunnel:getLogs", id),
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  updateSettings: (settings) => ipcRenderer.invoke("settings:update", settings),
 });

@@ -103,6 +103,13 @@ export default function Dashboard() {
       appendLogs(projectId, formattedLogs);
     });
 
+    const cleanupLogsCleared = API.onLogsCleared((projectId) => {
+      setLogs((prev) => ({
+        ...prev,
+        [projectId]: [],
+      }));
+    });
+
     // Tunnel listeners
     const cleanupTunnelStatus = API.onTunnelStatus(
       ({ projectId, status, url, error }) => {
@@ -152,6 +159,7 @@ export default function Dashboard() {
       cleanupList();
       cleanupLogs();
       cleanupLogsBatch();
+      cleanupLogsCleared();
       cleanupTunnelStatus();
       cleanupTunnelLog();
     };

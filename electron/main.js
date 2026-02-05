@@ -98,6 +98,11 @@ if (process.env.NODE_ENV === "development") {
   app.setPath("userData", app.getPath("userData") + "-dev");
 }
 
+import settingsService from "./services/settingsService.js";
+
+// Initialize settings early
+await settingsService.init();
+
 // Initialize logger early to catch startup issues
 logger.init();
 
@@ -182,7 +187,7 @@ app.whenReady().then(async () => {
     ({ startAutoStartProjects, checkZombieProcesses }) => {
       checkZombieProcesses();
       startAutoStartProjects();
-    }
+    },
   );
 
   const window = await createWindow();
@@ -197,12 +202,12 @@ app.whenReady().then(async () => {
     onStatusChange,
     onProjectListChange,
   } = await import("./services/projectsManager.js");
-  const { Project } = await import("../database/models/Project.js");
+  const { getProjects } = await import("./services/database.js");
   const { updateTrayMenu } = await import("./tray/tray.js");
 
   const refreshTray = async () => {
     logger.debug("[Tray] Refreshing menu state.");
-    const projects = await Project.findAll();
+    const projects = await getProjects();
     const runningIds = getRunningProjects();
     updateTrayMenu(
       projects,
@@ -211,7 +216,7 @@ app.whenReady().then(async () => {
       stopProject,
       restartProject,
       startAllProjects,
-      stopAllProjects
+      stopAllProjects,
     );
   };
 

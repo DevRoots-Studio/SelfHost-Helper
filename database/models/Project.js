@@ -118,6 +118,10 @@ export const initProjectModel = (sequelize) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
+      clearLogsBeforeStart: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
     },
     {
       sequelize,

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useAtom } from "jotai";
 import { isAddProjectModalOpenAtom } from "@/store/atoms";
+import { Switch } from "@/components/ui/switch";
 
 const API = window.api;
 
@@ -67,9 +68,14 @@ export default function AddProjectDialog({ onProjectsChange }) {
     type: "nodejs",
     script: "npm install && npm start",
     icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
+    clearLogsBeforeStart: false,
   });
 
   const [iconPreview, setIconPreview] = useState(newProject.icon);
+
+  const handleClearLogsToggle = (enabled) => {
+    setNewProject((prev) => ({ ...prev, clearLogsBeforeStart: enabled }));
+  };
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -264,6 +270,25 @@ export default function AddProjectDialog({ onProjectsChange }) {
                 <ImageIcon className="h-4 w-4" />
               </Button>
             </motion.div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
+            <div className="space-y-0.5">
+              <Label
+                htmlFor="clearLogsBeforeStart"
+                className="text-base cursor-pointer"
+              >
+                Clear Logs Before Start
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Wipe terminal log history every time this project starts
+              </p>
+            </div>
+            <Switch
+              id="clearLogsBeforeStart"
+              checked={newProject.clearLogsBeforeStart}
+              onCheckedChange={handleClearLogsToggle}
+            />
           </div>
         </div>
         <DialogFooter>

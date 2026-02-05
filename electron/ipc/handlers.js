@@ -2,8 +2,18 @@ import { ipcMain, dialog, BrowserWindow, shell, app } from "electron";
 import fs from "fs/promises";
 import path from "path";
 import AutoLaunch from "auto-launch";
-import { Project } from "../../database/models/Project.js";
-import { Category } from "../../database/models/Category.js";
+import {
+  getProjects,
+  addProject,
+  deleteProject,
+  updateProject,
+  reorderProjects,
+  getCategories,
+  addCategory,
+  deleteCategory,
+  updateCategory,
+  reorderCategories,
+} from "../services/database.js";
 import {
   startProject,
   stopProject,
@@ -16,14 +26,15 @@ import {
   notifyProjectListChanged,
   clearProjectLogs,
 } from "../services/projectsManager.js";
-import { 
-  startTunnel, 
-  stopTunnel, 
-  getTunnelLogs, 
-  clearTunnelLogs, 
-  getTunnelStatus 
+import {
+  startTunnel,
+  stopTunnel,
+  getTunnelLogs,
+  clearTunnelLogs,
+  getTunnelStatus,
 } from "../services/tunnelManager.js";
 import { watchFolder } from "../services/filesWatcher.js";
+import settingsService from "../services/settingsService.js";
 import logger from "../services/logger.js";
 
 const appLauncher = new AutoLaunch({
@@ -44,7 +55,7 @@ export const registerHandlers = () => {
 
       logger.debug(
         `[IPC:Handle] ${channel} called with args:`,
-        JSON.stringify(loggedArgs).slice(0, 500)
+        JSON.stringify(loggedArgs).slice(0, 500),
       );
       try {
         const result = await listener(event, ...args);
@@ -62,38 +73,34 @@ export const registerHandlers = () => {
     return originalOn(channel, (event, ...args) => {
       logger.debug(
         `[IPC:On] ${channel} received:`,
-        JSON.stringify(args).slice(0, 500)
+        JSON.stringify(args).slice(0, 500),
       );
       return listener(event, ...args);
     });
   };
 
   ipcMain.handle("projects:getAll", async () => {
-    const projects = await Project.findAll({
-      order: [["order", "ASC"]],
-    });
+    const projects = await getProjects();
     const runningIds = getRunningProjects();
     return projects.map((p) => ({
-      ...p.toJSON(),
+      ...p,
       status: runningIds.includes(p.id) ? "running" : "stopped",
       startTime: runningIds.includes(p.id) ? getProjectStartTime(p.id) : null,
     }));
   });
 
   ipcMain.handle("projects:add", async (_, projectData) => {
-    const project = await Project.create(projectData);
+    const project = await addProject(projectData);
     logger.info(`Project added: ${project.name} (ID: ${project.id})`);
     notifyProjectListChanged();
     return project;
   });
 
   ipcMain.handle("projects:delete", async (_, id) => {
-    const project = await Project.findByPk(id);
-    if (project) {
-      logger.info(`Deleting project: ${project.name} (ID: ${id})`);
+    const success = await deleteProject(id);
+    if (success) {
       await stopProject(id);
       clearProjectLogs(id);
-      await project.destroy();
       notifyProjectListChanged();
       return true;
     }
@@ -101,10 +108,8 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("projects:update", async (_, projectData) => {
-    const { id, ...data } = projectData;
-    const project = await Project.findByPk(id);
+    const project = await updateProject(projectData);
     if (project) {
-      await project.update(data);
       notifyProjectListChanged();
       return project;
     }
@@ -112,36 +117,30 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("projects:reorder", async (_, { orders, categoryId }) => {
-    for (const item of orders) {
-      const updateData = { order: item.order };
-      // Always update categoryId if provided (can be null for no category)
-      if (categoryId !== undefined) {
-        updateData.categoryId = categoryId;
+    // If categoryId is provided, we might need to update projects' categoryId before reordering
+    if (categoryId !== undefined) {
+      for (const item of orders) {
+        const proj = await updateProject({ id: item.id, categoryId });
       }
-      await Project.update(updateData, { where: { id: item.id } });
     }
+    const success = await reorderProjects(orders);
     notifyProjectListChanged();
-    return true;
+    return success;
   });
 
   ipcMain.handle("categories:getAll", async () => {
-    const categories = await Category.findAll({
-      order: [["order", "ASC"]],
-    });
-    return categories.map((c) => c.toJSON());
+    return await getCategories();
   });
 
   ipcMain.handle("categories:add", async (_, categoryData) => {
-    const category = await Category.create(categoryData);
+    const category = await addCategory(categoryData);
     notifyProjectListChanged();
     return category;
   });
 
   ipcMain.handle("categories:update", async (_, categoryData) => {
-    const { id, ...data } = categoryData;
-    const category = await Category.findByPk(id);
+    const category = await updateCategory(categoryData);
     if (category) {
-      await category.update(data);
       notifyProjectListChanged();
       return category;
     }
@@ -149,11 +148,15 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("categories:delete", async (_, id) => {
-    const category = await Category.findByPk(id);
-    if (category) {
-      // Unset categoryId for all projects in this category
-      await Project.update({ categoryId: null }, { where: { categoryId: id } });
-      await category.destroy();
+    const projects = await getProjects();
+    // Unset categoryId for all projects in this category
+    for (const p of projects) {
+      if (p.categoryId === id) {
+        await updateProject({ id: p.id, categoryId: null });
+      }
+    }
+    const success = await deleteCategory(id);
+    if (success) {
       notifyProjectListChanged();
       return true;
     }
@@ -161,11 +164,13 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("categories:reorder", async (_, orders) => {
-    for (const item of orders) {
-      await Category.update({ order: item.order }, { where: { id: item.id } });
-    }
+    // Convert array of {id, order} to object if needed, but reorderCategories in database.js expects an object currently?
+    // Let's check database.js reorderCategories.
+    const ordersObj = {};
+    orders.forEach((o) => (ordersObj[o.id] = o.order));
+    const success = await reorderCategories(ordersObj);
     notifyProjectListChanged();
-    return true;
+    return success;
   });
 
   ipcMain.handle("project:start", async (_, id) => startProject(id));
@@ -226,6 +231,16 @@ export const registerHandlers = () => {
     } catch (e) {
       return false;
     }
+  });
+
+  // Settings
+  ipcMain.handle("settings:get", async () => {
+    return await settingsService.getAll();
+  });
+
+  ipcMain.handle("settings:update", async (_, newSettings) => {
+    await settingsService.update(newSettings);
+    return true;
   });
 
   // Logs
@@ -313,7 +328,7 @@ export const registerHandlers = () => {
               type: "file",
             };
           }
-        })
+        }),
       );
       return files;
     }
@@ -375,7 +390,7 @@ export const registerHandlers = () => {
   ipcMain.handle("discord:getInviteInfo", async (_, inviteCode) => {
     try {
       const response = await fetch(
-        `https://discord.com/api/invites/${inviteCode}?with_counts=true`
+        `https://discord.com/api/invites/${inviteCode}?with_counts=true`,
       );
       if (!response.ok) throw new Error("Failed to fetch Discord server info");
       const data = await response.json();
