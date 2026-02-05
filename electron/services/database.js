@@ -18,16 +18,18 @@ export const initializeDatabase = async () => {
     const userDataPath = app.getPath("userData");
     const dbFile = path.join(userDataPath, "data.json");
 
-    // 1. Initialize main Database with JSON Driver as suggested by user
+    logger.info(`[Database] Initializing st.db at: ${dbFile}`);
+
+    // 1. Initialize main Database with JSON Driver
     db = new Database({
       driver: new JSONDriver(dbFile),
     });
 
-    // 2. Initialize Tables for Projects and Categories
+    // 2. Initialize Tables
     projectTable = new Table("projects", db);
     categoryTable = new Table("categories", db);
 
-    logger.info("[Database] st.db initialized.");
+    logger.info("[Database] st.db initialized and tables ready.");
 
     // 3. Migration logic (SQLite -> JSON)
     const sqlitePath =
@@ -36,10 +38,18 @@ export const initializeDatabase = async () => {
         : path.join(userDataPath, "projects.sqlite");
 
     if (fs.existsSync(sqlitePath)) {
+      logger.info(
+        `[Database] Found legacy SQLite database at ${sqlitePath}. Starting migration...`,
+      );
       await migrateFromSQLite(sqlitePath);
+    } else {
+      logger.debug(
+        "[Database] No legacy SQLite database found. Skipping migration.",
+      );
     }
   } catch (err) {
-    logger.error("[Database] Failed to initialize st.db:", err);
+    logger.error("[Database] Failed to initialize st.db:", err.message || err);
+    throw err; // Re-throw to prevent app from starting in broken state
   }
 };
 
@@ -80,8 +90,6 @@ async function migrateFromSQLite(sqlitePath) {
 
       for (const proj of projects) {
         const data = proj.toJSON();
-        // Ensure tunnel token is handled (Sequelize might have decrypted it in afterFind, but toJSON might have it encrypted/decrypted depending on implementation)
-        // Actually Project model has hooks. toJSON() usually returns current state.
         if (!(await projectTable.has(data.id.toString()))) {
           await projectTable.set(data.id.toString(), data);
         }
@@ -89,8 +97,19 @@ async function migrateFromSQLite(sqlitePath) {
 
       logger.info("[Migration] Data migration to st.db complete.");
 
+      // Close the connection before renaming to avoid EBUSY
+      await tempSequelize.close();
+      logger.info("[Migration] SQLite connection closed.");
+
       // Rename sqlite file to backup so we don't migrate again
-      fs.renameSync(sqlitePath, sqlitePath + ".backup_" + Date.now());
+      const backupPath = sqlitePath + ".backup_" + Date.now();
+      await fs.promises.rename(sqlitePath, backupPath);
+      logger.info(`[Migration] SQLite file backed up to ${backupPath}`);
+    } else {
+      // Even if no data, we should close and backup to avoid repeating empty checks
+      await tempSequelize.close();
+      const backupPath = sqlitePath + ".backup_empty_" + Date.now();
+      await fs.promises.rename(sqlitePath, backupPath);
     }
   } catch (err) {
     logger.error("[Migration] Error during migration:", err);

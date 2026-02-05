@@ -49,9 +49,14 @@ class Logger {
   format(msg, ...args) {
     let output = msg;
     if (args.length > 0) {
-      const formattedArgs = args.map((arg) =>
-        typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)
-      );
+      const formattedArgs = args.map((arg) => {
+        if (arg instanceof Error) {
+          return `${arg.message}\n${arg.stack}`;
+        }
+        return typeof arg === "object"
+          ? JSON.stringify(arg, null, 2)
+          : String(arg);
+      });
       output += " " + formattedArgs.join(" ");
     }
     return output;
@@ -60,7 +65,7 @@ class Logger {
   info(msg, ...args) {
     const formatted = `[INFO] [${new Date().toISOString()}] ${this.format(
       msg,
-      ...args
+      ...args,
     )}`;
     console.log(chalk.blue(formatted));
     this.write(formatted);
@@ -69,7 +74,7 @@ class Logger {
   warn(msg, ...args) {
     const formatted = `[WARN] [${new Date().toISOString()}] ${this.format(
       msg,
-      ...args
+      ...args,
     )}`;
     console.log(chalk.yellow(formatted));
     this.write(formatted);
@@ -78,7 +83,7 @@ class Logger {
   error(msg, ...args) {
     const formatted = `[ERROR] [${new Date().toISOString()}] ${this.format(
       msg,
-      ...args
+      ...args,
     )}`;
     console.error(chalk.red(formatted));
     this.write(formatted);
@@ -87,7 +92,7 @@ class Logger {
   debug(msg, ...args) {
     const formatted = `[DEBUG] [${new Date().toISOString()}] ${this.format(
       msg,
-      ...args
+      ...args,
     )}`;
     console.log(chalk.gray(formatted));
     this.write(formatted);

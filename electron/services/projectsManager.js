@@ -604,12 +604,14 @@ export const getProjectStats = async (id) => {
 //============================{Start Auto-Start Projects}=============================
 export const startAutoStartProjects = async () => {
   try {
-    const projects = await Project.findAll({ where: { autoStart: true } });
-    if (projects.length > 0) {
+    const projects = await getProjects();
+    const autoStartProjects = projects.filter((p) => p.autoStart);
+
+    if (autoStartProjects.length > 0) {
       logger.info(
-        `[ProjectsManager] Found ${projects.length} auto-start projects.`,
+        `[ProjectsManager] Found ${autoStartProjects.length} auto-start projects.`,
       );
-      for (const project of projects) {
+      for (const project of autoStartProjects) {
         // Check if already running (redundant if app just started, but good practice)
         if (!runningRuntimes[project.id]) {
           logger.info(

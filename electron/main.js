@@ -183,12 +183,10 @@ app.whenReady().then(async () => {
   registerHandlers(ipcMain);
 
   // Auto-start projects and check for zombies
-  import("./services/projectsManager.js").then(
-    ({ startAutoStartProjects, checkZombieProcesses }) => {
-      checkZombieProcesses();
-      startAutoStartProjects();
-    },
-  );
+  const { startAutoStartProjects, checkZombieProcesses } =
+    await import("./services/projectsManager.js");
+  await checkZombieProcesses();
+  await startAutoStartProjects();
 
   const window = await createWindow();
 
