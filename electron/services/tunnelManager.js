@@ -104,6 +104,15 @@ const sanitizeLog = (message) => {
 };
 
 /**
+ * Ensures the URL starts with https:// and avoids double protocol
+ */
+const ensureHttps = (url) => {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `https://${url}`;
+};
+
+/**
  * Start a tunnel for a project
  * @param {number} projectId - Project ID
  * @param {Object} options - Tunnel options
@@ -185,7 +194,7 @@ export const startTunnel = async (
       const publicHostnameRule = ingress.find((rule) => rule.hostname);
 
       if (publicHostnameRule) {
-        const url = `https://${publicHostnameRule.hostname}`;
+        const url = ensureHttps(publicHostnameRule.hostname);
         currentUrl = url; // Persist URL
         tunnel.url = url;
         logger.info(`[TunnelManager] Detected auth tunnel hostname: ${url}`);
@@ -200,7 +209,7 @@ export const startTunnel = async (
     // Event: URL available
     tunnel.on("url", (url) => {
       logger.info(`[TunnelManager] Project ${projectId} tunnel URL: ${url}`);
-      currentUrl = `https://${url}`; // Persist URL
+      currentUrl = ensureHttps(url); // Persist URL
       tunnel.url = currentUrl;
       sendTunnelStatus(projectId, {
         status: "running",
