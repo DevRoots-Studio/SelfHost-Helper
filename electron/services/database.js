@@ -235,23 +235,30 @@ export const updateCategory = async (categoryData) => {
   return updatedData;
 };
 
-export const reorderProjects = async (payload) => {
+export const reorderProjects = async (payload, categoryId = undefined) => {
   for (const { id, order } of payload) {
-    const proj = await projectTable.get(id.toString());
-    if (proj) {
-      proj.order = order;
-      await projectTable.set(id.toString(), proj);
+    const idStr = id.toString();
+    const existing = await projectTable.get(idStr);
+    if (existing) {
+      const updated = { ...existing, order };
+      if (categoryId !== undefined) {
+        updated.categoryId = categoryId;
+      }
+      await projectTable.set(idStr, updated);
     }
   }
   return true;
 };
 
 export const reorderCategories = async (orders) => {
-  for (const [id, order] of Object.entries(orders)) {
-    const cat = await categoryTable.get(id.toString());
-    if (cat) {
-      cat.order = order;
-      await categoryTable.set(id.toString(), cat);
+  // orders is expected to be an object: { id: order, ... }
+  const entries = Object.entries(orders);
+  for (const [id, order] of entries) {
+    const idStr = id.toString();
+    const existing = await categoryTable.get(idStr);
+    if (existing) {
+      const updated = { ...existing, order };
+      await categoryTable.set(idStr, updated);
     }
   }
   return true;

@@ -85,36 +85,32 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     // Handle root-level reordering (mixed categories and standalone projects)
     if (destination.droppableId === "sidebar-content") {
       const isProject = draggableId.startsWith("project-");
-      const id = parseInt(draggableId.split("-")[1]);
+      const id = draggableId.split("-")[1]; // Keep as string for comparison
 
       const combined = [
         ...categories.map((c) => ({ ...c, isCategory: true })),
         ...projects
           .filter((p) => !p.categoryId)
           .map((p) => ({ ...p, isProject: true })),
-      ].sort((a, b) => a.order - b.order);
+      ].sort((a, b) => (a.order || 0) - (b.order || 0));
 
-      // Find where it was in the combined list (if it was there)
       const sourceIndexInCombined = combined.findIndex(
         (item) =>
-          (isProject && item.isProject && item.id === id) ||
-          (!isProject && item.isCategory && item.id === id),
+          (isProject && item.isProject && item.id.toString() === id) ||
+          (!isProject && item.isCategory && item.id.toString() === id),
       );
 
       let moved;
       if (sourceIndexInCombined !== -1) {
-        // Item was already at root level, move it
         [moved] = combined.splice(sourceIndexInCombined, 1);
       } else {
-        // Item was inside a category, get it
-        const project = projects.find((p) => p.id === id);
+        const project = projects.find((p) => p.id.toString() === id);
         if (!project) return;
         moved = { ...project, isProject: true, categoryId: null };
       }
 
       combined.splice(destination.index, 0, moved);
 
-      // Distribute new orders
       const newOrders = combined.map((item, index) => ({
         id: item.id,
         order: index,
@@ -124,7 +120,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       // Update local state
       const updatedProjects = projects.map((p) => {
         const orderInfo = newOrders.find((o) => o.isProject && o.id === p.id);
-        if (p.id === id && isProject) {
+        if (p.id.toString() === id && isProject) {
           return { ...p, categoryId: null, order: orderInfo?.order ?? p.order };
         }
         if (orderInfo) return { ...p, order: orderInfo.order };
@@ -140,7 +136,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       setProjects(updatedProjects);
       setCategories(updatedCategories);
 
-      // Persist to DB
       try {
         const projectOrders = newOrders
           .filter((o) => o.isProject)
@@ -149,12 +144,16 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           .filter((o) => !o.isProject)
           .map((o) => ({ id: o.id, order: o.order }));
 
-        if (projectOrders.length > 0) {
+        if (isProject && id.toString() === moved.id.toString()) {
+          // If we moved a project to the root, we MUST update its categoryId atomically
           await API.reorderProjects({
             orders: projectOrders,
             categoryId: null,
           });
+        } else {
+          await API.reorderProjects({ orders: projectOrders });
         }
+
         if (categoryOrders.length > 0) {
           await API.reorderCategories(categoryOrders);
         }
@@ -165,25 +164,23 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       return;
     }
 
-    // Explicitly handle category dragging to prevent errors when dropping over category sub-lists
-    if (draggableId.startsWith("category-")) {
-      return;
-    }
-
-    // Handle moving project into a category or reordering inside one
+    // Handle moving project into a specific category or reordering inside one
     if (draggableId.startsWith("project-")) {
-      const destCategoryId = parseInt(destination.droppableId.split("-")[1]);
+      const destCategoryIdStr = destination.droppableId.replace("cat-", "");
+      const destCategoryId =
+        destCategoryIdStr === "sidebar-content"
+          ? null
+          : parseInt(destCategoryIdStr);
       const projectId = parseInt(draggableId.replace("project-", ""));
 
       const destProjects = projects
         .filter((p) => p.categoryId === destCategoryId)
-        .sort((a, b) => a.order - b.order);
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-      let movedProject = projects.find((p) => p.id === projectId);
+      const movedProject = projects.find((p) => p.id === projectId);
       if (!movedProject) return;
 
       const filteredDest = destProjects.filter((p) => p.id !== projectId);
-
       const finalDestProjects = [...filteredDest];
       finalDestProjects.splice(destination.index, 0, {
         ...movedProject,
@@ -191,7 +188,13 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       });
 
       const updatedProjects = projects.map((p) => {
-        if (p.id === projectId) return { ...p, categoryId: destCategoryId };
+        if (p.id === projectId)
+          return { ...p, categoryId: destCategoryId, order: destination.index };
+        // We also need to update orders of other projects in the destination category
+        const inDest = finalDestProjects.find((fp) => fp.id === p.id);
+        if (inDest) {
+          return { ...p, order: finalDestProjects.indexOf(inDest) };
+        }
         return p;
       });
 

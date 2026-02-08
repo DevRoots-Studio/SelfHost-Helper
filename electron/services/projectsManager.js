@@ -139,7 +139,15 @@ export const checkZombieProcesses = async () => {
               startTime: project.updatedAt || new Date(),
               platform: process.platform,
               isRecovered: true,
-              child: { pid: project.pid || 0, killed: false }, // Mock child for compatibility
+              child: {
+                pid: project.pid || 0,
+                killed: false,
+                once: () => {}, // Mock for killProjectGroup compatibility
+                emit: () => {},
+                on: () => {},
+                stderr: { on: () => {} },
+                stdout: { on: () => {} },
+              },
             };
 
             sendStatus(project.id, "running", {
@@ -185,8 +193,7 @@ async function isProcessGroupAlive(rootPid, platform) {
   }
 }
 
-export const getRunningProjects = () =>
-  Object.keys(runningRuntimes).map(Number);
+export const getRunningProjects = () => Object.keys(runningRuntimes);
 export const getProjectLogs = (id) => logHistory[id] || [];
 export const getProjectStartTime = (id) =>
   runningRuntimes[id] ? runningRuntimes[id].startTime : null;
@@ -644,7 +651,7 @@ const cleanupProjectRuntime = async (id) => {
   }
   delete runningRuntimes[id];
   try {
-    await Project.update({ pid: null }, { where: { id } });
+    await updateProject({ id, pid: null });
   } catch (err) {
     logger.error(`Failed to clear PID from DB for project ${id}:`, err);
   }

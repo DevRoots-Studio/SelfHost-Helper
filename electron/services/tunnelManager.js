@@ -409,5 +409,5 @@ export const stopAllTunnels = () => {
  * Get all running tunnel project IDs
  */
 export const getRunningTunnels = () => {
-  return Object.keys(runningTunnels).map(Number);
+  return Object.keys(runningTunnels);
 };

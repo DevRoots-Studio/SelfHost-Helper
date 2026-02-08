@@ -84,8 +84,10 @@ export const registerHandlers = () => {
     const runningIds = getRunningProjects();
     return projects.map((p) => ({
       ...p,
-      status: runningIds.includes(p.id) ? "running" : "stopped",
-      startTime: runningIds.includes(p.id) ? getProjectStartTime(p.id) : null,
+      status: runningIds.includes(p.id?.toString()) ? "running" : "stopped",
+      startTime: runningIds.includes(p.id?.toString())
+        ? getProjectStartTime(p.id)
+        : null,
     }));
   });
 
@@ -117,13 +119,7 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("projects:reorder", async (_, { orders, categoryId }) => {
-    // If categoryId is provided, we might need to update projects' categoryId before reordering
-    if (categoryId !== undefined) {
-      for (const item of orders) {
-        const proj = await updateProject({ id: item.id, categoryId });
-      }
-    }
-    const success = await reorderProjects(orders);
+    const success = await reorderProjects(orders, categoryId);
     notifyProjectListChanged();
     return success;
   });

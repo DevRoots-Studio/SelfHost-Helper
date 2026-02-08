@@ -16,12 +16,12 @@ export const updateTrayMenu = (
   stopProject,
   restartProject,
   startAll,
-  stopAll
+  stopAll,
 ) => {
   if (!tray) return;
 
   const projectItems = projects.map((project) => {
-    const isRunning = runningIds.includes(project.id);
+    const isRunning = runningIds.includes(project.id?.toString());
     return {
       label: project.name,
       submenu: [
