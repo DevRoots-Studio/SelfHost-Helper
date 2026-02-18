@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Settings,
@@ -52,7 +53,19 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const [editCategoryName, setEditCategoryName] = useState("");
   const [collapsedCategories, setCollapsedCategories] = useState(() => {
     const saved = localStorage.getItem("collapsedCategories");
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((id) => {
+          const parsedId = Number(id);
+          return Number.isFinite(parsedId) ? parsedId : null;
+        })
+        .filter((id) => id !== null);
+    } catch {
+      return [];
+    }
   });
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editProjectName, setEditProjectName] = useState("");
@@ -66,14 +79,344 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     );
   }, [collapsedCategories]);
 
+  const toNullableNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalizeOrder = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const parseDraggableMeta = (draggableId) => {
+    if (draggableId.startsWith("project-")) {
+      return {
+        kind: "project",
+        id: toNullableNumber(draggableId.replace("project-", "")),
+      };
+    }
+    if (draggableId.startsWith("category-")) {
+      return {
+        kind: "category",
+        id: toNullableNumber(draggableId.replace("category-", "")),
+      };
+    }
+    return null;
+  };
+
+  const parseCategoryDroppableId = (droppableId) => {
+    if (droppableId === "sidebar-content") return null;
+    if (!droppableId?.startsWith("cat-")) return undefined;
+    return toNullableNumber(droppableId.replace("cat-", ""));
+  };
+
+  const isInCategory = (project, categoryId) =>
+    toNullableNumber(project.categoryId) === categoryId;
+
+  const getSortedProjectsInCategory = (categoryId, projectList = projects) =>
+    projectList
+      .filter((project) => isInCategory(project, categoryId))
+      .sort((a, b) => normalizeOrder(a.order) - normalizeOrder(b.order));
+
+  const buildProjectReorderUpdates = (projectList, categoryId) =>
+    projectList
+      .map((project, index) => ({
+        id: toNullableNumber(project.id),
+        order: index,
+        categoryId,
+      }))
+      .filter((update) => update.id !== null);
+
   const toggleCategory = (id) => {
+    const normalizedId = toNullableNumber(id);
+    if (normalizedId === null) return;
     setCollapsedCategories((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+      prev.includes(normalizedId)
+        ? prev.filter((i) => i !== normalizedId)
+        : [...prev, normalizedId],
     );
   };
 
+  const moveProjectToCategory = async ({
+    projectId,
+    destinationCategoryId,
+    destinationIndex,
+    sourceDroppableId,
+    destinationDroppableId,
+  }) => {
+    const sourceCategoryId = parseCategoryDroppableId(sourceDroppableId);
+    if (sourceCategoryId === undefined) return;
+
+    const movedProject = projects.find(
+      (project) => toNullableNumber(project.id) === projectId,
+    );
+    if (!movedProject) return;
+
+    const isSameCategory = sourceCategoryId === destinationCategoryId;
+
+    const sourceWithoutMoved = getSortedProjectsInCategory(sourceCategoryId)
+      .filter((project) => toNullableNumber(project.id) !== projectId)
+      .map((project) => ({ ...project }));
+
+    const destinationWithoutMoved = (isSameCategory
+      ? sourceWithoutMoved
+      : getSortedProjectsInCategory(destinationCategoryId).filter(
+          (project) => toNullableNumber(project.id) !== projectId,
+        )
+    ).map((project) => ({ ...project }));
+
+    const insertAt =
+      destinationIndex === null || destinationIndex === undefined
+        ? destinationWithoutMoved.length
+        : Math.max(0, Math.min(destinationIndex, destinationWithoutMoved.length));
+
+    destinationWithoutMoved.splice(insertAt, 0, {
+      ...movedProject,
+      categoryId: destinationCategoryId,
+    });
+
+    const finalDestinationProjects = destinationWithoutMoved;
+    const finalSourceProjects = isSameCategory
+      ? finalDestinationProjects
+      : sourceWithoutMoved;
+
+    const updatedProjects = projects.map((project) => {
+      const currentId = toNullableNumber(project.id);
+      if (currentId === null) return project;
+
+      if (currentId === projectId) {
+        return {
+          ...project,
+          categoryId: destinationCategoryId,
+          order: insertAt,
+        };
+      }
+
+      const destinationOrder = finalDestinationProjects.findIndex(
+        (item) => toNullableNumber(item.id) === currentId,
+      );
+      if (destinationOrder !== -1) {
+        return {
+          ...project,
+          categoryId: destinationCategoryId,
+          order: destinationOrder,
+        };
+      }
+
+      if (!isSameCategory) {
+        const sourceOrder = finalSourceProjects.findIndex(
+          (item) => toNullableNumber(item.id) === currentId,
+        );
+        if (sourceOrder !== -1) {
+          return {
+            ...project,
+            categoryId: sourceCategoryId,
+            order: sourceOrder,
+          };
+        }
+      }
+
+      return project;
+    });
+
+    setProjects(updatedProjects);
+
+    try {
+      const updates = [
+        ...buildProjectReorderUpdates(
+          finalDestinationProjects,
+          destinationCategoryId,
+        ),
+        ...(isSameCategory
+          ? []
+          : buildProjectReorderUpdates(finalSourceProjects, sourceCategoryId)),
+      ];
+
+      await API.reorderProjectsBulk({ updates });
+
+      if (sourceDroppableId !== destinationDroppableId) {
+        onProjectsChange();
+      }
+    } catch (error) {
+      toast.error("Failed to move project");
+      onProjectsChange();
+    }
+  };
+
+  const reorderRootLevel = async ({
+    draggableKind,
+    draggableId,
+    destinationIndex,
+  }) => {
+    const combined = [
+      ...categories.map((category) => ({
+        ...category,
+        normalizedId: toNullableNumber(category.id),
+        isCategory: true,
+      })),
+      ...projects
+        .filter((project) => toNullableNumber(project.categoryId) === null)
+        .map((project) => ({
+          ...project,
+          normalizedId: toNullableNumber(project.id),
+          isProject: true,
+        })),
+    ]
+      .filter((item) => item.normalizedId !== null)
+      .sort((a, b) => normalizeOrder(a.order) - normalizeOrder(b.order));
+
+    const sourceIndexInCombined = combined.findIndex((item) => {
+      if (draggableKind === "project") {
+        return item.isProject && item.normalizedId === draggableId;
+      }
+      return item.isCategory && item.normalizedId === draggableId;
+    });
+
+    let moved;
+    if (sourceIndexInCombined !== -1) {
+      [moved] = combined.splice(sourceIndexInCombined, 1);
+    } else if (draggableKind === "project") {
+      const project = projects.find(
+        (item) => toNullableNumber(item.id) === draggableId,
+      );
+      if (!project) return;
+      moved = {
+        ...project,
+        normalizedId: toNullableNumber(project.id),
+        isProject: true,
+        categoryId: null,
+      };
+    } else {
+      return;
+    }
+
+    const movedProjectSourceCategoryId =
+      draggableKind === "project" ? toNullableNumber(moved.categoryId) : null;
+
+    const insertAt = Math.max(0, Math.min(destinationIndex, combined.length));
+    combined.splice(insertAt, 0, moved);
+
+    const newOrders = combined.map((item, index) => ({
+      id: item.normalizedId,
+      order: index,
+      isProject: item.isProject,
+    }));
+
+    const sourceCategoryProjectsWithoutMoved =
+      movedProjectSourceCategoryId !== null
+        ? getSortedProjectsInCategory(movedProjectSourceCategoryId).filter(
+            (project) => toNullableNumber(project.id) !== draggableId,
+          )
+        : [];
+
+    const updatedProjects = projects.map((project) => {
+      const currentId = toNullableNumber(project.id);
+      if (currentId === null) return project;
+
+      const orderInfo = newOrders.find(
+        (item) => item.isProject && item.id === currentId,
+      );
+
+      if (draggableKind === "project" && currentId === draggableId) {
+        return {
+          ...project,
+          categoryId: null,
+          order: orderInfo?.order ?? project.order,
+        };
+      }
+
+      if (movedProjectSourceCategoryId !== null) {
+        const sourceOrder = sourceCategoryProjectsWithoutMoved.findIndex(
+          (item) => toNullableNumber(item.id) === currentId,
+        );
+        if (sourceOrder !== -1) {
+          return {
+            ...project,
+            categoryId: movedProjectSourceCategoryId,
+            order: sourceOrder,
+          };
+        }
+      }
+
+      if (orderInfo) return { ...project, order: orderInfo.order };
+      return project;
+    });
+
+    const updatedCategories = categories.map((category) => {
+      const currentId = toNullableNumber(category.id);
+      if (currentId === null) return category;
+      const orderInfo = newOrders.find(
+        (item) => !item.isProject && item.id === currentId,
+      );
+      if (orderInfo) return { ...category, order: orderInfo.order };
+      return category;
+    });
+
+    setProjects(updatedProjects);
+    setCategories(updatedCategories);
+
+    try {
+      const projectOrders = newOrders
+        .filter((item) => item.isProject)
+        .map((item) => ({ id: item.id, order: item.order }));
+      const categoryOrders = newOrders
+        .filter((item) => !item.isProject)
+        .map((item) => ({ id: item.id, order: item.order }));
+
+      if (draggableKind === "project") {
+        const updates = [
+          ...projectOrders.map((project) => ({
+            id: project.id,
+            order: project.order,
+            categoryId: null,
+          })),
+          ...(movedProjectSourceCategoryId !== null
+            ? buildProjectReorderUpdates(
+                sourceCategoryProjectsWithoutMoved,
+                movedProjectSourceCategoryId,
+              )
+            : []),
+        ];
+        await API.reorderProjectsBulk({ updates });
+      } else {
+        await API.reorderProjects({ orders: projectOrders });
+      }
+
+      if (categoryOrders.length > 0) {
+        await API.reorderCategories(categoryOrders);
+      }
+    } catch (error) {
+      toast.error("Failed to reorder items");
+      onProjectsChange();
+    }
+  };
+
   const handleDragEnd = async (result) => {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, combine } = result;
+    const draggableMeta = parseDraggableMeta(draggableId);
+    if (!draggableMeta || draggableMeta.id === null) return;
+
+    // Header drop via combine mode: drop project on category card.
+    if (combine) {
+      const combineMeta = parseDraggableMeta(combine.draggableId);
+      if (
+        draggableMeta.kind === "project" &&
+        combineMeta?.kind === "category" &&
+        combineMeta.id !== null
+      ) {
+        await moveProjectToCategory({
+          projectId: draggableMeta.id,
+          destinationCategoryId: combineMeta.id,
+          destinationIndex: null,
+          sourceDroppableId: source.droppableId,
+          destinationDroppableId: `cat-${combineMeta.id}`,
+        });
+        return;
+      }
+    }
+
     if (!destination) return;
     if (
       destination.droppableId === source.droppableId &&
@@ -82,137 +425,28 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       return;
     }
 
-    // Handle root-level reordering (mixed categories and standalone projects)
     if (destination.droppableId === "sidebar-content") {
-      const isProject = draggableId.startsWith("project-");
-      const id = draggableId.split("-")[1]; // Keep as string for comparison
-
-      const combined = [
-        ...categories.map((c) => ({ ...c, isCategory: true })),
-        ...projects
-          .filter((p) => !p.categoryId)
-          .map((p) => ({ ...p, isProject: true })),
-      ].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-      const sourceIndexInCombined = combined.findIndex(
-        (item) =>
-          (isProject && item.isProject && item.id.toString() === id) ||
-          (!isProject && item.isCategory && item.id.toString() === id),
-      );
-
-      let moved;
-      if (sourceIndexInCombined !== -1) {
-        [moved] = combined.splice(sourceIndexInCombined, 1);
-      } else {
-        const project = projects.find((p) => p.id.toString() === id);
-        if (!project) return;
-        moved = { ...project, isProject: true, categoryId: null };
-      }
-
-      combined.splice(destination.index, 0, moved);
-
-      const newOrders = combined.map((item, index) => ({
-        id: item.id,
-        order: index,
-        isProject: item.isProject,
-      }));
-
-      // Update local state
-      const updatedProjects = projects.map((p) => {
-        const orderInfo = newOrders.find((o) => o.isProject && o.id === p.id);
-        if (p.id.toString() === id && isProject) {
-          return { ...p, categoryId: null, order: orderInfo?.order ?? p.order };
-        }
-        if (orderInfo) return { ...p, order: orderInfo.order };
-        return p;
+      await reorderRootLevel({
+        draggableKind: draggableMeta.kind,
+        draggableId: draggableMeta.id,
+        destinationIndex: destination.index,
       });
-
-      const updatedCategories = categories.map((c) => {
-        const orderInfo = newOrders.find((o) => !o.isProject && o.id === c.id);
-        if (orderInfo) return { ...c, order: orderInfo.order };
-        return c;
-      });
-
-      setProjects(updatedProjects);
-      setCategories(updatedCategories);
-
-      try {
-        const projectOrders = newOrders
-          .filter((o) => o.isProject)
-          .map((o) => ({ id: o.id, order: o.order }));
-        const categoryOrders = newOrders
-          .filter((o) => !o.isProject)
-          .map((o) => ({ id: o.id, order: o.order }));
-
-        if (isProject && id.toString() === moved.id.toString()) {
-          // If we moved a project to the root, we MUST update its categoryId atomically
-          await API.reorderProjects({
-            orders: projectOrders,
-            categoryId: null,
-          });
-        } else {
-          await API.reorderProjects({ orders: projectOrders });
-        }
-
-        if (categoryOrders.length > 0) {
-          await API.reorderCategories(categoryOrders);
-        }
-      } catch (error) {
-        toast.error("Failed to reorder items");
-        onProjectsChange();
-      }
       return;
     }
 
-    // Handle moving project into a specific category or reordering inside one
-    if (draggableId.startsWith("project-")) {
-      const destCategoryIdStr = destination.droppableId.replace("cat-", "");
-      const destCategoryId =
-        destCategoryIdStr === "sidebar-content"
-          ? null
-          : parseInt(destCategoryIdStr);
-      const projectId = parseInt(draggableId.replace("project-", ""));
+    if (draggableMeta.kind === "project") {
+      const destinationCategoryId = parseCategoryDroppableId(
+        destination.droppableId,
+      );
+      if (destinationCategoryId === undefined) return;
 
-      const destProjects = projects
-        .filter((p) => p.categoryId === destCategoryId)
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-      const movedProject = projects.find((p) => p.id === projectId);
-      if (!movedProject) return;
-
-      const filteredDest = destProjects.filter((p) => p.id !== projectId);
-      const finalDestProjects = [...filteredDest];
-      finalDestProjects.splice(destination.index, 0, {
-        ...movedProject,
-        categoryId: destCategoryId,
+      await moveProjectToCategory({
+        projectId: draggableMeta.id,
+        destinationCategoryId,
+        destinationIndex: destination.index,
+        sourceDroppableId: source.droppableId,
+        destinationDroppableId: destination.droppableId,
       });
-
-      const updatedProjects = projects.map((p) => {
-        if (p.id === projectId)
-          return { ...p, categoryId: destCategoryId, order: destination.index };
-        // We also need to update orders of other projects in the destination category
-        const inDest = finalDestProjects.find((fp) => fp.id === p.id);
-        if (inDest) {
-          return { ...p, order: finalDestProjects.indexOf(inDest) };
-        }
-        return p;
-      });
-
-      setProjects(updatedProjects);
-
-      try {
-        await API.reorderProjects({
-          orders: finalDestProjects.map((p, i) => ({ id: p.id, order: i })),
-          categoryId: destCategoryId,
-        });
-
-        if (source.droppableId !== destination.droppableId) {
-          onProjectsChange();
-        }
-      } catch (error) {
-        toast.error("Failed to move project");
-        onProjectsChange();
-      }
     }
   };
 
@@ -221,7 +455,9 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     try {
       await API.addCategory({
         name: newCategoryName.trim(),
-        order: categories.length + projects.filter((p) => !p.categoryId).length,
+        order:
+          categories.length +
+          projects.filter((p) => toNullableNumber(p.categoryId) === null).length,
       });
       setNewCategoryName("");
       setIsAddingCategory(false);
@@ -286,41 +522,66 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     API.openPath(path);
   };
 
-  const renderFolderLogo = (categoryId) => {
-    const categoryProjects = projects.filter(
-      (p) => p.categoryId === categoryId,
+  const renderFolderLogo = (
+    categoryId,
+    { compact = false, enlargeWhenEmpty = false } = {},
+  ) => {
+    const normalizedCategoryId = toNullableNumber(categoryId);
+    const categoryProjects = getSortedProjectsInCategory(normalizedCategoryId);
+    const isEmpty = categoryProjects.length === 0;
+
+    const wrapperClass = cn(
+      "rounded-lg border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center shrink-0",
+      compact ? "w-8 h-8" : "w-10 h-10",
+      isEmpty && enlargeWhenEmpty && (compact ? "w-10 h-10" : "w-12 h-12"),
     );
 
-    if (categoryProjects.length > 0) {
+    if (!isEmpty) {
       return (
-        <div className="grid grid-cols-2 gap-0.5 p-1.5 place-items-center">
-          {categoryProjects.slice(0, 4).map((p) => (
-            <div
-              key={p.id}
-              className="w-3.5 h-3.5 rounded-[2px] overflow-hidden bg-white/10"
-            >
-              {p.icon ? (
-                <img
-                  src={
-                    p.icon.match(/^(https?:\/\/|data:)/)
-                      ? p.icon
-                      : `media:///${p.icon.replace(/\\/g, "/")}?t=${new Date(
-                          p.updatedAt,
-                        ).getTime()}`
-                  }
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[6px] font-bold">
-                  {p.name.charAt(0)}
-                </div>
-              )}
-            </div>
-          ))}
+        <div className={wrapperClass}>
+          <div className="grid grid-cols-2 gap-0.5 p-1 place-items-center w-full h-full">
+            {categoryProjects.slice(0, 4).map((p) => (
+              <div
+                key={p.id}
+                className={cn(
+                  "rounded-[2px] overflow-hidden bg-white/10",
+                  compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5",
+                )}
+              >
+                {p.icon ? (
+                  <img
+                    alt=""
+                    src={
+                      p.icon.match(/^(https?:\/\/|data:)/)
+                        ? p.icon
+                        : `media:///${p.icon.replace(/\\/g, "/")}?t=${new Date(
+                            p.updatedAt,
+                          ).getTime()}`
+                    }
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[6px] font-bold">
+                    {p.name.charAt(0)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
-    return <FolderIcon className="w-5 h-5 text-muted-foreground/40" />;
+
+    return (
+      <div className={wrapperClass}>
+        <FolderIcon
+          className={cn(
+            "text-muted-foreground/40",
+            compact ? "w-4 h-4" : "w-5 h-5",
+          )}
+        />
+      </div>
+    );
   };
 
   const navigate = useNavigate();
@@ -447,157 +708,173 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         draggableId={`project-${p.id}`}
         index={index}
       >
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className="outline-none"
-          >
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <div
-                  onClick={() => setSelectedProjectId(p.id)}
-                  className={cn(
-                    "sidebar-item group relative transition-all duration-200 select-none",
-                    width < 120 ? "collapsed" : "",
-                    width < 120 && !p.categoryId && !isSelected
-                      ? "border-white/5"
-                      : "",
-                    isSelected ? "active" : "hover:bg-white/5",
-                    width < 120 ? "mx-auto" : "px-3 py-2.5",
-                    snapshot.isDragging &&
-                      "opacity-50 ring-2 ring-primary bg-primary/10",
-                  )}
-                  title={width < 120 ? p.name : undefined}
-                >
-                  {width >= 120 && (
-                    <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-opacity p-1">
-                      <GripVertical className="h-3 w-3" />
-                    </div>
-                  )}
+        {(provided, snapshot) => {
+          const draggableStyle = {
+            ...provided.draggableProps.style,
+            ...(snapshot.isDragging ? { zIndex: 10000 } : {}),
+          };
 
+          const projectNode = (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              style={draggableStyle}
+              className="outline-none"
+            >
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
                   <div
+                    onClick={() => setSelectedProjectId(p.id)}
                     className={cn(
-                      "relative shrink-0 flex items-center justify-center transition-all duration-300",
-                      width < 120 ? "w-10 h-10" : "w-10 h-10",
+                      "sidebar-item group relative transition-all duration-200 select-none",
+                      width < 120 ? "collapsed" : "",
+                      width < 120 &&
+                        toNullableNumber(p.categoryId) === null &&
+                        !isSelected
+                        ? "border-white/5"
+                        : "",
+                      isSelected ? "active" : "hover:bg-white/5",
+                      width < 120 ? "mx-auto" : "px-3 py-2.5",
+                      snapshot.isDragging &&
+                        "opacity-95 ring-2 ring-primary bg-primary/20 shadow-2xl",
                     )}
+                    title={width < 120 ? p.name : undefined}
                   >
-                    {p.icon ? (
-                      <div
-                        className={cn(
-                          "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
-                          width < 120
-                            ? "w-10 h-10 rounded-xl"
-                            : "w-8 h-8 rounded-md",
-                        )}
-                      >
-                        <img
-                          src={
-                            p.icon.match(/^(https?:\/\/|data:)/)
-                              ? p.icon
-                              : `media:///${p.icon.replace(/\\/g, "/")}?t=${
-                                  new Date(p.updatedAt).getTime() || Date.now()
-                                }`
-                          }
-                          alt={p.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={cn(
-                          "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
-                          width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8",
-                        )}
-                      >
-                        {p.name.charAt(0).toUpperCase()}
+                    {width >= 120 && (
+                      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-opacity p-1">
+                        <GripVertical className="h-3 w-3" />
                       </div>
                     )}
-                  </div>
 
-                  {width >= 120 && (
-                    <div className="flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left">
-                      <div className="flex items-center gap-2">
-                        {editingProjectId === p.id ? (
-                          <input
-                            autoFocus
-                            className="bg-transparent border-none outline-none text-sm font-medium flex-1 text-primary"
-                            value={editProjectName}
-                            onChange={(e) => setEditProjectName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleUpdateProject(p.id);
-                              if (e.key === "Escape") setEditingProjectId(null);
-                            }}
-                            onBlur={() => setEditingProjectId(null)}
-                            onClick={(e) => e.stopPropagation()}
+                    <div
+                      className={cn(
+                        "relative shrink-0 flex items-center justify-center transition-all duration-300",
+                        width < 120 ? "w-10 h-10" : "w-10 h-10",
+                      )}
+                    >
+                      {p.icon ? (
+                        <div
+                          className={cn(
+                            "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
+                            width < 120
+                              ? "w-10 h-10 rounded-xl"
+                              : "w-8 h-8 rounded-md",
+                          )}
+                        >
+                          <img
+                            src={
+                              p.icon.match(/^(https?:\/\/|data:)/)
+                                ? p.icon
+                                : `media:///${p.icon.replace(/\\/g, "/")}?t=${
+                                    new Date(p.updatedAt).getTime() || Date.now()
+                                  }`
+                            }
+                            alt={p.name}
+                            className="w-full h-full object-cover"
                           />
-                        ) : (
-                          <span className="font-medium truncate text-sm flex-1">
-                            {p.name}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs opacity-50 truncate text-muted-foreground">
-                        {p.path}
-                      </span>
+                        </div>
+                      ) : (
+                        <div
+                          className={cn(
+                            "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
+                            width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8",
+                          )}
+                        >
+                          {p.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  <div
-                    className={cn(
-                      "absolute transition-all duration-300 flex items-center justify-center",
-                      width < 120
-                        ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
-                        : "relative right-auto top-auto ml-auto transform-none",
-                    )}
-                  >
-                    {p.status === "running" && (
-                      <div className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                    {width >= 120 && (
+                      <div className="flex flex-col min-w-0 flex-1 ml-3 transition-all duration-300 origin-left">
+                        <div className="flex items-center gap-2">
+                          {editingProjectId === p.id ? (
+                            <input
+                              autoFocus
+                              className="bg-transparent border-none outline-none text-sm font-medium flex-1 text-primary"
+                              value={editProjectName}
+                              onChange={(e) => setEditProjectName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleUpdateProject(p.id);
+                                if (e.key === "Escape") setEditingProjectId(null);
+                              }}
+                              onBlur={() => setEditingProjectId(null)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="font-medium truncate text-sm flex-1">
+                              {p.name}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs opacity-50 truncate text-muted-foreground">
+                          {p.path}
+                        </span>
                       </div>
                     )}
-                    {p.status === "error" && (
-                      <div className="h-2 w-2 rounded-full bg-red-500" />
-                    )}
-                    {(!p.status || p.status === "stopped") && width >= 120 && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
-                    )}
+
+                    <div
+                      className={cn(
+                        "absolute transition-all duration-300 flex items-center justify-center",
+                        width < 120
+                          ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
+                          : "relative right-auto top-auto ml-auto transform-none",
+                      )}
+                    >
+                      {p.status === "running" && (
+                        <div className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                        </div>
+                      )}
+                      {p.status === "error" && (
+                        <div className="h-2 w-2 rounded-full bg-red-500" />
+                      )}
+                      {(!p.status || p.status === "stopped") && width >= 120 && (
+                        <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem
-                  onClick={() => {
-                    setSelectedProjectId(p.id);
-                    setIsProjectSettingsOpen(true);
-                  }}
-                >
-                  <Settings className="w-4 h-4 mr-2" /> Settings
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onClick={() => {
-                    setEditingProjectId(p.id);
-                    setEditProjectName(p.name);
-                  }}
-                >
-                  <Edit2 className="w-4 h-4 mr-2" /> Rename
-                </ContextMenuItem>
-                <ContextMenuItem onClick={() => openInExplorer(null, p.path)}>
-                  <FolderOpen className="w-4 h-4 mr-2" /> Open Folder
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => handleDeleteProject(p.id)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete Server
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          </div>
-        )}
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    onClick={() => {
+                      setSelectedProjectId(p.id);
+                      setIsProjectSettingsOpen(true);
+                    }}
+                  >
+                    <Settings className="w-4 h-4 mr-2" /> Settings
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => {
+                      setEditingProjectId(p.id);
+                      setEditProjectName(p.name);
+                    }}
+                  >
+                    <Edit2 className="w-4 h-4 mr-2" /> Rename
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => openInExplorer(null, p.path)}>
+                    <FolderOpen className="w-4 h-4 mr-2" /> Open Folder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => handleDeleteProject(p.id)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete Server
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            </div>
+          );
+
+          if (snapshot.isDragging && typeof document !== "undefined") {
+            return createPortal(projectNode, document.body);
+          }
+
+          return projectNode;
+        }}
       </Draggable>
     );
   };
@@ -711,7 +988,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   </div>
                 )}
 
-                <Droppable droppableId="sidebar-content" type="project">
+                <Droppable
+                  droppableId="sidebar-content"
+                  type="project"
+                  isCombineEnabled
+                >
                   {(provided) => (
                     <div
                       {...provided.droppableProps}
@@ -724,22 +1005,29 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                       {[
                         ...categories.map((c) => ({ ...c, isCategory: true })),
                         ...projects
-                          .filter((p) => !p.categoryId)
+                          .filter((p) => toNullableNumber(p.categoryId) === null)
                           .map((p) => ({ ...p, isProject: true })),
                       ]
-                        .sort((a, b) => a.order - b.order)
+                        .sort(
+                          (a, b) =>
+                            normalizeOrder(a.order) - normalizeOrder(b.order),
+                        )
                         .map((item, index) => {
                           if (item.isProject) {
                             return renderProject(item, index);
                           }
 
                           const category = item;
+                          const categoryId = toNullableNumber(category.id);
+                          if (categoryId === null) return null;
+                          const categoryProjects =
+                            getSortedProjectsInCategory(categoryId);
                           const isCategoryCollapsed =
-                            collapsedCategories.includes(category.id);
+                            collapsedCategories.includes(categoryId);
                           return (
                             <Draggable
-                              key={`category-${category.id}`}
-                              draggableId={`category-${category.id}`}
+                              key={`category-${categoryId}`}
+                              draggableId={`category-${categoryId}`}
                               index={index}
                             >
                               {(providedCat, snapshotCat) => (
@@ -755,7 +1043,10 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                           "transition-all duration-300",
                                           isCollapsed
                                             ? cn(
-                                                "mx-auto w-12 rounded-xl overflow-hidden transition-all duration-300",
+                                                "mx-auto rounded-xl overflow-hidden transition-all duration-300",
+                                                categoryProjects.length === 0
+                                                  ? "w-14"
+                                                  : "w-12",
                                                 isCategoryCollapsed
                                                   ? "hover:bg-white/5 border-2 border-white/5"
                                                   : "bg-primary/[0.07] shadow-lg ring-1 ring-white/10",
@@ -763,7 +1054,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                             : cn(
                                                 "rounded-xl border transition-all duration-500",
                                                 isCategoryCollapsed
-                                                  ? "bg-primary/[0.07] border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-lg"
+                                                  ? cn(
+                                                      "bg-primary/[0.07] border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-lg",
+                                                      categoryProjects.length ===
+                                                        0 && "min-h-[4.25rem]",
+                                                    )
                                                   : "bg-primary/[0.07] border-primary/20 p-1.5 shadow-2xl shadow-black/40",
                                               ),
                                           snapshotCat.isDragging &&
@@ -773,7 +1068,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                         <div
                                           className={cn(
                                             "flex items-center justify-between group/cat",
-                                            !isCollapsed && "px-2 py-1.5",
+                                            !isCollapsed &&
+                                              (isCategoryCollapsed &&
+                                              categoryProjects.length === 0
+                                                ? "px-2 py-2.5"
+                                                : "px-2 py-1.5"),
                                           )}
                                         >
                                           <div
@@ -784,12 +1083,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                 : "",
                                             )}
                                             onClick={() =>
-                                              toggleCategory(category.id)
+                                              toggleCategory(categoryId)
                                             }
                                             {...providedCat.dragHandleProps}
                                           >
                                             {isCollapsed ? (
-                                              renderFolderLogo(category.id)
+                                              renderFolderLogo(categoryId, {
+                                                enlargeWhenEmpty: true,
+                                              })
                                             ) : (
                                               <>
                                                 <div className="opacity-0 group-hover/cat:opacity-30 transition-opacity p-1 -ml-1">
@@ -802,8 +1103,19 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                       "-rotate-90",
                                                   )}
                                                 />
+                                                {isCategoryCollapsed && (
+                                                  <div className="mr-1">
+                                                    {renderFolderLogo(
+                                                      categoryId,
+                                                      {
+                                                        compact: true,
+                                                        enlargeWhenEmpty: true,
+                                                      },
+                                                    )}
+                                                  </div>
+                                                )}
                                                 {editingCategoryId ===
-                                                category.id ? (
+                                                categoryId ? (
                                                   <input
                                                     autoFocus
                                                     className="bg-transparent border-none outline-none text-xs font-bold uppercase tracking-wider flex-1 text-primary"
@@ -816,7 +1128,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                     onKeyDown={(e) => {
                                                       if (e.key === "Enter")
                                                         handleUpdateCategory(
-                                                          category.id,
+                                                          categoryId,
                                                         );
                                                     }}
                                                     onBlur={() =>
@@ -870,7 +1182,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                               className="overflow-hidden"
                                             >
                                               <Droppable
-                                                droppableId={`cat-${category.id}`}
+                                                droppableId={`cat-${categoryId}`}
                                                 type="project"
                                               >
                                                 {(
@@ -881,7 +1193,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                     {...providedProj.droppableProps}
                                                     ref={providedProj.innerRef}
                                                     className={cn(
-                                                      "space-y-1 min-h-[4px] transition-all duration-300 rounded-lg",
+                                                      "space-y-1 min-h-[2rem] transition-all duration-300 rounded-lg",
                                                       snapshotProj.isDraggingOver &&
                                                         "bg-primary/10",
                                                       isCollapsed
@@ -889,19 +1201,17 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                         : "mt-1.5 mb-1",
                                                     )}
                                                   >
-                                                    {projects
-                                                      .filter(
-                                                        (p) =>
-                                                          p.categoryId ===
-                                                          category.id,
-                                                      )
-                                                      .sort(
-                                                        (a, b) =>
-                                                          a.order - b.order,
-                                                      )
-                                                      .map((p, index) =>
-                                                        renderProject(p, index),
+                                                    {snapshotProj.isDraggingOver &&
+                                                      categoryProjects.length ===
+                                                        0 && (
+                                                        <div className="mx-1 rounded-md border border-dashed border-primary/30 bg-primary/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+                                                          Drop project here
+                                                        </div>
                                                       )}
+                                                    {categoryProjects.map(
+                                                      (p, index) =>
+                                                        renderProject(p, index),
+                                                    )}
                                                     {providedProj.placeholder}
                                                   </div>
                                                 )}
@@ -914,7 +1224,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                     <ContextMenuContent>
                                       <ContextMenuItem
                                         onClick={() => {
-                                          setEditingCategoryId(category.id);
+                                          setEditingCategoryId(categoryId);
                                           setEditCategoryName(category.name);
                                         }}
                                       >
@@ -925,7 +1235,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                       <ContextMenuItem
                                         className="text-destructive focus:text-destructive"
                                         onClick={() =>
-                                          handleDeleteCategory(category.id)
+                                          handleDeleteCategory(categoryId)
                                         }
                                       >
                                         <Trash2 className="w-4 h-4 mr-2" />{" "}
