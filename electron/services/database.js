@@ -12,6 +12,7 @@ let categoryTable = null;
 
 /**
  * Initialize st.db and migrate data from SQLite if necessary.
+ * Public helpers below intentionally return safe defaults when tables are not ready.
  */
 export const initializeDatabase = async () => {
   try {
@@ -113,17 +114,19 @@ async function migrateFromSQLite(sqlitePath) {
     }
   } catch (err) {
     logger.error("[Migration] Error during migration:", err);
+    throw err;
   }
 }
 
 // ---------------- Helper Methods ----------------
+// Note: until initializeDatabase() completes, methods return []/null/false defaults.
 
 export const getProjects = async () => {
   if (!projectTable) return [];
   const entries = await projectTable.all();
   return entries
     .map((e) => {
-      const data = e.data;
+      const data = { ...e.data };
       if (data.encryptedTunnelToken) {
         data.encryptedTunnelToken = decryptSecret(data.encryptedTunnelToken);
       }
@@ -134,7 +137,10 @@ export const getProjects = async () => {
 
 export const getProjectById = async (id) => {
   if (!projectTable) return null;
-  const data = await projectTable.get(id.toString());
+  const storedData = await projectTable.get(id.toString());
+  if (!storedData) return null;
+
+  const data = { ...storedData };
   if (data && data.encryptedTunnelToken) {
     data.encryptedTunnelToken = decryptSecret(data.encryptedTunnelToken);
   }
@@ -144,9 +150,12 @@ export const getProjectById = async (id) => {
 export const addProject = async (projectData) => {
   if (!projectTable) return null;
   const projects = await projectTable.all();
+  const validProjectIds = projects
+    .map((p) => Number(p?.data?.id))
+    .filter((id) => Number.isInteger(id) && Number.isFinite(id));
   const nextId =
-    projects.length > 0
-      ? Math.max(...projects.map((p) => parseInt(p.ID) || 0)) + 1
+    validProjectIds.length > 0
+      ? Math.max(...validProjectIds) + 1
       : 1;
   const id = nextId.toString();
 
@@ -201,9 +210,12 @@ export const getCategories = async () => {
 export const addCategory = async (categoryData) => {
   if (!categoryTable) return null;
   const categories = await categoryTable.all();
+  const validCategoryIds = categories
+    .map((c) => Number(c?.data?.id))
+    .filter((id) => Number.isInteger(id) && Number.isFinite(id));
   const nextId =
-    categories.length > 0
-      ? Math.max(...categories.map((c) => parseInt(c.ID) || 0)) + 1
+    validCategoryIds.length > 0
+      ? Math.max(...validCategoryIds) + 1
       : 1;
   const id = nextId.toString();
 
@@ -236,6 +248,8 @@ export const updateCategory = async (categoryData) => {
 };
 
 export const reorderProjects = async (payload, categoryId = undefined) => {
+  if (!projectTable) return false;
+
   for (const { id, order } of payload) {
     const idStr = id.toString();
     const existing = await projectTable.get(idStr);
@@ -250,15 +264,100 @@ export const reorderProjects = async (payload, categoryId = undefined) => {
   return true;
 };
 
+export const reorderProjectsBulk = async (updates) => {
+  if (!projectTable) return false;
+  if (!Array.isArray(updates)) {
+    throw new Error("reorderProjectsBulk expects an updates array");
+  }
+  if (updates.length === 0) return true;
+
+  const normalizedUpdates = updates.map((update, index) => {
+    const id = Number(update?.id);
+    const order = Number(update?.order);
+    const rawCategoryId = update?.categoryId;
+    const categoryId = rawCategoryId === null ? null : Number(rawCategoryId);
+
+    if (!Number.isInteger(id)) {
+      throw new Error(`Invalid project id at updates[${index}]`);
+    }
+    if (!Number.isInteger(order)) {
+      throw new Error(`Invalid project order at updates[${index}]`);
+    }
+    if (!(rawCategoryId === null || Number.isInteger(categoryId))) {
+      throw new Error(`Invalid project categoryId at updates[${index}]`);
+    }
+
+    return {
+      id,
+      idStr: id.toString(),
+      order,
+      categoryId,
+    };
+  });
+
+  const seenIds = new Set();
+  for (const update of normalizedUpdates) {
+    if (seenIds.has(update.idStr)) {
+      throw new Error(`Duplicate project id in bulk reorder payload: ${update.id}`);
+    }
+    seenIds.add(update.idStr);
+  }
+
+  const snapshot = new Map();
+  for (const update of normalizedUpdates) {
+    const existing = await projectTable.get(update.idStr);
+    if (!existing) {
+      throw new Error(`Project not found for bulk reorder: ${update.id}`);
+    }
+    snapshot.set(update.idStr, existing);
+  }
+
+  try {
+    for (const update of normalizedUpdates) {
+      const existing = snapshot.get(update.idStr);
+      await projectTable.set(update.idStr, {
+        ...existing,
+        order: update.order,
+        categoryId: update.categoryId,
+      });
+    }
+    return true;
+  } catch (error) {
+    logger.error(
+      "[Database] reorderProjectsBulk failed. Rolling back touched records.",
+      error,
+    );
+
+    // Best-effort atomicity over JSON storage: restore pre-write snapshot.
+    for (const [idStr, original] of snapshot.entries()) {
+      try {
+        await projectTable.set(idStr, original);
+      } catch (rollbackError) {
+        logger.error(
+          `[Database] reorderProjectsBulk rollback failed for project ${idStr}:`,
+          rollbackError,
+        );
+      }
+    }
+    throw error;
+  }
+};
+
+/**
+ * Reorder categories by updating their order values.
+ * @param {Object} orders - Object mapping category id to order value.
+ * @returns {Promise<boolean>} true on success, false when DB is not initialized.
+ */
 export const reorderCategories = async (orders) => {
+  if (!categoryTable) return false;
+
   // orders is expected to be an object: { id: order, ... }
   const entries = Object.entries(orders);
   for (const [id, order] of entries) {
-    const idStr = id.toString();
-    const existing = await categoryTable.get(idStr);
+    const existing = await categoryTable.get(id);
     if (existing) {
       const updated = { ...existing, order };
-      await categoryTable.set(idStr, updated);
+      await categoryTable.set(id, updated);
     }
   }
   return true;

@@ -11,6 +11,67 @@ import TunnelView from "@/components/TunnelView";
 import EmptyState from "@/components/EmptyState";
 
 const API = window.api;
+const isDev = import.meta.env.DEV;
+
+const warnedInvalidProjectIds = new Set();
+const warnedInvalidCategoryIds = new Set();
+
+const toNullableNumber = (value) => {
+  if (value === null || value === undefined) return null;
+  const normalizedValue = typeof value === "string" ? value.trim() : value;
+  if (normalizedValue === "") return null;
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toOrderNumber = (value) => {
+  const normalizedValue = typeof value === "string" ? value.trim() : value;
+  if (normalizedValue === "") return 0;
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const warnInvalidIdOnce = (kind, rawId) => {
+  if (!isDev) return;
+  const key = String(rawId);
+  const registry =
+    kind === "project" ? warnedInvalidProjectIds : warnedInvalidCategoryIds;
+  if (registry.has(key)) return;
+  registry.add(key);
+  console.warn(`[Dashboard] Dropping ${kind} with non-numeric id:`, rawId);
+};
+
+const normalizeProject = (project) => {
+  const normalizedId = toNullableNumber(project.id);
+  if (normalizedId === null) {
+    warnInvalidIdOnce("project", project.id);
+    return null;
+  }
+  return {
+    ...project,
+    id: normalizedId,
+    categoryId: toNullableNumber(project.categoryId),
+    order: toOrderNumber(project.order),
+  };
+};
+
+const normalizeCategory = (category) => {
+  const normalizedId = toNullableNumber(category.id);
+  if (normalizedId === null) {
+    warnInvalidIdOnce("category", category.id);
+    return null;
+  }
+  return {
+    ...category,
+    id: normalizedId,
+    order: toOrderNumber(category.order),
+  };
+};
+
+const normalizeProjectList = (projectList = []) =>
+  projectList.map(normalizeProject).filter(Boolean);
+const normalizeCategoryList = (categoryList = []) =>
+  categoryList.map(normalizeCategory).filter(Boolean);
 
 export default function Dashboard() {
   const [projects, setProjects] = useAtom(atoms.projectsAtom);
@@ -37,8 +98,8 @@ export default function Dashboard() {
       API.getProjects(),
       API.getCategories(),
     ]);
-    setProjects(projectList);
-    setCategories(categoryList);
+    setProjects(normalizeProjectList(projectList));
+    setCategories(normalizeCategoryList(categoryList));
   };
 
   const loadFileTree = async (path) => {
@@ -52,8 +113,10 @@ export default function Dashboard() {
     loadData();
     const cleanupStatus = API.onStatusChange(
       ({ projectId, status, startTime }) => {
+        const normalizedProjectId = toNullableNumber(projectId);
+        if (normalizedProjectId === null) return;
         setProjects((prev) => {
-          const project = prev.find((p) => p.id === projectId);
+          const project = prev.find((p) => p.id === normalizedProjectId);
           if (project && project.status !== status) {
             if (status === "running") {
               toast.success(`${project.name} is now running`);
@@ -64,7 +127,7 @@ export default function Dashboard() {
             }
           }
           return prev.map((p) =>
-            p.id === projectId ? { ...p, status, startTime } : p,
+            p.id === normalizedProjectId ? { ...p, status, startTime } : p,
           );
         });
       },
@@ -169,7 +232,7 @@ export default function Dashboard() {
     if (selectedProjectId) {
       setStats(null); // Immediately clear stats on project switch
       const syncProjectStatus = async () => {
-        const list = await API.getProjects();
+        const list = normalizeProjectList(await API.getProjects());
         setProjects(list);
       };
       syncProjectStatus();
@@ -299,8 +362,18 @@ export default function Dashboard() {
   const handleUpdateProject = async (projectData, silent = false) => {
     const updated = await API.updateProject(projectData);
     if (updated) {
+      const normalizedUpdated = normalizeProject(updated);
+      if (!normalizedUpdated) {
+        if (!silent) {
+          toast.error("Failed to normalize updated project");
+        }
+        loadData();
+        return;
+      }
       setProjects((prev) =>
-        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+        prev.map((p) =>
+          p.id === normalizedUpdated.id ? { ...p, ...normalizedUpdated } : p,
+        ),
       );
       if (!silent) toast.success("Settings saved");
     } else {
