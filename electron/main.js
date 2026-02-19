@@ -25,6 +25,44 @@ let tray = null;
 let isQuitting = false;
 
 global.mainWindow = null;
+const EXTERNAL_MEDIA_DIRS_ENV_KEY = "SELFHOST_MEDIA_ALLOWED_DIRS";
+const configuredExternalMediaBases = (process.env[EXTERNAL_MEDIA_DIRS_ENV_KEY] ||
+  "")
+  .split(path.delimiter)
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+  .map((entry) => path.resolve(entry));
+let hasLoggedPermissiveExternalMediaMode = false;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const normalizePathForComparison = (targetPath) => {
+  const normalizedPath = path.normalize(path.resolve(targetPath));
+  return process.platform === "win32"
+    ? normalizedPath.toLowerCase()
+    : normalizedPath;
+};
+
+const isPathWithinBase = (targetPath, basePath) => {
+  const normalizedTarget = normalizePathForComparison(targetPath);
+  const normalizedBase = normalizePathForComparison(basePath);
+
+  if (normalizedTarget === normalizedBase) return true;
+
+  const normalizedBaseWithSeparator = normalizedBase.endsWith(path.sep)
+    ? normalizedBase
+    : `${normalizedBase}${path.sep}`;
+
+  return normalizedTarget.startsWith(normalizedBaseWithSeparator);
+};
+
+const resolveAndValidatePath = (candidatePath, allowedBases) => {
+  const resolvedPath = path.resolve(candidatePath);
+  const isAllowed = allowedBases.some((basePath) =>
+    isPathWithinBase(resolvedPath, basePath),
+  );
+  return isAllowed ? resolvedPath : null;
+};
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -53,16 +91,70 @@ async function createWindow() {
   global.mainWindow = mainWindow;
 
   if (isDev) {
-    try {
-      await mainWindow.loadURL("http://localhost:5173");
-    } catch (e) {
-      logger.info("Waiting for Vite server...");
-      setTimeout(() => mainWindow.loadURL("http://localhost:5173"), 2000);
+    const devServerUrl = "http://localhost:5173";
+    const maxRetries = 5;
+    const retryDelayMs = 1500;
+    let loadedDevUrl = false;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+      if (!mainWindow || mainWindow.isDestroyed()) return null;
+
+      try {
+        await mainWindow.loadURL(devServerUrl);
+        loadedDevUrl = true;
+        break;
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        if (isLastAttempt) {
+          logger.error("[Window] Failed to load Vite server after retries:", error);
+          break;
+        }
+
+        logger.info(
+          `[Window] Waiting for Vite server (attempt ${attempt}/${maxRetries})...`,
+        );
+        await sleep(retryDelayMs);
+
+        if (!mainWindow || mainWindow.isDestroyed()) return null;
+      }
     }
-    mainWindow.webContents.openDevTools();
+
+    if (loadedDevUrl && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.openDevTools();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      const fallbackHtml = `
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SelfHost Helper Dev</title>
+    <style>
+      body { font-family: sans-serif; margin: 32px; color: #111; }
+      h1 { margin-bottom: 8px; }
+      p { line-height: 1.5; }
+      code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Failed to connect to Vite dev server</h1>
+    <p>Could not load <code>${devServerUrl}</code> after multiple retries.</p>
+    <p>Ensure <code>npm run dev:react</code> is running, then reload the window.</p>
+  </body>
+</html>`;
+      try {
+        await mainWindow.loadURL(
+          `data:text/html;charset=utf-8,${encodeURIComponent(fallbackHtml)}`,
+        );
+      } catch (fallbackError) {
+        logger.error("[Window] Failed to load dev fallback error page:", fallbackError);
+        return null;
+      }
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
+
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
@@ -106,19 +198,41 @@ await settingsService.init();
 // Initialize logger early to catch startup issues
 logger.init();
 
-app.whenReady().then(async () => {
+app
+  .whenReady()
+  .then(async () => {
   logger.info("Application starting up (Ready)...");
   protocol.handle("media", async (request) => {
     try {
       const url = new URL(request.url);
       let filePath;
+      let allowedBases = [];
 
       if (url.hostname === "app") {
-        const relativePath = decodeURIComponent(url.pathname);
-        filePath = path.join(app.getAppPath(), relativePath);
-        if (!fs.existsSync(filePath)) {
-          filePath = path.join(process.cwd(), relativePath);
+        const relativePath = decodeURIComponent(url.pathname).replace(
+          /^[/\\]+/,
+          "",
+        );
+        const appBase = path.resolve(app.getAppPath());
+        const cwdBase = path.resolve(process.cwd());
+        const appCandidate = path.resolve(appBase, relativePath);
+        const cwdCandidate = path.resolve(cwdBase, relativePath);
+
+        if (
+          isPathWithinBase(appCandidate, appBase) &&
+          fs.existsSync(appCandidate)
+        ) {
+          filePath = appCandidate;
+        } else if (
+          isPathWithinBase(cwdCandidate, cwdBase) &&
+          fs.existsSync(cwdCandidate)
+        ) {
+          filePath = cwdCandidate;
+        } else {
+          // Keep deterministic lookup and validate against both app-local bases below.
+          filePath = appCandidate;
         }
+        allowedBases = [appBase, cwdBase];
       } else {
         // Handle media://G/path, media:///G:/path, media:///G/path
         let rawPath = decodeURIComponent(url.pathname);
@@ -140,11 +254,50 @@ app.whenReady().then(async () => {
         } else {
           filePath = rawPath;
         }
+
+        if (!path.isAbsolute(filePath)) {
+          logger.warn(`[Media Protocol] Rejected non-absolute path: ${filePath}`);
+          return new Response("Forbidden", { status: 403 });
+        }
+
+        if (configuredExternalMediaBases.length > 0) {
+          allowedBases.push(...configuredExternalMediaBases);
+        } else {
+          // Backward-compatible permissive mode: allow readable files on the resolved drive root.
+          const driveRoot = path.parse(path.resolve(filePath)).root;
+          if (driveRoot) {
+            allowedBases.push(driveRoot);
+          }
+          if (
+            process.platform === "win32" &&
+            hostname &&
+            hostname.length === 1 &&
+            /^[a-zA-Z]$/.test(hostname)
+          ) {
+            allowedBases.push(path.resolve(`${hostname}:\\`));
+          }
+
+          if (!hasLoggedPermissiveExternalMediaMode) {
+            logger.warn(
+              `[Media Protocol] External media requests are using permissive drive-root mode. Set ${EXTERNAL_MEDIA_DIRS_ENV_KEY} to a ${path.delimiter}-separated list of allowed directories to restrict access.`,
+            );
+            hasLoggedPermissiveExternalMediaMode = true;
+          }
+        }
       }
 
-      filePath = path.normalize(filePath);
       // Remove any surrounding quotes that might have been pasted
       filePath = filePath.replace(/^["']|["']$/g, "").trim();
+      filePath = path.normalize(filePath);
+
+      const resolvedFilePath = resolveAndValidatePath(filePath, allowedBases);
+      if (!resolvedFilePath) {
+        logger.warn(
+          `[Media Protocol] Blocked path outside allowed bases: ${filePath}`,
+        );
+        return new Response("Forbidden", { status: 403 });
+      }
+      filePath = resolvedFilePath;
 
       try {
         await fs.promises.access(filePath, fs.constants.R_OK);
@@ -189,6 +342,13 @@ app.whenReady().then(async () => {
   await startAutoStartProjects();
 
   const window = await createWindow();
+  if (!window) {
+    logger.error(
+      "[Window] createWindow returned null during startup. Aborting tray setup.",
+    );
+    app.quit();
+    return;
+  }
 
   const {
     startProject,
@@ -236,14 +396,25 @@ app.whenReady().then(async () => {
   // Initial tray setup
   refreshTray();
 
-  app.on("activate", () => {
+  app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else {
+      try {
+        const createdWindow = await createWindow();
+        if (!createdWindow) {
+          logger.error("[Window] createWindow returned null on activate.");
+        }
+      } catch (error) {
+        logger.error("[Window] Failed to create window on activate:", error);
+      }
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
     }
   });
-});
+  })
+  .catch((error) => {
+    logger.error("[Startup] Fatal initialization error:", error);
+    app.exit(1);
+  });
 
 let isShuttingDown = false;
 

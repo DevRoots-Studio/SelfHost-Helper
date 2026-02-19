@@ -1,5 +1,31 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+const allowedListenerChannels = [
+  "project:log",
+  "project:logs-batch",
+  "project:status",
+  "projects:list-changed",
+  "project:logs-cleared",
+  "file:change",
+  "tunnel:status",
+  "tunnel:log",
+  "window:maximize",
+  "window:unmaximize",
+  "app:shutting-down",
+];
+
+const removeAllListeners = (channel) => {
+  if (!allowedListenerChannels.includes(channel)) {
+    console.warn(
+      `[Preload] Blocked removeAllListeners for disallowed channel: ${channel}`,
+    );
+    return false;
+  }
+
+  ipcRenderer.removeAllListeners(channel);
+  return true;
+};
+
 contextBridge.exposeInMainWorld("api", {
   startProject: (id) => ipcRenderer.invoke("project:start", id),
   stopProject: (id) => ipcRenderer.invoke("project:stop", id),
@@ -24,6 +50,8 @@ contextBridge.exposeInMainWorld("api", {
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
   reorderProjects: (payload) => ipcRenderer.invoke("projects:reorder", payload),
+  reorderProjectsBulk: (payload) =>
+    ipcRenderer.invoke("projects:reorderBulk", payload),
 
   getCategories: () => ipcRenderer.invoke("categories:getAll"),
   addCategory: (category) => ipcRenderer.invoke("categories:add", category),
@@ -83,7 +111,7 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("tunnel:log", subscription);
   },
 
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+  removeAllListeners,
   // for custom title bar
   closeWindow: () => ipcRenderer.send("window:close"),
   minimizeWindow: () => ipcRenderer.send("window:minimize"),

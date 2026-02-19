@@ -8,6 +8,7 @@ import {
   deleteProject,
   updateProject,
   reorderProjects,
+  reorderProjectsBulk,
   getCategories,
   addCategory,
   deleteCategory,
@@ -124,6 +125,12 @@ export const registerHandlers = () => {
     return success;
   });
 
+  ipcMain.handle("projects:reorderBulk", async (_, { updates }) => {
+    const success = await reorderProjectsBulk(updates);
+    notifyProjectListChanged();
+    return success;
+  });
+
   ipcMain.handle("categories:getAll", async () => {
     return await getCategories();
   });
@@ -145,9 +152,19 @@ export const registerHandlers = () => {
 
   ipcMain.handle("categories:delete", async (_, id) => {
     const projects = await getProjects();
+    const normalizeCategoryId = (value) => {
+      if (value === null || value === undefined || value === "") return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const targetCategoryId = normalizeCategoryId(id);
+
     // Unset categoryId for all projects in this category
     for (const p of projects) {
-      if (p.categoryId === id) {
+      if (
+        targetCategoryId !== null &&
+        normalizeCategoryId(p.categoryId) === targetCategoryId
+      ) {
         await updateProject({ id: p.id, categoryId: null });
       }
     }
