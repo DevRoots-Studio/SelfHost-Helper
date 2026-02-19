@@ -73,10 +73,7 @@ export default function LogViewer({ projectId, status, onSendInput }) {
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
     const resizeObserver = new ResizeObserver(() => {
-      if (
-        terminalContainerRef.current &&
-        terminalContainerRef.current.clientWidth > 0
-      ) {
+      if (terminalContainerRef.current && terminalContainerRef.current.clientWidth > 0) {
         try {
           fitAddon.fit();
         } catch (e) {
@@ -138,10 +135,7 @@ export default function LogViewer({ projectId, status, onSendInput }) {
       e.preventDefault();
       if (history.length === 0) return;
 
-      const newIndex =
-        historyIndex === -1
-          ? history.length - 1
-          : Math.max(0, historyIndex - 1);
+      const newIndex = historyIndex === -1 ? history.length - 1 : Math.max(0, historyIndex - 1);
       setHistoryIndex(newIndex);
       setInput(history[newIndex]);
     } else if (e.key === "ArrowDown") {
@@ -196,9 +190,7 @@ export default function LogViewer({ projectId, status, onSendInput }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              status === "running" ? "Type command..." : "Project is offline"
-            }
+            placeholder={status === "running" ? "Type command..." : "Project is offline"}
             spellCheck={false}
             autoComplete="off"
             disabled={status !== "running"}
@@ -215,12 +207,7 @@ export default function LogViewer({ projectId, status, onSendInput }) {
         </Button>
       </div>
       <div className=" absolute top-4 right-4 cursor-pointer">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClear}
-          className="cursor-pointer"
-        >
+        <Button variant="ghost" size="icon" onClick={handleClear} className="cursor-pointer">
           <BrushCleaning className="h-4 w-4" />
         </Button>
       </div>

@@ -1,13 +1,7 @@
 import React from "react";
 import Editor from "@monaco-editor/react";
 
-const MonacoEditor = ({
-  value,
-  onChange,
-  onSave,
-  language = "javascript",
-  theme = "vs-dark",
-}) => {
+const MonacoEditor = ({ value, onChange, onSave, language = "javascript", theme = "vs-dark" }) => {
   const handleEditorChange = (value) => {
     onChange(value);
   };
@@ -23,10 +17,7 @@ const MonacoEditor = ({
         theme={theme}
         onChange={handleEditorChange}
         onMount={(editor, monaco) => {
-          if (
-            monaco?.languages?.javascriptDefaults &&
-            monaco?.languages?.typescriptDefaults
-          ) {
+          if (monaco?.languages?.javascriptDefaults && monaco?.languages?.typescriptDefaults) {
             monaco.languages.javascriptDefaults.setCompilerOptions({
               allowNonTsExtensions: true,
               checkJs: true,

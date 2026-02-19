@@ -38,10 +38,7 @@ export const initProjectModel = (sequelize) => {
             // If the stored value is corrupted, return an empty object and log a warning
             // This prevents the app from throwing when reading malformed env data
             // during runtime while preserving the raw value in the DB.
-            console.warn(
-              `Project.env contains invalid JSON for project id=${this.id}:`,
-              e,
-            );
+            console.warn(`Project.env contains invalid JSON for project id=${this.id}:`, e);
             return {};
           }
         },
@@ -105,7 +102,7 @@ export const initProjectModel = (sequelize) => {
           } catch (e) {
             console.warn(
               `Project.tunnelConfig contains invalid JSON for project id=${this.id}:`,
-              e,
+              e
             );
             return {};
           }
@@ -129,22 +126,18 @@ export const initProjectModel = (sequelize) => {
       hooks: {
         beforeSave: async (project) => {
           if (project.changed("encryptedTunnelToken")) {
-            const { encryptSecret } =
-              await import("../../electron/services/secretStore.js");
-            project.encryptedTunnelToken = encryptSecret(
-              project.encryptedTunnelToken,
-            );
+            const { encryptSecret } = await import("../../electron/services/secretStore.js");
+            project.encryptedTunnelToken = encryptSecret(project.encryptedTunnelToken);
           }
         },
         afterFind: async (results) => {
           if (!results) return;
-          const { decryptSecret } =
-            await import("../../electron/services/secretStore.js");
+          const { decryptSecret } = await import("../../electron/services/secretStore.js");
           const decrypt = (project) => {
             if (project.encryptedTunnelToken) {
               project.setDataValue(
                 "encryptedTunnelToken",
-                decryptSecret(project.encryptedTunnelToken),
+                decryptSecret(project.encryptedTunnelToken)
               );
             }
           };
@@ -157,14 +150,13 @@ export const initProjectModel = (sequelize) => {
         },
         afterSave: async (project) => {
           if (project.encryptedTunnelToken) {
-            const { decryptSecret } =
-              await import("../../electron/services/secretStore.js");
+            const { decryptSecret } = await import("../../electron/services/secretStore.js");
             const decrypted = decryptSecret(project.encryptedTunnelToken);
             project.setDataValue("encryptedTunnelToken", decrypted);
             project.changed("encryptedTunnelToken", false);
           }
         },
       },
-    },
+    }
   );
 };

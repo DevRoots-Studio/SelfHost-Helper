@@ -34,10 +34,12 @@ export default function TunnelLogViewer({ logs = [] }) {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new ClipboardAddon());
-    term.loadAddon(new WebLinksAddon((event, uri) => {
-      event.preventDefault();
-      window.api.openExternal(uri);
-    }));
+    term.loadAddon(
+      new WebLinksAddon((event, uri) => {
+        event.preventDefault();
+        window.api.openExternal(uri);
+      })
+    );
 
     term.attachCustomKeyEventHandler((arg) => {
       if (arg.ctrlKey && (arg.code === "KeyC" || arg.code === "KeyV")) {
@@ -47,7 +49,7 @@ export default function TunnelLogViewer({ logs = [] }) {
     });
 
     term.open(terminalContainerRef.current);
-    
+
     // Initial fit
     requestAnimationFrame(() => {
       try {
@@ -91,18 +93,18 @@ export default function TunnelLogViewer({ logs = [] }) {
 
     // ANSI escape codes for improved colors
     const colors = {
-      info: "\x1b[96m",    // Bright Cyan (for info)
+      info: "\x1b[96m", // Bright Cyan (for info)
       success: "\x1b[92m", // Bright Green
-      warn: "\x1b[93m",    // Bright Yellow
-      error: "\x1b[91m",   // Bright Red
-      reset: "\x1b[0m"
+      warn: "\x1b[93m", // Bright Yellow
+      error: "\x1b[91m", // Bright Red
+      reset: "\x1b[0m",
     };
 
     for (let i = lastLogIndexRef.current; i < logs.length; i++) {
       const log = logs[i];
       const timestamp = new Date(log.timestamp).toLocaleTimeString([], { hour12: false });
       const color = colors[log.type] || colors.info;
-      
+
       term.write(`\x1b[90m[${timestamp}]\x1b[0m ${color}${log.message}${colors.reset}\n`);
     }
 

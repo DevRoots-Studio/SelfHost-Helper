@@ -33,19 +33,14 @@ export default function ProjectHeader({
             <div
               className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                selectedProject.status === "running"
-                  ? "bg-green-400 animate-pulse"
-                  : "bg-red-400"
+                selectedProject.status === "running" ? "bg-green-400 animate-pulse" : "bg-red-400"
               )}
             />
             {selectedProject.status || "stopped"}
           </div>
         </h2>
         {selectedProject.status === "running" && selectedProject.startTime && (
-          <Uptime
-            key={selectedProject.id}
-            startTime={selectedProject.startTime}
-          />
+          <Uptime key={selectedProject.id} startTime={selectedProject.startTime} />
         )}
       </div>
       <div className="flex items-center space-x-2 no-drag flex-wrap gap-2">

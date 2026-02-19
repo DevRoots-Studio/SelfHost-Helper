@@ -8,13 +8,13 @@ import logger from "./logger.js";
  */
 export const encryptSecret = (plaintext) => {
   if (!plaintext) return "";
-  
+
   try {
     if (!safeStorage.isEncryptionAvailable()) {
       logger.warn("SecretStore: Encryption is not available on this machine.");
       return plaintext; // Fallback to plaintext if encryption is not available (not ideal but avoids crash)
     }
-    
+
     const buffer = safeStorage.encryptString(plaintext);
     return buffer.toString("base64");
   } catch (error) {
@@ -30,12 +30,12 @@ export const encryptSecret = (plaintext) => {
  */
 export const decryptSecret = (ciphertext) => {
   if (!ciphertext) return "";
-  
+
   try {
     if (!safeStorage.isEncryptionAvailable()) {
       return ciphertext;
     }
-    
+
     const buffer = Buffer.from(ciphertext, "base64");
     return safeStorage.decryptString(buffer);
   } catch (error) {

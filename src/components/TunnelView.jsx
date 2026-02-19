@@ -27,13 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "react-toastify";
 import { useAtom } from "jotai";
 import { tunnelStateAtom } from "@/store/atoms";
@@ -49,14 +43,10 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
 
   const [mode, setMode] = useState(selectedProject.tunnelMode || "quick");
   const [port, setPort] = useState(selectedProject.tunnelPort || 3000);
-  const [token, setToken] = useState(
-    selectedProject.encryptedTunnelToken || "",
-  );
+  const [token, setToken] = useState(selectedProject.encryptedTunnelToken || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [autoStart, setAutoStart] = useState(
-    selectedProject.autoStartTunnel || false,
-  );
+  const [autoStart, setAutoStart] = useState(selectedProject.autoStartTunnel || false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [config, setConfig] = useState({
@@ -87,15 +77,9 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
     prevStatusRef.current = projectTunnelState.status;
   }, [selectedProject.id]);
   useEffect(() => {
-    if (
-      prevStatusRef.current !== "running" &&
-      projectTunnelState.status === "running"
-    ) {
+    if (prevStatusRef.current !== "running" && projectTunnelState.status === "running") {
       toast.success("Tunnel established successfully!");
-    } else if (
-      prevStatusRef.current === "running" &&
-      projectTunnelState.status === "stopped"
-    ) {
+    } else if (prevStatusRef.current === "running" && projectTunnelState.status === "stopped") {
       toast.info("Tunnel stopped.");
     }
     prevStatusRef.current = projectTunnelState.status;
@@ -161,7 +145,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
+    navigator.clipboard
+      .writeText(text)
       .then(() => toast.success("URL copied to clipboard"))
       .catch((err) => {
         console.error("Failed to copy to clipboard:", err);
@@ -185,12 +170,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   <Settings2 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">
-                    Tunnel Configuration
-                  </CardTitle>
-                  <CardDescription>
-                    Configure how your project is exposed
-                  </CardDescription>
+                  <CardTitle className="text-lg">Tunnel Configuration</CardTitle>
+                  <CardDescription>Configure how your project is exposed</CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -207,10 +188,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowHelp(!showHelp)}
-                  className={cn(
-                    "gap-2 cursor-pointer",
-                    showHelp && "bg-primary/20 text-primary",
-                  )}
+                  className={cn("gap-2 cursor-pointer", showHelp && "bg-primary/20 text-primary")}
                 >
                   <HelpCircle className="h-4 w-4" />
                   Help
@@ -227,8 +205,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
                   <div className="absolute left-full ml-2 top-0 w-64 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[10px] hidden group-hover:block z-50">
                     Quick: Free, random URL, no account needed. <br />
-                    Authenticated: Fixed URL (custom domain), requires
-                    Cloudflare Zero Trust token.
+                    Authenticated: Fixed URL (custom domain), requires Cloudflare Zero Trust token.
                   </div>
                 </div>
               </Label>
@@ -239,7 +216,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                     "flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm transition-all cursor-pointer",
                     mode === "quick"
                       ? "bg-primary text-primary-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-foreground",
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Zap className="h-4 w-4" /> Quick
@@ -250,7 +227,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                     "flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm transition-all cursor-pointer",
                     mode === "authenticated"
                       ? "bg-primary text-primary-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-foreground",
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <ShieldCheck className="h-4 w-4" /> Authenticated
@@ -265,8 +242,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                 <div className="group relative">
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
                   <div className="absolute left-full ml-2 top-0 w-64 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[10px] hidden group-hover:block z-50">
-                    The port your local service is running on (e.g., 3000,
-                    8080).
+                    The port your local service is running on (e.g., 3000, 8080).
                   </div>
                 </div>
               </Label>
@@ -297,8 +273,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   <div className="group relative">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
                     <div className="absolute left-full ml-2 top-0 w-64 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[10px] hidden group-hover:block z-50">
-                      Copy the token from Cloudflare Zero Trust dashboard
-                      (Networks {"->"} Tunnels).
+                      Copy the token from Cloudflare Zero Trust dashboard (Networks {"->"} Tunnels).
                     </div>
                   </div>
                 </Label>
@@ -320,8 +295,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   <div className="group relative">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
                     <div className="absolute left-full ml-2 top-0 w-64 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[10px] hidden group-hover:block z-50">
-                      Automatically start this tunnel whenever the project
-                      starts.
+                      Automatically start this tunnel whenever the project starts.
                     </div>
                   </div>
                 </Label>
@@ -329,10 +303,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   Launch tunnel automatically with project startup.
                 </p>
               </div>
-              <Switch
-                checked={autoStart}
-                onCheckedChange={(v) => setAutoStart(v)}
-              />
+              <Switch checked={autoStart} onCheckedChange={(v) => setAutoStart(v)} />
             </div>
 
             {/* Advanced Settings Toggle (Authenticated mode only) */}
@@ -347,23 +318,17 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   ) : (
                     <ChevronDown className="h-3 w-3" />
                   )}
-                  {showAdvanced
-                    ? "Hide Advanced Settings"
-                    : "Show Advanced Settings"}
+                  {showAdvanced ? "Hide Advanced Settings" : "Show Advanced Settings"}
                 </button>
 
                 {showAdvanced && (
                   <div className="mt-4 space-y-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">
-                          Protocol
-                        </Label>
+                        <Label className="text-xs text-muted-foreground">Protocol</Label>
                         <Select
                           value={config.protocol}
-                          onValueChange={(v) =>
-                            setConfig({ ...config, protocol: v })
-                          }
+                          onValueChange={(v) => setConfig({ ...config, protocol: v })}
                         >
                           <SelectTrigger className="bg-black/20 border-white/5 text-xs h-9">
                             <SelectValue placeholder="Select Protocol" />
@@ -375,14 +340,10 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">
-                          Log Level
-                        </Label>
+                        <Label className="text-xs text-muted-foreground">Log Level</Label>
                         <Select
                           value={config.loglevel}
-                          onValueChange={(v) =>
-                            setConfig({ ...config, loglevel: v })
-                          }
+                          onValueChange={(v) => setConfig({ ...config, loglevel: v })}
                         >
                           <SelectTrigger className="bg-black/20 border-white/5 text-xs h-9">
                             <SelectValue placeholder="Select Log Level" />
@@ -406,9 +367,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                       </div>
                       <Switch
                         checked={config.noTLSVerify}
-                        onCheckedChange={(v) =>
-                          setConfig({ ...config, noTLSVerify: v })
-                        }
+                        onCheckedChange={(v) => setConfig({ ...config, noTLSVerify: v })}
                       />
                     </div>
 
@@ -419,8 +378,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                           <div className="group relative">
                             <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
                             <div className="absolute left-full ml-2 bottom-0 w-48 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[9px] hidden group-hover:block z-50">
-                              Timeout for establishing a new connection to the
-                              local service (e.g., 30s).
+                              Timeout for establishing a new connection to the local service (e.g.,
+                              30s).
                             </div>
                           </div>
                         </Label>
@@ -442,8 +401,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                           <div className="group relative">
                             <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
                             <div className="absolute left-full ml-2 bottom-0 w-48 p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border text-[9px] hidden group-hover:block z-50">
-                              Sets the HTTP Host header for requests sent to the
-                              local service.
+                              Sets the HTTP Host header for requests sent to the local service.
                             </div>
                           </div>
                         </Label>
@@ -467,8 +425,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
 
             {/* Action Buttons */}
             <div className="pt-4 mt-auto">
-              {projectTunnelState.status === "stopped" ||
-              projectTunnelState.status === "error" ? (
+              {projectTunnelState.status === "stopped" || projectTunnelState.status === "error" ? (
                 <Button
                   onClick={handleStart}
                   disabled={isProcessing}
@@ -484,9 +441,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                   className="w-full h-11 font-semibold rounded-xl transition-all shadow-lg active:scale-95 gap-2 cursor-pointer"
                 >
                   <Square className="h-4 w-4" />{" "}
-                  {projectTunnelState.status === "connecting"
-                    ? "Stop Connecting"
-                    : "Stop Tunnel"}
+                  {projectTunnelState.status === "connecting" ? "Stop Connecting" : "Stop Tunnel"}
                 </Button>
               )}
             </div>
@@ -545,9 +500,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                       <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-green-500 border-2 border-background shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
                     </div>
                     <div className="w-full px-4">
-                      <h3 className="text-xl font-bold text-green-500">
-                        Tunnel Running
-                      </h3>
+                      <h3 className="text-xl font-bold text-green-500">Tunnel Running</h3>
                       <div className="mt-6 p-4 bg-black/40 rounded-xl border border-white/10 group relative flex flex-col gap-3 max-w-md mx-auto">
                         <div className="flex items-center justify-between gap-3">
                           <code className="text-sm font-mono text-primary break-all truncate">
@@ -558,9 +511,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-primary transition-all rounded-md"
-                              onClick={() =>
-                                copyToClipboard(projectTunnelState.url)
-                              }
+                              onClick={() => copyToClipboard(projectTunnelState.url)}
                               disabled={!projectTunnelState.url}
                             >
                               <Copy className="h-4 w-4" />
@@ -591,17 +542,11 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                       <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-destructive border-2 border-background" />
                     </div>
                     <div className="w-full">
-                      <h3 className="text-xl font-bold text-destructive">
-                        Tunnel Error
-                      </h3>
+                      <h3 className="text-xl font-bold text-destructive">Tunnel Error</h3>
                       <p className="text-muted-foreground text-sm mt-1 mb-4">
                         {projectTunnelState.error}
                       </p>
-                      <Button
-                        onClick={handleStart}
-                        variant="outline"
-                        className="h-9 text-xs"
-                      >
+                      <Button onClick={handleStart} variant="outline" className="h-9 text-xs">
                         Try Again
                       </Button>
                     </div>
@@ -620,9 +565,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                     <HelpCircle className="h-5 w-5 text-primary" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="font-bold text-sm">
-                      How to get a Tunnel Token?
-                    </h3>
+                    <h3 className="font-bold text-sm">How to get a Tunnel Token?</h3>
                     <ol className="text-xs text-muted-foreground space-y-3 list-decimal list-inside">
                       <li>
                         Go to{" "}
@@ -635,22 +578,19 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
                         and sign in.
                       </li>
                       <li>
-                        Navigate to <b>Zero Trust</b> → <b>Networks</b> →{" "}
-                        <b>Tunnels</b>.
+                        Navigate to <b>Zero Trust</b> → <b>Networks</b> → <b>Tunnels</b>.
                       </li>
                       <li>
-                        Click <b>"Create a tunnel"</b> and select{" "}
-                        <b>"Cloudflared"</b>.
+                        Click <b>"Create a tunnel"</b> and select <b>"Cloudflared"</b>.
                       </li>
                       <li>Give your tunnel a name and save it.</li>
                       <li>
-                        In the installation step, find{" "}
-                        <b>"Choose your environment"</b> and select{" "}
+                        In the installation step, find <b>"Choose your environment"</b> and select{" "}
                         <b>"Windows"</b>.
                       </li>
                       <li>
-                        You will see a command, copy ONLY the long alphanumeric
-                        string after <code>--token</code>.
+                        You will see a command, copy ONLY the long alphanumeric string after{" "}
+                        <code>--token</code>.
                       </li>
                       <li>Paste it into the Token input field in this app.</li>
                     </ol>

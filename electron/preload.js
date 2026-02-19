@@ -16,9 +16,7 @@ const allowedListenerChannels = [
 
 const removeAllListeners = (channel) => {
   if (!allowedListenerChannels.includes(channel)) {
-    console.warn(
-      `[Preload] Blocked removeAllListeners for disallowed channel: ${channel}`,
-    );
+    console.warn(`[Preload] Blocked removeAllListeners for disallowed channel: ${channel}`);
     return false;
   }
 
@@ -34,8 +32,7 @@ contextBridge.exposeInMainWorld("api", {
   stopTunnel: (id) => ipcRenderer.invoke("tunnel:stop", id),
 
   readFile: (filePath) => ipcRenderer.invoke("file:read", filePath),
-  writeFile: (filePath, content) =>
-    ipcRenderer.invoke("file:write", filePath, content),
+  writeFile: (filePath, content) => ipcRenderer.invoke("file:write", filePath, content),
   watchFolder: (folderPath) => ipcRenderer.invoke("watcher:watch", folderPath),
 
   getLogs: (id) => ipcRenderer.invoke("logs:get", id),
@@ -50,16 +47,13 @@ contextBridge.exposeInMainWorld("api", {
   deleteProject: (id) => ipcRenderer.invoke("projects:delete", id),
   updateProject: (project) => ipcRenderer.invoke("projects:update", project),
   reorderProjects: (payload) => ipcRenderer.invoke("projects:reorder", payload),
-  reorderProjectsBulk: (payload) =>
-    ipcRenderer.invoke("projects:reorderBulk", payload),
+  reorderProjectsBulk: (payload) => ipcRenderer.invoke("projects:reorderBulk", payload),
 
   getCategories: () => ipcRenderer.invoke("categories:getAll"),
   addCategory: (category) => ipcRenderer.invoke("categories:add", category),
   deleteCategory: (id) => ipcRenderer.invoke("categories:delete", id),
-  updateCategory: (category) =>
-    ipcRenderer.invoke("categories:update", category),
-  reorderCategories: (orders) =>
-    ipcRenderer.invoke("categories:reorder", orders),
+  updateCategory: (category) => ipcRenderer.invoke("categories:update", category),
+  reorderCategories: (orders) => ipcRenderer.invoke("categories:reorder", orders),
 
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   selectFile: () => ipcRenderer.invoke("dialog:openFile"),
@@ -86,14 +80,12 @@ contextBridge.exposeInMainWorld("api", {
   onProjectsChange: (callback) => {
     const subscription = () => callback();
     ipcRenderer.on("projects:list-changed", subscription);
-    return () =>
-      ipcRenderer.removeListener("projects:list-changed", subscription);
+    return () => ipcRenderer.removeListener("projects:list-changed", subscription);
   },
   onLogsCleared: (callback) => {
     const subscription = (_, projectId) => callback(projectId);
     ipcRenderer.on("project:logs-cleared", subscription);
-    return () =>
-      ipcRenderer.removeListener("project:logs-cleared", subscription);
+    return () => ipcRenderer.removeListener("project:logs-cleared", subscription);
   },
   onFileChange: (callback) => {
     const subscription = (_, data) => callback(data);
@@ -135,8 +127,7 @@ contextBridge.exposeInMainWorld("api", {
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
   openPath: (path) => ipcRenderer.invoke("shell:openPath", path),
-  getDiscordInfo: (invitecode) =>
-    ipcRenderer.invoke("discord:getInviteInfo", invitecode),
+  getDiscordInfo: (invitecode) => ipcRenderer.invoke("discord:getInviteInfo", invitecode),
   getProjectStats: (id) => ipcRenderer.invoke("project:getStats", id),
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
   getAppPath: () => ipcRenderer.invoke("app:getAppPath"),

@@ -56,7 +56,7 @@ export const registerHandlers = () => {
 
       logger.debug(
         `[IPC:Handle] ${channel} called with args:`,
-        JSON.stringify(loggedArgs).slice(0, 500),
+        JSON.stringify(loggedArgs).slice(0, 500)
       );
       try {
         const result = await listener(event, ...args);
@@ -72,10 +72,7 @@ export const registerHandlers = () => {
   const originalOn = ipcMain.on.bind(ipcMain);
   ipcMain.on = (channel, listener) => {
     return originalOn(channel, (event, ...args) => {
-      logger.debug(
-        `[IPC:On] ${channel} received:`,
-        JSON.stringify(args).slice(0, 500),
-      );
+      logger.debug(`[IPC:On] ${channel} received:`, JSON.stringify(args).slice(0, 500));
       return listener(event, ...args);
     });
   };
@@ -86,9 +83,7 @@ export const registerHandlers = () => {
     return projects.map((p) => ({
       ...p,
       status: runningIds.includes(p.id?.toString()) ? "running" : "stopped",
-      startTime: runningIds.includes(p.id?.toString())
-        ? getProjectStartTime(p.id)
-        : null,
+      startTime: runningIds.includes(p.id?.toString()) ? getProjectStartTime(p.id) : null,
     }));
   });
 
@@ -161,10 +156,7 @@ export const registerHandlers = () => {
 
     // Unset categoryId for all projects in this category
     for (const p of projects) {
-      if (
-        targetCategoryId !== null &&
-        normalizeCategoryId(p.categoryId) === targetCategoryId
-      ) {
+      if (targetCategoryId !== null && normalizeCategoryId(p.categoryId) === targetCategoryId) {
         await updateProject({ id: p.id, categoryId: null });
       }
     }
@@ -309,9 +301,7 @@ export const registerHandlers = () => {
   ipcMain.handle("dialog:openFile", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
-      filters: [
-        { name: "Images", extensions: ["jpg", "png", "gif", "ico", "svg"] },
-      ],
+      filters: [{ name: "Images", extensions: ["jpg", "png", "gif", "ico", "svg"] }],
     });
     if (canceled) {
       return null;
@@ -341,7 +331,7 @@ export const registerHandlers = () => {
               type: "file",
             };
           }
-        }),
+        })
       );
       return files;
     }
@@ -403,7 +393,7 @@ export const registerHandlers = () => {
   ipcMain.handle("discord:getInviteInfo", async (_, inviteCode) => {
     try {
       const response = await fetch(
-        `https://discord.com/api/invites/${inviteCode}?with_counts=true`,
+        `https://discord.com/api/invites/${inviteCode}?with_counts=true`
       );
       if (!response.ok) throw new Error("Failed to fetch Discord server info");
       const data = await response.json();

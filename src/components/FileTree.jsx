@@ -27,13 +27,7 @@ const sortTree = (nodes) => {
     });
 };
 
-const FileTreeNode = ({
-  node,
-  onSelect,
-  selectedPath,
-  level = 0,
-  defaultOpen = false,
-}) => {
+const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
   const [iconError, setIconError] = useState(false);
   const isDirectory = node.type === "directory";
@@ -60,9 +54,7 @@ const FileTreeNode = ({
     onSelect(node);
   };
 
-  const iconName = isDirectory
-    ? getFolderIcon(node.name, isOpen)
-    : getFileIcon(node.name);
+  const iconName = isDirectory ? getFolderIcon(node.name, isOpen) : getFileIcon(node.name);
 
   // If the iconName is just "file" or "folder", we use Lucide by default
   // to avoid trying to load non-existent generic icons.
@@ -73,10 +65,7 @@ const FileTreeNode = ({
   };
 
   const useLucide =
-    iconError ||
-    iconName === "file" ||
-    iconName === "folder" ||
-    iconName === "folder-open";
+    iconError || iconName === "file" || iconName === "folder" || iconName === "folder-open";
 
   const iconUrl = getIconUrl(iconName);
 
@@ -99,10 +88,7 @@ const FileTreeNode = ({
           onClick={isDirectory ? handleToggle : undefined}
         >
           {isDirectory ? (
-            <motion.div
-              animate={{ rotate: isOpen ? 90 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
               <ChevronRight className="h-3.5 w-3.5" />
             </motion.div>
           ) : (
@@ -164,9 +150,7 @@ export default function FileTree({ files, onSelectFile, selectedPath }) {
 
   if (!files || files.length === 0) {
     return (
-      <div className="p-4 text-xs text-muted-foreground italic text-center">
-        No files found
-      </div>
+      <div className="p-4 text-xs text-muted-foreground italic text-center">No files found</div>
     );
   }
 

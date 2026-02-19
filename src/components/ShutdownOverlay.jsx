@@ -24,12 +24,9 @@ export default function ShutdownOverlay({ isVisible }) {
             </div>
 
             <div className="space-y-2 text-center">
-              <h2 className="text-2xl font-bold tracking-tight">
-                Shutting Down
-              </h2>
+              <h2 className="text-2xl font-bold tracking-tight">Shutting Down</h2>
               <p className="text-muted-foreground max-w-[280px]">
-                Please wait while we gracefully stop your projects and save
-                their data...
+                Please wait while we gracefully stop your projects and save their data...
               </p>
             </div>
 

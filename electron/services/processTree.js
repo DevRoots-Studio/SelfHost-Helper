@@ -43,16 +43,12 @@ async function getAllWindowsProcesses() {
       }
     }
 
-    logger.debug(
-      `[processTree] Found ${processes.length} total system processes using WMIC.`
-    );
+    logger.debug(`[processTree] Found ${processes.length} total system processes using WMIC.`);
 
     return processes;
   } catch (_err) {
     try {
-      logger.info(
-        "[processTree] WMIC failed or missing, falling back to PowerShell..."
-      );
+      logger.info("[processTree] WMIC failed or missing, falling back to PowerShell...");
       const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CommandLine | ConvertTo-Json -Compress"`;
       const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
       if (!stdout.trim()) return [];
@@ -103,9 +99,7 @@ function buildTree(allProcs, rootPid) {
     }
   }
 
-  logger.debug(
-    `[processTree] Built tree for root PID ${rootPid}. Tree size: ${tree.length}`
-  );
+  logger.debug(`[processTree] Built tree for root PID ${rootPid}. Tree size: ${tree.length}`);
   return tree;
 }
 
@@ -121,10 +115,7 @@ async function getUnixGroupPids(pgid) {
       .filter((line) => line)
       .map((line) => parseInt(line, 10));
   } catch (_err) {
-    logger.error(
-      `[processTree] Error fetching Unix group PIDs for PGID ${pgid}:`,
-      _err
-    );
+    logger.error(`[processTree] Error fetching Unix group PIDs for PGID ${pgid}:`, _err);
     return [];
   }
 }
@@ -160,17 +151,13 @@ export async function getProjectProcessInfo(rootPid, platform) {
     const pids = await getUnixGroupPids(rootPid);
     if (pids.length === 0) return [];
     try {
-      const { stdout } = await execAsync(
-        `ps -o pid=,args= -p ${pids.join(",")}`
-      );
+      const { stdout } = await execAsync(`ps -o pid=,args= -p ${pids.join(",")}`);
       return stdout
         .split("\n")
         .filter((l) => l.trim())
         .map((line) => {
           const match = line.trim().match(/^(\d+)\s+(.+)$/);
-          return match
-            ? { pid: parseInt(match[1], 10), commandLine: match[2] }
-            : null;
+          return match ? { pid: parseInt(match[1], 10), commandLine: match[2] } : null;
         })
         .filter((x) => x);
     } catch (_err) {
@@ -203,29 +190,18 @@ export async function killProjectGroup(child, platform, timeout = 5000) {
     });
 
     if (platform === "win32") {
-      logger.info(
-        `[processTree] Executing taskkill for PID ${child.pid} (tree=true)`
-      );
+      logger.info(`[processTree] Executing taskkill for PID ${child.pid} (tree=true)`);
       exec(`taskkill /pid ${child.pid} /f /t`, (err) => {
-        if (err)
-          logger.warn(
-            `[processTree] taskkill warning for PID ${child.pid}:`,
-            err.message
-          );
+        if (err) logger.warn(`[processTree] taskkill warning for PID ${child.pid}:`, err.message);
         clearTimeout(timer);
         done(0);
       });
     } else {
       try {
-        logger.info(
-          `[processTree] Sending SIGKILL to process group ${-child.pid}`
-        );
+        logger.info(`[processTree] Sending SIGKILL to process group ${-child.pid}`);
         process.kill(-child.pid, "SIGKILL");
       } catch (err) {
-        logger.warn(
-          `[processTree] SIGKILL failed for group ${-child.pid}:`,
-          err.message
-        );
+        logger.warn(`[processTree] SIGKILL failed for group ${-child.pid}:`, err.message);
       }
       clearTimeout(timer);
       done(0);

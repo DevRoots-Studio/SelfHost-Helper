@@ -28,10 +28,7 @@ class SettingsService {
       logger.info("[SettingsService] Settings initialized with st.db.");
       this.initialized = true;
     } catch (err) {
-      logger.error(
-        "[SettingsService] Failed to initialize settings with st.db:",
-        err,
-      );
+      logger.error("[SettingsService] Failed to initialize settings with st.db:", err);
     }
   }
 

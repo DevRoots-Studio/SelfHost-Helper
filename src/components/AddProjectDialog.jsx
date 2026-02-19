@@ -118,9 +118,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
       <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Add Project</DialogTitle>
-          <DialogDescription>
-            Select a Node.js project directory to manage.
-          </DialogDescription>
+          <DialogDescription>Select a Node.js project directory to manage.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -135,11 +133,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
                 placeholder="Select a directory..."
                 className="bg-muted/50 focus-visible:ring-1"
               />
-              <Button
-                variant="secondary"
-                onClick={handleBrowseValues}
-                className="cursor-pointer"
-              >
+              <Button variant="secondary" onClick={handleBrowseValues} className="cursor-pointer">
                 <FolderIcon className="mr-2 h-4 w-4" /> Browse
               </Button>
             </div>
@@ -151,9 +145,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
             <Input
               id="name"
               value={newProject.name}
-              onChange={(e) =>
-                setNewProject({ ...newProject, name: e.target.value })
-              }
+              onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
               placeholder="My Server"
             />
           </div>
@@ -190,9 +182,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
             <Input
               id="script"
               value={newProject.script}
-              onChange={(e) =>
-                setNewProject({ ...newProject, script: e.target.value })
-              }
+              onChange={(e) => setNewProject({ ...newProject, script: e.target.value })}
               placeholder="npm start"
             />
           </div>
@@ -207,9 +197,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
                 <Input
                   id="icon"
                   value={newProject.icon || ""}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, icon: e.target.value })
-                  }
+                  onChange={(e) => setNewProject({ ...newProject, icon: e.target.value })}
                   className="bg-muted/50 focus-visible:ring-1 w-full"
                   placeholder="https://... or C:\..."
                 />
@@ -274,10 +262,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
 
           <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
             <div className="space-y-0.5">
-              <Label
-                htmlFor="clearLogsBeforeStart"
-                className="text-base cursor-pointer"
-              >
+              <Label htmlFor="clearLogsBeforeStart" className="text-base cursor-pointer">
                 Clear Logs Before Start
               </Label>
               <p className="text-xs text-muted-foreground">
@@ -294,11 +279,7 @@ export default function AddProjectDialog({ onProjectsChange }) {
         <DialogFooter>
           <Button
             onClick={handleAddProject}
-            disabled={
-              !newProject.path ||
-              !newProject.name.trim() ||
-              !newProject.script.trim()
-            }
+            disabled={!newProject.path || !newProject.name.trim() || !newProject.script.trim()}
             className="cursor-pointer"
           >
             Add Project

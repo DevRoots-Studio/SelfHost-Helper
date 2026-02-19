@@ -5,9 +5,7 @@ export default function TitleBar() {
 
   useEffect(() => {
     const cleanupMaximize = window.api.onMaximize(() => setMaximized(true));
-    const cleanupUnmaximize = window.api.onUnmaximize(() =>
-      setMaximized(false)
-    );
+    const cleanupUnmaximize = window.api.onUnmaximize(() => setMaximized(false));
 
     return () => {
       cleanupMaximize();

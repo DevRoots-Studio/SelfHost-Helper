@@ -16,7 +16,7 @@ export const updateTrayMenu = (
   stopProject,
   restartProject,
   startAll,
-  stopAll,
+  stopAll
 ) => {
   if (!tray) return;
 
@@ -60,9 +60,7 @@ export const updateTrayMenu = (
     {
       label: "Servers",
       submenu:
-        projectItems.length > 0
-          ? projectItems
-          : [{ label: "No projects found", enabled: false }],
+        projectItems.length > 0 ? projectItems : [{ label: "No projects found", enabled: false }],
     },
     { type: "separator" },
     { label: "Quit", click: () => currentOnQuit() },
@@ -83,9 +81,7 @@ export const initTray = (mainWindow, onQuit) => {
   tray = new Tray(iconPath);
 
   const tooltop =
-    process.env.NODE_ENV === "development"
-      ? "SelfHost helper Dev"
-      : "SelfHost helper";
+    process.env.NODE_ENV === "development" ? "SelfHost helper Dev" : "SelfHost helper";
 
   tray.setToolTip(tooltop);
   tray.on("double-click", () => mainWindow.show());

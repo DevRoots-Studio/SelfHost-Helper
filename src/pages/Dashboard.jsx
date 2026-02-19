@@ -34,8 +34,7 @@ const toOrderNumber = (value) => {
 const warnInvalidIdOnce = (kind, rawId) => {
   if (!isDev) return;
   const key = String(rawId);
-  const registry =
-    kind === "project" ? warnedInvalidProjectIds : warnedInvalidCategoryIds;
+  const registry = kind === "project" ? warnedInvalidProjectIds : warnedInvalidCategoryIds;
   if (registry.has(key)) return;
   registry.add(key);
   console.warn(`[Dashboard] Dropping ${kind} with non-numeric id:`, rawId);
@@ -75,29 +74,20 @@ const normalizeCategoryList = (categoryList = []) =>
 
 export default function Dashboard() {
   const [projects, setProjects] = useAtom(atoms.projectsAtom);
-  const [selectedProjectId, setSelectedProjectId] = useAtom(
-    atoms.selectedProjectIdAtom,
-  );
+  const [selectedProjectId, setSelectedProjectId] = useAtom(atoms.selectedProjectIdAtom);
   const selectedProject = useAtomValue(atoms.selectedProjectAtom);
   const setLogs = useSetAtom(atoms.logsAtom);
   const [viewMode, setViewMode] = useAtom(atoms.viewModeAtom);
   const [fileTree, setFileTree] = useAtom(atoms.fileTreeAtom);
-  const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(
-    atoms.isFileTreeLoadingAtom,
-  );
+  const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(atoms.isFileTreeLoadingAtom);
   const setStats = useSetAtom(atoms.statsAtom);
-  const [projectEditorStates, setProjectEditorStates] = useAtom(
-    atoms.projectEditorStatesAtom,
-  );
+  const [projectEditorStates, setProjectEditorStates] = useAtom(atoms.projectEditorStatesAtom);
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
 
   const setCategories = useSetAtom(atoms.categoriesAtom);
 
   const loadData = async () => {
-    const [projectList, categoryList] = await Promise.all([
-      API.getProjects(),
-      API.getCategories(),
-    ]);
+    const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
     setProjects(normalizeProjectList(projectList));
     setCategories(normalizeCategoryList(categoryList));
   };
@@ -111,27 +101,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
-    const cleanupStatus = API.onStatusChange(
-      ({ projectId, status, startTime }) => {
-        const normalizedProjectId = toNullableNumber(projectId);
-        if (normalizedProjectId === null) return;
-        setProjects((prev) => {
-          const project = prev.find((p) => p.id === normalizedProjectId);
-          if (project && project.status !== status) {
-            if (status === "running") {
-              toast.success(`${project.name} is now running`);
-            } else if (status === "stopped") {
-              toast.info(`${project.name} has stopped`);
-            } else if (status === "error") {
-              toast.error(`${project.name} encountered an error`);
-            }
+    const cleanupStatus = API.onStatusChange(({ projectId, status, startTime }) => {
+      const normalizedProjectId = toNullableNumber(projectId);
+      if (normalizedProjectId === null) return;
+      setProjects((prev) => {
+        const project = prev.find((p) => p.id === normalizedProjectId);
+        if (project && project.status !== status) {
+          if (status === "running") {
+            toast.success(`${project.name} is now running`);
+          } else if (status === "stopped") {
+            toast.info(`${project.name} has stopped`);
+          } else if (status === "error") {
+            toast.error(`${project.name} encountered an error`);
           }
-          return prev.map((p) =>
-            p.id === normalizedProjectId ? { ...p, status, startTime } : p,
-          );
-        });
-      },
-    );
+        }
+        return prev.map((p) => (p.id === normalizedProjectId ? { ...p, status, startTime } : p));
+      });
+    });
     const cleanupList = API.onProjectsChange(() => {
       loadData();
     });
@@ -174,48 +160,38 @@ export default function Dashboard() {
     });
 
     // Tunnel listeners
-    const cleanupTunnelStatus = API.onTunnelStatus(
-      ({ projectId, status, url, error }) => {
-        setTunnelState((prev) => ({
+    const cleanupTunnelStatus = API.onTunnelStatus(({ projectId, status, url, error }) => {
+      setTunnelState((prev) => ({
+        ...prev,
+        [projectId]: {
+          ...(prev[projectId] || { logs: [] }),
+          status,
+          url,
+          error,
+        },
+      }));
+    });
+
+    const cleanupTunnelLog = API.onTunnelLog(({ projectId, message, type, timestamp }) => {
+      setTunnelState((prev) => {
+        const projectState = prev[projectId] || {
+          status: "stopped",
+          url: null,
+          logs: [],
+        };
+        const newLogs = [...(projectState.logs || []), { message, type, timestamp }];
+        // Limit to 100 logs
+        const trimmedLogs = newLogs.length > 100 ? newLogs.slice(newLogs.length - 100) : newLogs;
+
+        return {
           ...prev,
           [projectId]: {
-            ...(prev[projectId] || { logs: [] }),
-            status,
-            url,
-            error,
+            ...projectState,
+            logs: trimmedLogs,
           },
-        }));
-      },
-    );
-
-    const cleanupTunnelLog = API.onTunnelLog(
-      ({ projectId, message, type, timestamp }) => {
-        setTunnelState((prev) => {
-          const projectState = prev[projectId] || {
-            status: "stopped",
-            url: null,
-            logs: [],
-          };
-          const newLogs = [
-            ...(projectState.logs || []),
-            { message, type, timestamp },
-          ];
-          // Limit to 100 logs
-          const trimmedLogs =
-            newLogs.length > 100
-              ? newLogs.slice(newLogs.length - 100)
-              : newLogs;
-
-          return {
-            ...prev,
-            [projectId]: {
-              ...projectState,
-              logs: trimmedLogs,
-            },
-          };
-        });
-      },
-    );
+        };
+      });
+    });
 
     return () => {
       cleanupStatus();
@@ -307,9 +283,7 @@ export default function Dashboard() {
   const handleStart = async (id) => {
     const res = await API.startProject(id);
     if (!res?.success) {
-      toast.error(
-        `Failed to start project: ${res?.message || "Unknown error"}`,
-      );
+      toast.error(`Failed to start project: ${res?.message || "Unknown error"}`);
     }
   };
 
@@ -371,9 +345,7 @@ export default function Dashboard() {
         return;
       }
       setProjects((prev) =>
-        prev.map((p) =>
-          p.id === normalizedUpdated.id ? { ...p, ...normalizedUpdated } : p,
-        ),
+        prev.map((p) => (p.id === normalizedUpdated.id ? { ...p, ...normalizedUpdated } : p))
       );
       if (!silent) toast.success("Settings saved");
     } else {
@@ -434,9 +406,7 @@ export default function Dashboard() {
                     fileTree={fileTree}
                     isFileTreeLoading={isFileTreeLoading}
                     initialFile={selectedProjectEditorFile}
-                    onFileSelect={(path) =>
-                      handleEditorFileChange(selectedProject.id, path)
-                    }
+                    onFileSelect={(path) => handleEditorFileChange(selectedProject.id, path)}
                   />
                 )}
               </div>

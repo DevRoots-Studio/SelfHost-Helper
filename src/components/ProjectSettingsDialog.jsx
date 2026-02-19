@@ -45,13 +45,7 @@ const PROJECT_TYPES = [
   { value: "other", label: "Other", script: "" },
 ];
 
-export default function ProjectSettingsDialog({
-  project,
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-}) {
+export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave, onDelete }) {
   const [formData, setFormData] = useState({
     name: "",
     path: "",
@@ -128,11 +122,7 @@ export default function ProjectSettingsDialog({
   };
 
   const handleDelete = () => {
-    if (
-      confirm(
-        `Are you sure you want to delete "${formData.name}"? This cannot be undone.`,
-      )
-    ) {
+    if (confirm(`Are you sure you want to delete "${formData.name}"? This cannot be undone.`)) {
       onDelete(project.id);
       onClose();
     }
@@ -144,8 +134,7 @@ export default function ProjectSettingsDialog({
       path: project?.path || "",
       script:
         project?.script ||
-        (project?.type &&
-          PROJECT_TYPES.find((t) => t.value === project.type)?.script) ||
+        (project?.type && PROJECT_TYPES.find((t) => t.value === project.type)?.script) ||
         "npm start",
       autoStart: project?.autoStart || false,
       type: project?.type || "node",
@@ -173,9 +162,7 @@ export default function ProjectSettingsDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Project Settings</DialogTitle>
-          <DialogDescription>
-            Configure settings for {project?.name}.
-          </DialogDescription>
+          <DialogDescription>Configure settings for {project?.name}.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
@@ -192,9 +179,7 @@ export default function ProjectSettingsDialog({
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, name: e.target.value }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                   className="bg-background/50"
                 />
               </div>
@@ -203,16 +188,11 @@ export default function ProjectSettingsDialog({
                 <Select
                   value={formData.type}
                   onValueChange={(value) => {
-                    const typeInfo = PROJECT_TYPES.find(
-                      (t) => t.value === value,
-                    );
+                    const typeInfo = PROJECT_TYPES.find((t) => t.value === value);
                     setFormData((prev) => ({
                       ...prev,
                       type: value,
-                      script:
-                        value !== "other" && typeInfo
-                          ? typeInfo.script
-                          : prev.script,
+                      script: value !== "other" && typeInfo ? typeInfo.script : prev.script,
                     }));
                   }}
                 >
@@ -249,9 +229,7 @@ export default function ProjectSettingsDialog({
 
           {/* Configuration */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold border-b border-border pb-2">
-              Configuration
-            </h3>
+            <h3 className="text-lg font-semibold border-b border-border pb-2">Configuration</h3>
 
             <div className="space-y-2">
               <Label htmlFor="path">
@@ -261,9 +239,7 @@ export default function ProjectSettingsDialog({
                 <Input
                   id="path"
                   value={formData.path}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, path: e.target.value }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, path: e.target.value }))}
                   className="bg-background/50"
                 />
                 <Button
@@ -284,9 +260,7 @@ export default function ProjectSettingsDialog({
               <Input
                 id="script"
                 value={formData.script}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, script: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, script: e.target.value }))}
                 className="bg-background/50 font-mono"
                 placeholder="npm start"
               />
@@ -302,9 +276,7 @@ export default function ProjectSettingsDialog({
                   <Input
                     id="icon"
                     value={formData.icon}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, icon: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, icon: e.target.value }))}
                     className="bg-background/50 w-full"
                     placeholder="Path to .png, .jpg, .ico"
                   />
@@ -315,9 +287,7 @@ export default function ProjectSettingsDialog({
                       layout
                       className="w-9 h-9 bg-secondary rounded overflow-hidden border border-border flex items-center justify-center relative shrink-0"
                       role="img"
-                      aria-label={`Icon preview for ${
-                        formData.name || "project"
-                      }`}
+                      aria-label={`Icon preview for ${formData.name || "project"}`}
                       initial={{ opacity: 0, width: 0, x: -6 }}
                       animate={{ opacity: 1, width: 36, x: 0 }}
                       exit={{ opacity: 0, width: 0, x: 6 }}
@@ -366,9 +336,7 @@ export default function ProjectSettingsDialog({
                 <Label htmlFor="autoStart" className="text-base cursor-pointer">
                   Auto Start
                 </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically run on app startup
-                </p>
+                <p className="text-xs text-muted-foreground">Automatically run on app startup</p>
               </div>
               <Switch
                 id="autoStart"
@@ -381,10 +349,7 @@ export default function ProjectSettingsDialog({
 
             <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
               <div className="space-y-0.5">
-                <Label
-                  htmlFor="clearLogsBeforeStart"
-                  className="text-base cursor-pointer"
-                >
+                <Label htmlFor="clearLogsBeforeStart" className="text-base cursor-pointer">
                   Clear Logs Before Start
                 </Label>
                 <p className="text-xs text-muted-foreground">
@@ -438,10 +403,7 @@ export default function ProjectSettingsDialog({
           <MotionButton
             onClick={handleSave}
             disabled={
-              isLoading ||
-              !formData.name.trim() ||
-              !formData.path.trim() ||
-              !formData.script.trim()
+              isLoading || !formData.name.trim() || !formData.path.trim() || !formData.script.trim()
             }
             whileTap={{ scale: 0.97 }}
             animate={{

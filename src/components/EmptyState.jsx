@@ -13,8 +13,7 @@ export default function EmptyState({ onAddProject }) {
         No Project Selected
       </h3>
       <p className="max-w-md text-center text-muted-foreground text-lg mb-8 leading-relaxed">
-        Select a project from the sidebar to manage it, or verify your
-        deployment status.
+        Select a project from the sidebar to manage it, or verify your deployment status.
       </p>
       <Button
         className="cursor-pointer btn-primary h-12 px-8 text-base shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"

@@ -12,7 +12,9 @@
     "build:dev": "vite build && cross-env NODE_ENV=development electron-builder --config.extraMetadata.appId=com.selfhosthelper.dev --config.directories.output=release-dev --config.productName=\"SelfHost Helper Dev\"",
     "build:prod": "vite build && cross-env NODE_ENV=production electron-builder",
     "postinstall": "electron-builder install-app-deps",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "build": {
     "appId": "com.selfhosthelper.app",
@@ -90,6 +92,7 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "postcss": "latest",
+    "prettier": "^3.8.1",
     "tailwindcss": "latest",
     "vite": "latest",
     "wait-on": "latest"

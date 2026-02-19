@@ -40,13 +40,11 @@ export const initializeDatabase = async () => {
 
     if (fs.existsSync(sqlitePath)) {
       logger.info(
-        `[Database] Found legacy SQLite database at ${sqlitePath}. Starting migration...`,
+        `[Database] Found legacy SQLite database at ${sqlitePath}. Starting migration...`
       );
       await migrateFromSQLite(sqlitePath);
     } else {
-      logger.debug(
-        "[Database] No legacy SQLite database found. Skipping migration.",
-      );
+      logger.debug("[Database] No legacy SQLite database found. Skipping migration.");
     }
   } catch (err) {
     logger.error("[Database] Failed to initialize st.db:", err.message || err);
@@ -129,14 +127,14 @@ async function migrateFromSQLite(sqlitePath) {
     } catch (queryErr) {
       logger.warn(
         "[Migration] Raw read failed (e.g. missing table). Skipping migration:",
-        queryErr?.message ?? queryErr,
+        queryErr?.message ?? queryErr
       );
       try {
         await tempSequelize.close();
       } catch (closeErr) {
         logger.warn(
           "[Migration] Failed to close SQLite connection during skip:",
-          closeErr?.message ?? closeErr,
+          closeErr?.message ?? closeErr
         );
       }
       const backupPath = sqlitePath + ".backup_skip_" + Date.now();
@@ -146,7 +144,7 @@ async function migrateFromSQLite(sqlitePath) {
 
     if (categories.length > 0 || projects.length > 0) {
       logger.info(
-        `[Migration] Found ${categories.length} categories and ${projects.length} projects in SQLite. Migrating...`,
+        `[Migration] Found ${categories.length} categories and ${projects.length} projects in SQLite. Migrating...`
       );
 
       for (const row of categories) {
@@ -218,10 +216,7 @@ export const addProject = async (projectData) => {
   const validProjectIds = projects
     .map((p) => Number(p?.data?.id))
     .filter((id) => Number.isInteger(id) && Number.isFinite(id));
-  const nextId =
-    validProjectIds.length > 0
-      ? Math.max(...validProjectIds) + 1
-      : 1;
+  const nextId = validProjectIds.length > 0 ? Math.max(...validProjectIds) + 1 : 1;
   const id = nextId.toString();
 
   const data = {
@@ -244,17 +239,14 @@ export const updateProject = async (projectData) => {
 
   const updatedData = { ...existing, ...projectData };
   if (projectData.encryptedTunnelToken !== undefined) {
-    updatedData.encryptedTunnelToken = encryptSecret(
-      projectData.encryptedTunnelToken,
-    );
+    updatedData.encryptedTunnelToken = encryptSecret(projectData.encryptedTunnelToken);
   }
 
   await projectTable.set(id, updatedData);
   return {
     ...updatedData,
     encryptedTunnelToken:
-      projectData.encryptedTunnelToken ||
-      decryptSecret(updatedData.encryptedTunnelToken),
+      projectData.encryptedTunnelToken || decryptSecret(updatedData.encryptedTunnelToken),
   };
 };
 
@@ -267,9 +259,7 @@ export const deleteProject = async (id) => {
 export const getCategories = async () => {
   if (!categoryTable) return [];
   const entries = await categoryTable.all();
-  return entries
-    .map((e) => e.data)
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  return entries.map((e) => e.data).sort((a, b) => (a.order || 0) - (b.order || 0));
 };
 
 export const addCategory = async (categoryData) => {
@@ -278,10 +268,7 @@ export const addCategory = async (categoryData) => {
   const validCategoryIds = categories
     .map((c) => Number(c?.data?.id))
     .filter((id) => Number.isInteger(id) && Number.isFinite(id));
-  const nextId =
-    validCategoryIds.length > 0
-      ? Math.max(...validCategoryIds) + 1
-      : 1;
+  const nextId = validCategoryIds.length > 0 ? Math.max(...validCategoryIds) + 1 : 1;
   const id = nextId.toString();
 
   const data = {
@@ -388,10 +375,7 @@ export const reorderProjectsBulk = async (updates) => {
     }
     return true;
   } catch (error) {
-    logger.error(
-      "[Database] reorderProjectsBulk failed. Rolling back touched records.",
-      error,
-    );
+    logger.error("[Database] reorderProjectsBulk failed. Rolling back touched records.", error);
 
     // Best-effort atomicity over JSON storage: restore pre-write snapshot.
     for (const [idStr, original] of snapshot.entries()) {
@@ -400,7 +384,7 @@ export const reorderProjectsBulk = async (updates) => {
       } catch (rollbackError) {
         logger.error(
           `[Database] reorderProjectsBulk rollback failed for project ${idStr}:`,
-          rollbackError,
+          rollbackError
         );
       }
     }

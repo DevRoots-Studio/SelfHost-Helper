@@ -1,0 +1,9 @@
+node_modules
+dist
+release
+release-dev
+build
+*.min.js
+public/file-icons
+electron/job/build
+.git

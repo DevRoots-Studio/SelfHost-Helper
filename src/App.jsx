@@ -23,9 +23,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background">
         <ShutdownOverlay isVisible={isShuttingDown} />
-        <title>
-          {import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}
-        </title>
+        <title>{import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}</title>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />

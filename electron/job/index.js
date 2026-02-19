@@ -11,10 +11,7 @@ const require = createRequire(import.meta.url);
 let bindingPath = join(__dirname, "build/Release/job.node");
 
 // Handle Electron ASAR packaging: native modules must be loaded from app.asar.unpacked
-if (
-  bindingPath.includes("app.asar") &&
-  !bindingPath.includes("app.asar.unpacked")
-) {
+if (bindingPath.includes("app.asar") && !bindingPath.includes("app.asar.unpacked")) {
   bindingPath = bindingPath.replace("app.asar", "app.asar.unpacked");
 }
 

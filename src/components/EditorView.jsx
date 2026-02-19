@@ -163,10 +163,7 @@ export default function EditorView({
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error("File read timeout after 10 seconds")),
-          10000
-        )
+        setTimeout(() => reject(new Error("File read timeout after 10 seconds")), 10000)
       );
 
       const contentPromise = API.readFile(filePath);
@@ -228,8 +225,7 @@ export default function EditorView({
   // Bind Ctrl/Cmd+S to save the current file (capture phase to prevent browser default)
   useEffect(() => {
     const onKeyDown = (e) => {
-      const isSave =
-        (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
+      const isSave = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
       if (isSave) {
         e.preventDefault();
         handleSaveFile();
@@ -237,14 +233,17 @@ export default function EditorView({
     };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [handleSaveFile]);
 
   return (
     <div className="h-full flex text-sm">
       {/* Editor Sidebar (File Tree) */}
-      <div ref={treeRef} className="relative border-r border-white/5 flex flex-col" style={{ width: treeWidth }}>
+      <div
+        ref={treeRef}
+        className="relative border-r border-white/5 flex flex-col"
+        style={{ width: treeWidth }}
+      >
         <div
           className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 z-50"
           onMouseDown={(e) => {
@@ -259,11 +258,7 @@ export default function EditorView({
           {isFileTreeLoading ? (
             <div className="p-4 text-xs text-muted-foreground">Loading...</div>
           ) : (
-            <FileTree
-              files={fileTree}
-              onSelectFile={handleFileSelect}
-              selectedPath={currentFile}
-            />
+            <FileTree files={fileTree} onSelectFile={handleFileSelect} selectedPath={currentFile} />
           )}
         </div>
       </div>
@@ -311,9 +306,7 @@ export default function EditorView({
             ) : fileLoadError ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
                 <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
-                <p className="text-sm text-destructive mb-4 text-center">
-                  {fileLoadError}
-                </p>
+                <p className="text-sm text-destructive mb-4 text-center">{fileLoadError}</p>
                 <Button
                   size="sm"
                   variant="outline"
@@ -341,9 +334,7 @@ export default function EditorView({
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-30">
               <FolderOpen className="h-16 w-16 mb-4 stroke-[1.5]" />
               <p className="text-lg font-medium">No File Selected</p>
-              <p className="text-xs">
-                Select a file from the explorer to start editing
-              </p>
+              <p className="text-xs">Select a file from the explorer to start editing</p>
             </div>
           )}
         </div>

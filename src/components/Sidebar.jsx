@@ -73,10 +73,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const setIsProjectSettingsOpen = useSetAtom(isProjectSettingsOpenAtom);
 
   useEffect(() => {
-    localStorage.setItem(
-      "collapsedCategories",
-      JSON.stringify(collapsedCategories),
-    );
+    localStorage.setItem("collapsedCategories", JSON.stringify(collapsedCategories));
   }, [collapsedCategories]);
 
   const toNullableNumber = (value) => {
@@ -112,8 +109,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     return toNullableNumber(droppableId.replace("cat-", ""));
   };
 
-  const isInCategory = (project, categoryId) =>
-    toNullableNumber(project.categoryId) === categoryId;
+  const isInCategory = (project, categoryId) => toNullableNumber(project.categoryId) === categoryId;
 
   const getSortedProjectsInCategory = (categoryId, projectList = projects) =>
     projectList
@@ -133,9 +129,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     const normalizedId = toNullableNumber(id);
     if (normalizedId === null) return;
     setCollapsedCategories((prev) =>
-      prev.includes(normalizedId)
-        ? prev.filter((i) => i !== normalizedId)
-        : [...prev, normalizedId],
+      prev.includes(normalizedId) ? prev.filter((i) => i !== normalizedId) : [...prev, normalizedId]
     );
   };
 
@@ -149,9 +143,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     const sourceCategoryId = parseCategoryDroppableId(sourceDroppableId);
     if (sourceCategoryId === undefined) return;
 
-    const movedProject = projects.find(
-      (project) => toNullableNumber(project.id) === projectId,
-    );
+    const movedProject = projects.find((project) => toNullableNumber(project.id) === projectId);
     if (!movedProject) return;
 
     const isSameCategory = sourceCategoryId === destinationCategoryId;
@@ -160,11 +152,12 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       .filter((project) => toNullableNumber(project.id) !== projectId)
       .map((project) => ({ ...project }));
 
-    const destinationWithoutMoved = (isSameCategory
-      ? sourceWithoutMoved
-      : getSortedProjectsInCategory(destinationCategoryId).filter(
-          (project) => toNullableNumber(project.id) !== projectId,
-        )
+    const destinationWithoutMoved = (
+      isSameCategory
+        ? sourceWithoutMoved
+        : getSortedProjectsInCategory(destinationCategoryId).filter(
+            (project) => toNullableNumber(project.id) !== projectId
+          )
     ).map((project) => ({ ...project }));
 
     const insertAt =
@@ -178,9 +171,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     });
 
     const finalDestinationProjects = destinationWithoutMoved;
-    const finalSourceProjects = isSameCategory
-      ? finalDestinationProjects
-      : sourceWithoutMoved;
+    const finalSourceProjects = isSameCategory ? finalDestinationProjects : sourceWithoutMoved;
 
     const updatedProjects = projects.map((project) => {
       const currentId = toNullableNumber(project.id);
@@ -195,7 +186,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       }
 
       const destinationOrder = finalDestinationProjects.findIndex(
-        (item) => toNullableNumber(item.id) === currentId,
+        (item) => toNullableNumber(item.id) === currentId
       );
       if (destinationOrder !== -1) {
         return {
@@ -207,7 +198,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
       if (!isSameCategory) {
         const sourceOrder = finalSourceProjects.findIndex(
-          (item) => toNullableNumber(item.id) === currentId,
+          (item) => toNullableNumber(item.id) === currentId
         );
         if (sourceOrder !== -1) {
           return {
@@ -225,10 +216,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
     try {
       const updates = [
-        ...buildProjectReorderUpdates(
-          finalDestinationProjects,
-          destinationCategoryId,
-        ),
+        ...buildProjectReorderUpdates(finalDestinationProjects, destinationCategoryId),
         ...(isSameCategory
           ? []
           : buildProjectReorderUpdates(finalSourceProjects, sourceCategoryId)),
@@ -245,11 +233,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     }
   };
 
-  const reorderRootLevel = async ({
-    draggableKind,
-    draggableId,
-    destinationIndex,
-  }) => {
+  const reorderRootLevel = async ({ draggableKind, draggableId, destinationIndex }) => {
     const combined = [
       ...categories.map((category) => ({
         ...category,
@@ -278,9 +262,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     if (sourceIndexInCombined !== -1) {
       [moved] = combined.splice(sourceIndexInCombined, 1);
     } else if (draggableKind === "project") {
-      const project = projects.find(
-        (item) => toNullableNumber(item.id) === draggableId,
-      );
+      const project = projects.find((item) => toNullableNumber(item.id) === draggableId);
       if (!project) return;
       moved = {
         ...project,
@@ -307,7 +289,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     const sourceCategoryProjectsWithoutMoved =
       movedProjectSourceCategoryId !== null
         ? getSortedProjectsInCategory(movedProjectSourceCategoryId).filter(
-            (project) => toNullableNumber(project.id) !== draggableId,
+            (project) => toNullableNumber(project.id) !== draggableId
           )
         : [];
 
@@ -315,9 +297,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
       const currentId = toNullableNumber(project.id);
       if (currentId === null) return project;
 
-      const orderInfo = newOrders.find(
-        (item) => item.isProject && item.id === currentId,
-      );
+      const orderInfo = newOrders.find((item) => item.isProject && item.id === currentId);
 
       if (draggableKind === "project" && currentId === draggableId) {
         return {
@@ -329,7 +309,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
       if (movedProjectSourceCategoryId !== null) {
         const sourceOrder = sourceCategoryProjectsWithoutMoved.findIndex(
-          (item) => toNullableNumber(item.id) === currentId,
+          (item) => toNullableNumber(item.id) === currentId
         );
         if (sourceOrder !== -1) {
           return {
@@ -347,9 +327,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     const updatedCategories = categories.map((category) => {
       const currentId = toNullableNumber(category.id);
       if (currentId === null) return category;
-      const orderInfo = newOrders.find(
-        (item) => !item.isProject && item.id === currentId,
-      );
+      const orderInfo = newOrders.find((item) => !item.isProject && item.id === currentId);
       if (orderInfo) return { ...category, order: orderInfo.order };
       return category;
     });
@@ -375,7 +353,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           ...(movedProjectSourceCategoryId !== null
             ? buildProjectReorderUpdates(
                 sourceCategoryProjectsWithoutMoved,
-                movedProjectSourceCategoryId,
+                movedProjectSourceCategoryId
               )
             : []),
         ];
@@ -418,10 +396,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     }
 
     if (!destination) return;
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
       return;
     }
 
@@ -435,9 +410,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     }
 
     if (draggableMeta.kind === "project") {
-      const destinationCategoryId = parseCategoryDroppableId(
-        destination.droppableId,
-      );
+      const destinationCategoryId = parseCategoryDroppableId(destination.droppableId);
       if (destinationCategoryId === undefined) return;
 
       await moveProjectToCategory({
@@ -503,11 +476,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   };
 
   const handleDeleteProject = async (id) => {
-    if (
-      confirm(
-        "Are you sure? This will remove the project from SelfHost Helper.",
-      )
-    ) {
+    if (confirm("Are you sure? This will remove the project from SelfHost Helper.")) {
       try {
         await API.deleteProject(id);
         onProjectsChange();
@@ -522,10 +491,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     API.openPath(path);
   };
 
-  const renderFolderLogo = (
-    categoryId,
-    { compact = false, enlargeWhenEmpty = false } = {},
-  ) => {
+  const renderFolderLogo = (categoryId, { compact = false, enlargeWhenEmpty = false } = {}) => {
     const normalizedCategoryId = toNullableNumber(categoryId);
     const categoryProjects = getSortedProjectsInCategory(normalizedCategoryId);
     const isEmpty = categoryProjects.length === 0;
@@ -533,7 +499,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     const wrapperClass = cn(
       "rounded-lg border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center shrink-0",
       compact ? "w-8 h-8" : "w-10 h-10",
-      isEmpty && enlargeWhenEmpty && (compact ? "w-10 h-10" : "w-12 h-12"),
+      isEmpty && enlargeWhenEmpty && (compact ? "w-10 h-10" : "w-12 h-12")
     );
 
     if (!isEmpty) {
@@ -545,7 +511,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 key={p.id}
                 className={cn(
                   "rounded-[2px] overflow-hidden bg-white/10",
-                  compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5",
+                  compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5"
                 )}
               >
                 {p.icon ? (
@@ -555,7 +521,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                       p.icon.match(/^(https?:\/\/|data:)/)
                         ? p.icon
                         : `media:///${p.icon.replace(/\\/g, "/")}?t=${new Date(
-                            p.updatedAt,
+                            p.updatedAt
                           ).getTime()}`
                     }
                     className="w-full h-full object-cover"
@@ -574,12 +540,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
     return (
       <div className={wrapperClass}>
-        <FolderIcon
-          className={cn(
-            "text-muted-foreground/40",
-            compact ? "w-4 h-4" : "w-5 h-5",
-          )}
-        />
+        <FolderIcon className={cn("text-muted-foreground/40", compact ? "w-4 h-4" : "w-5 h-5")} />
       </div>
     );
   };
@@ -589,7 +550,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isOverlayMode, setIsOverlayMode] = useState(
-    typeof window !== "undefined" && window.innerWidth <= 900,
+    typeof window !== "undefined" && window.innerWidth <= 900
   );
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [discordInfo, setDiscordInfo] = useState(null);
@@ -703,11 +664,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const renderProject = (p, index) => {
     const isSelected = selectedProject?.id === p.id;
     return (
-      <Draggable
-        key={`project-${p.id}`}
-        draggableId={`project-${p.id}`}
-        index={index}
-      >
+      <Draggable key={`project-${p.id}`} draggableId={`project-${p.id}`} index={index}>
         {(provided, snapshot) => {
           const draggableStyle = {
             ...provided.draggableProps.style,
@@ -729,15 +686,13 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                     className={cn(
                       "sidebar-item group relative transition-all duration-200 select-none",
                       width < 120 ? "collapsed" : "",
-                      width < 120 &&
-                        toNullableNumber(p.categoryId) === null &&
-                        !isSelected
+                      width < 120 && toNullableNumber(p.categoryId) === null && !isSelected
                         ? "border-white/5"
                         : "",
                       isSelected ? "active" : "hover:bg-white/5",
                       width < 120 ? "mx-auto" : "px-3 py-2.5",
                       snapshot.isDragging &&
-                        "opacity-95 ring-2 ring-primary bg-primary/20 shadow-2xl",
+                        "opacity-95 ring-2 ring-primary bg-primary/20 shadow-2xl"
                     )}
                     title={width < 120 ? p.name : undefined}
                   >
@@ -750,16 +705,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                     <div
                       className={cn(
                         "relative shrink-0 flex items-center justify-center transition-all duration-300",
-                        width < 120 ? "w-10 h-10" : "w-10 h-10",
+                        width < 120 ? "w-10 h-10" : "w-10 h-10"
                       )}
                     >
                       {p.icon ? (
                         <div
                           className={cn(
                             "rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300",
-                            width < 120
-                              ? "w-10 h-10 rounded-xl"
-                              : "w-8 h-8 rounded-md",
+                            width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8 rounded-md"
                           )}
                         >
                           <img
@@ -778,7 +731,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                         <div
                           className={cn(
                             "flex items-center justify-center font-bold text-lg bg-white/5 rounded-lg transition-all",
-                            width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8",
+                            width < 120 ? "w-10 h-10 rounded-xl" : "w-8 h-8"
                           )}
                         >
                           {p.name.charAt(0).toUpperCase()}
@@ -803,9 +756,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <span className="font-medium truncate text-sm flex-1">
-                              {p.name}
-                            </span>
+                            <span className="font-medium truncate text-sm flex-1">{p.name}</span>
                           )}
                         </div>
                         <span className="text-xs opacity-50 truncate text-muted-foreground">
@@ -819,7 +770,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                         "absolute transition-all duration-300 flex items-center justify-center",
                         width < 120
                           ? "top-0 right-0 -translate-y-1/4 translate-x-1/4"
-                          : "relative right-auto top-auto ml-auto transform-none",
+                          : "relative right-auto top-auto ml-auto transform-none"
                       )}
                     >
                       {p.status === "running" && (
@@ -828,9 +779,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
                         </div>
                       )}
-                      {p.status === "error" && (
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                      )}
+                      {p.status === "error" && <div className="h-2 w-2 rounded-full bg-red-500" />}
                       {(!p.status || p.status === "stopped") && width >= 120 && (
                         <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
                       )}
@@ -897,7 +846,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           "bg-transparent border-r border-white/5 flex flex-col backdrop-blur-xl relative overflow-hidden group/sidebar",
           isOverlayMode && isOverlayOpen
             ? "fixed inset-y-0 left-0 z-50 shadow-xl bg-background/90"
-            : "",
+            : ""
         )}
         initial={false}
         animate={{ width: width }}
@@ -916,7 +865,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         <div
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
-            width < 120 ? "justify-center px-0" : "justify-between px-4",
+            width < 120 ? "justify-center px-0" : "justify-between px-4"
           )}
         >
           <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -958,7 +907,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               <div
                 className={cn(
                   "flex-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar",
-                  isCollapsed ? "space-y-3" : "space-y-5",
+                  isCollapsed ? "space-y-3" : "space-y-5"
                 )}
               >
                 {isAddingCategory && !isCollapsed && (
@@ -988,18 +937,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   </div>
                 )}
 
-                <Droppable
-                  droppableId="sidebar-content"
-                  type="project"
-                  isCombineEnabled
-                >
+                <Droppable droppableId="sidebar-content" type="project" isCombineEnabled>
                   {(provided) => (
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
                       className={cn(
                         isCollapsed ? "space-y-3" : "space-y-5",
-                        "min-h-full pb-20 transition-all",
+                        "min-h-full pb-20 transition-all"
                       )}
                     >
                       {[
@@ -1008,10 +953,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                           .filter((p) => toNullableNumber(p.categoryId) === null)
                           .map((p) => ({ ...p, isProject: true })),
                       ]
-                        .sort(
-                          (a, b) =>
-                            normalizeOrder(a.order) - normalizeOrder(b.order),
-                        )
+                        .sort((a, b) => normalizeOrder(a.order) - normalizeOrder(b.order))
                         .map((item, index) => {
                           if (item.isProject) {
                             return renderProject(item, index);
@@ -1020,10 +962,8 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                           const category = item;
                           const categoryId = toNullableNumber(category.id);
                           if (categoryId === null) return null;
-                          const categoryProjects =
-                            getSortedProjectsInCategory(categoryId);
-                          const isCategoryCollapsed =
-                            collapsedCategories.includes(categoryId);
+                          const categoryProjects = getSortedProjectsInCategory(categoryId);
+                          const isCategoryCollapsed = collapsedCategories.includes(categoryId);
                           return (
                             <Draggable
                               key={`category-${categoryId}`}
@@ -1044,47 +984,39 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                           isCollapsed
                                             ? cn(
                                                 "mx-auto rounded-xl overflow-hidden transition-all duration-300",
-                                                categoryProjects.length === 0
-                                                  ? "w-14"
-                                                  : "w-12",
+                                                categoryProjects.length === 0 ? "w-14" : "w-12",
                                                 isCategoryCollapsed
                                                   ? "hover:bg-white/5 border-2 border-white/5"
-                                                  : "bg-primary/[0.07] shadow-lg ring-1 ring-white/10",
+                                                  : "bg-primary/[0.07] shadow-lg ring-1 ring-white/10"
                                               )
                                             : cn(
                                                 "rounded-xl border transition-all duration-500",
                                                 isCategoryCollapsed
                                                   ? cn(
                                                       "bg-primary/[0.07] border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-lg",
-                                                      categoryProjects.length ===
-                                                        0 && "min-h-[4.25rem]",
+                                                      categoryProjects.length === 0 &&
+                                                        "min-h-[4.25rem]"
                                                     )
-                                                  : "bg-primary/[0.07] border-primary/20 p-1.5 shadow-2xl shadow-black/40",
+                                                  : "bg-primary/[0.07] border-primary/20 p-1.5 shadow-2xl shadow-black/40"
                                               ),
-                                          snapshotCat.isDragging &&
-                                            "opacity-80 scale-95",
+                                          snapshotCat.isDragging && "opacity-80 scale-95"
                                         )}
                                       >
                                         <div
                                           className={cn(
                                             "flex items-center justify-between group/cat",
                                             !isCollapsed &&
-                                              (isCategoryCollapsed &&
-                                              categoryProjects.length === 0
+                                              (isCategoryCollapsed && categoryProjects.length === 0
                                                 ? "px-2 py-2.5"
-                                                : "px-2 py-1.5"),
+                                                : "px-2 py-1.5")
                                           )}
                                         >
                                           <div
                                             className={cn(
                                               "flex items-center gap-2 flex-1 min-w-0 cursor-pointer select-none",
-                                              isCollapsed
-                                                ? "w-12 h-12 justify-center"
-                                                : "",
+                                              isCollapsed ? "w-12 h-12 justify-center" : ""
                                             )}
-                                            onClick={() =>
-                                              toggleCategory(categoryId)
-                                            }
+                                            onClick={() => toggleCategory(categoryId)}
                                             {...providedCat.dragHandleProps}
                                           >
                                             {isCollapsed ? (
@@ -1099,41 +1031,30 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                 <ChevronDown
                                                   className={cn(
                                                     "h-3.5 w-3.5 text-muted-foreground transition-transform",
-                                                    isCategoryCollapsed &&
-                                                      "-rotate-90",
+                                                    isCategoryCollapsed && "-rotate-90"
                                                   )}
                                                 />
                                                 {isCategoryCollapsed && (
                                                   <div className="mr-1">
-                                                    {renderFolderLogo(
-                                                      categoryId,
-                                                      {
-                                                        compact: true,
-                                                        enlargeWhenEmpty: true,
-                                                      },
-                                                    )}
+                                                    {renderFolderLogo(categoryId, {
+                                                      compact: true,
+                                                      enlargeWhenEmpty: true,
+                                                    })}
                                                   </div>
                                                 )}
-                                                {editingCategoryId ===
-                                                categoryId ? (
+                                                {editingCategoryId === categoryId ? (
                                                   <input
                                                     autoFocus
                                                     className="bg-transparent border-none outline-none text-xs font-bold uppercase tracking-wider flex-1 text-primary"
                                                     value={editCategoryName}
                                                     onChange={(e) =>
-                                                      setEditCategoryName(
-                                                        e.target.value,
-                                                      )
+                                                      setEditCategoryName(e.target.value)
                                                     }
                                                     onKeyDown={(e) => {
                                                       if (e.key === "Enter")
-                                                        handleUpdateCategory(
-                                                          categoryId,
-                                                        );
+                                                        handleUpdateCategory(categoryId);
                                                     }}
-                                                    onBlur={() =>
-                                                      setEditingCategoryId(null)
-                                                    }
+                                                    onBlur={() => setEditingCategoryId(null)}
                                                   />
                                                 ) : (
                                                   <span
@@ -1141,7 +1062,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                       "text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-300 truncate",
                                                       isCategoryCollapsed
                                                         ? "text-muted-foreground/40 group-hover/cat:text-muted-foreground/70"
-                                                        : "text-primary/80",
+                                                        : "text-primary/80"
                                                     )}
                                                   >
                                                     {category.name}
@@ -1174,9 +1095,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                   ? { duration: 0 }
                                                   : {
                                                       duration: 0.3,
-                                                      ease: [
-                                                        0.04, 0.62, 0.23, 0.98,
-                                                      ],
+                                                      ease: [0.04, 0.62, 0.23, 0.98],
                                                     }
                                               }
                                               className="overflow-hidden"
@@ -1185,10 +1104,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                 droppableId={`cat-${categoryId}`}
                                                 type="project"
                                               >
-                                                {(
-                                                  providedProj,
-                                                  snapshotProj,
-                                                ) => (
+                                                {(providedProj, snapshotProj) => (
                                                   <div
                                                     {...providedProj.droppableProps}
                                                     ref={providedProj.innerRef}
@@ -1196,21 +1112,17 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                       "space-y-1 min-h-[2rem] transition-all duration-300 rounded-lg",
                                                       snapshotProj.isDraggingOver &&
                                                         "bg-primary/10",
-                                                      isCollapsed
-                                                        ? "pb-2"
-                                                        : "mt-1.5 mb-1",
+                                                      isCollapsed ? "pb-2" : "mt-1.5 mb-1"
                                                     )}
                                                   >
                                                     {snapshotProj.isDraggingOver &&
-                                                      categoryProjects.length ===
-                                                        0 && (
+                                                      categoryProjects.length === 0 && (
                                                         <div className="mx-1 rounded-md border border-dashed border-primary/30 bg-primary/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
                                                           Drop project here
                                                         </div>
                                                       )}
-                                                    {categoryProjects.map(
-                                                      (p, index) =>
-                                                        renderProject(p, index),
+                                                    {categoryProjects.map((p, index) =>
+                                                      renderProject(p, index)
                                                     )}
                                                     {providedProj.placeholder}
                                                   </div>
@@ -1228,18 +1140,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                           setEditCategoryName(category.name);
                                         }}
                                       >
-                                        <Edit2 className="w-4 h-4 mr-2" />{" "}
-                                        Rename Category
+                                        <Edit2 className="w-4 h-4 mr-2" /> Rename Category
                                       </ContextMenuItem>
                                       <ContextMenuSeparator />
                                       <ContextMenuItem
                                         className="text-destructive focus:text-destructive"
-                                        onClick={() =>
-                                          handleDeleteCategory(categoryId)
-                                        }
+                                        onClick={() => handleDeleteCategory(categoryId)}
                                       >
-                                        <Trash2 className="w-4 h-4 mr-2" />{" "}
-                                        Delete Category
+                                        <Trash2 className="w-4 h-4 mr-2" /> Delete Category
                                       </ContextMenuItem>
                                     </ContextMenuContent>
                                   </ContextMenu>
@@ -1268,9 +1176,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         <div
           className={cn(
             "bg-card/30 mt-auto",
-            isCollapsed
-              ? "p-3 space-y-3 flex flex-col items-center"
-              : "p-4 space-y-2",
+            isCollapsed ? "p-3 space-y-3 flex flex-col items-center" : "p-4 space-y-2"
           )}
         >
           <AnimatePresence mode="wait">
@@ -1340,14 +1246,11 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                         <div className="flex items-center gap-2 text-xs text-zinc-400 mt-1">
                           <span className="flex items-center gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                            {discordInfo?.approximate_presence_count?.toLocaleString() ||
-                              "-"}
+                            {discordInfo?.approximate_presence_count?.toLocaleString() || "-"}
                           </span>
                           <span>•</span>
                           <span>
-                            {discordInfo?.approximate_member_count?.toLocaleString() ||
-                              "-"}{" "}
-                            Members
+                            {discordInfo?.approximate_member_count?.toLocaleString() || "-"} Members
                           </span>
                         </div>
                       </div>
@@ -1355,11 +1258,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
 
                     <Button
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-medium"
-                      onClick={() =>
-                        API.openExternal(
-                          `https://discord.gg/${DISCORD_INVITE_CODE}`,
-                        )
-                      }
+                      onClick={() => API.openExternal(`https://discord.gg/${DISCORD_INVITE_CODE}`)}
                     >
                       Join Server
                     </Button>
@@ -1375,7 +1274,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               onClick={() => navigate("/settings")}
               className={cn(
                 "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer",
-                isCollapsed ? "justify-center px-0" : "justify-start px-3",
+                isCollapsed ? "justify-center px-0" : "justify-start px-3"
               )}
             >
               <Settings className="h-4 w-4 shrink-0" />
