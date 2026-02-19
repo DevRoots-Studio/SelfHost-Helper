@@ -73,7 +73,7 @@ function normalizeProjectRow(row) {
     name: row.name ?? "",
     path: row.path ?? "",
     script: row.script ?? "npm start",
-    autoStart: row.autoStart ?? false,
+    autoStart: Boolean(row.autoStart ?? false),
     env: parseJson(row.env, {}),
     pid: row.pid ?? null,
     type: row.type ?? "node",
@@ -86,8 +86,8 @@ function normalizeProjectRow(row) {
     tunnelPort: row.tunnelPort ?? 3000,
     encryptedTunnelToken: row.encryptedTunnelToken ?? "",
     tunnelConfig: parseJson(row.tunnelConfig, {}),
-    autoStartTunnel: row.autoStartTunnel ?? false,
-    clearLogsBeforeStart: row.clearLogsBeforeStart ?? false,
+    autoStartTunnel: Boolean(row.autoStartTunnel ?? false),
+    clearLogsBeforeStart: Boolean(row.clearLogsBeforeStart ?? false),
   };
 }
 
