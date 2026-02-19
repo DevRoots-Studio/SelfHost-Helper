@@ -55,63 +55,121 @@ export const initializeDatabase = async () => {
 };
 
 /**
- * Migration helper
+ * Normalize a raw Project row from legacy SQLite (which may lack newer columns)
+ * to the shape expected by the app, with model defaults for missing fields.
+ */
+function normalizeProjectRow(row) {
+  const parseJson = (val, fallback) => {
+    if (val == null || val === "") return fallback;
+    if (typeof val === "object") return val;
+    try {
+      return JSON.parse(val);
+    } catch {
+      return fallback;
+    }
+  };
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    path: row.path ?? "",
+    script: row.script ?? "npm start",
+    autoStart: row.autoStart ?? false,
+    env: parseJson(row.env, {}),
+    pid: row.pid ?? null,
+    type: row.type ?? "node",
+    description: row.description ?? null,
+    icon: row.icon ?? null,
+    order: row.order ?? 0,
+    uuid: row.uuid ?? null,
+    categoryId: row.categoryId ?? null,
+    tunnelMode: row.tunnelMode ?? "quick",
+    tunnelPort: row.tunnelPort ?? 3000,
+    encryptedTunnelToken: row.encryptedTunnelToken ?? "",
+    tunnelConfig: parseJson(row.tunnelConfig, {}),
+    autoStartTunnel: row.autoStartTunnel ?? false,
+    clearLogsBeforeStart: row.clearLogsBeforeStart ?? false,
+  };
+}
+
+/**
+ * Normalize a raw Category row from legacy SQLite.
+ */
+function normalizeCategoryRow(row) {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    order: row.order ?? 0,
+    uuid: row.uuid ?? null,
+  };
+}
+
+/**
+ * Migration helper: read legacy SQLite with raw SQL (no model schema assumption),
+ * then write normalized rows to st.db and backup the SQLite file.
  */
 async function migrateFromSQLite(sqlitePath) {
   try {
-    const { Sequelize } = await import("sequelize");
+    const { Sequelize, QueryTypes } = await import("sequelize");
     const tempSequelize = new Sequelize({
       dialect: "sqlite",
       storage: sqlitePath,
       logging: false,
     });
 
-    const { initProjectModel, Project } =
-      await import("../../database/models/Project.js");
-    const { initCategoryModel, Category } =
-      await import("../../database/models/Category.js");
+    let categories = [];
+    let projects = [];
 
-    initProjectModel(tempSequelize);
-    initCategoryModel(tempSequelize);
-
-    const categories = await Category.findAll();
-    const projects = await Project.findAll();
+    try {
+      categories = await tempSequelize.query("SELECT * FROM Categories", {
+        type: QueryTypes.SELECT,
+      });
+      projects = await tempSequelize.query("SELECT * FROM Projects", {
+        type: QueryTypes.SELECT,
+      });
+    } catch (queryErr) {
+      logger.warn(
+        "[Migration] Raw read failed (e.g. missing table). Skipping migration:",
+        queryErr?.message ?? queryErr,
+      );
+      await tempSequelize.close();
+      const backupPath = sqlitePath + ".backup_skip_" + Date.now();
+      await fs.promises.rename(sqlitePath, backupPath);
+      return;
+    }
 
     if (categories.length > 0 || projects.length > 0) {
       logger.info(
         `[Migration] Found ${categories.length} categories and ${projects.length} projects in SQLite. Migrating...`,
       );
 
-      for (const cat of categories) {
-        const data = cat.toJSON();
+      for (const row of categories) {
+        const data = normalizeCategoryRow(row);
         if (!(await categoryTable.has(data.id.toString()))) {
           await categoryTable.set(data.id.toString(), data);
         }
       }
 
-      for (const proj of projects) {
-        const data = proj.toJSON();
+      for (const row of projects) {
+        const data = normalizeProjectRow(row);
         if (!(await projectTable.has(data.id.toString()))) {
           await projectTable.set(data.id.toString(), data);
         }
       }
 
       logger.info("[Migration] Data migration to st.db complete.");
-
-      // Close the connection before renaming to avoid EBUSY
-      await tempSequelize.close();
-      logger.info("[Migration] SQLite connection closed.");
-
-      // Rename sqlite file to backup so we don't migrate again
-      const backupPath = sqlitePath + ".backup_" + Date.now();
-      await fs.promises.rename(sqlitePath, backupPath);
-      logger.info(`[Migration] SQLite file backed up to ${backupPath}`);
-    } else {
-      // Even if no data, we should close and backup to avoid repeating empty checks
-      await tempSequelize.close();
-      const backupPath = sqlitePath + ".backup_empty_" + Date.now();
-      await fs.promises.rename(sqlitePath, backupPath);
     }
+
+    // Close the connection before renaming to avoid EBUSY
+    await tempSequelize.close();
+    logger.info("[Migration] SQLite connection closed.");
+
+    // Rename sqlite file to backup so we don't migrate again
+    const backupPath =
+      categories.length > 0 || projects.length > 0
+        ? sqlitePath + ".backup_" + Date.now()
+        : sqlitePath + ".backup_empty_" + Date.now();
+    await fs.promises.rename(sqlitePath, backupPath);
+    logger.info(`[Migration] SQLite file backed up to ${backupPath}`);
   } catch (err) {
     logger.error("[Migration] Error during migration:", err);
     throw err;
