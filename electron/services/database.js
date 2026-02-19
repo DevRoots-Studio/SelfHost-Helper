@@ -131,7 +131,14 @@ async function migrateFromSQLite(sqlitePath) {
         "[Migration] Raw read failed (e.g. missing table). Skipping migration:",
         queryErr?.message ?? queryErr,
       );
-      await tempSequelize.close();
+      try {
+        await tempSequelize.close();
+      } catch (closeErr) {
+        logger.warn(
+          "[Migration] Failed to close SQLite connection during skip:",
+          closeErr?.message ?? closeErr,
+        );
+      }
       const backupPath = sqlitePath + ".backup_skip_" + Date.now();
       await fs.promises.rename(sqlitePath, backupPath);
       return;
