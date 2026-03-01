@@ -1,5 +1,6 @@
 import chokidar from "chokidar";
 import logger from "./logger.js";
+import { isPathIgnored } from "./ignorePatterns.js";
 
 const watchers = {};
 
@@ -10,7 +11,10 @@ export const watchFolder = (folderPath) => {
   }
 
   const watcher = chokidar.watch(folderPath, {
-    ignored: /(^|[\/\\])\../,
+    ignored: (path) => {
+      if (/(^|[\/\\])\../.test(path)) return true;
+      return isPathIgnored(path);
+    },
     persistent: true,
     ignoreInitial: true,
   });

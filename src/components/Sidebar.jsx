@@ -1267,29 +1267,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               </motion.div>
             )}
           </AnimatePresence>
-
-          <motion.div layout>
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/settings")}
-              className={cn(
-                "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer",
-                isCollapsed ? "justify-center px-0" : "justify-start px-3"
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              {!isCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0, x: -5 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -5 }}
-                  className="truncate"
-                >
-                  Settings
-                </motion.span>
-              )}
-            </Button>
-          </motion.div>
         </div>
       </motion.aside>
     </>

@@ -1,8 +1,16 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-toastify";
 import { getFileIcon, getFolderIcon } from "@/lib/materialIcons";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+
 const API = window.api;
 // Sort function: folders first, then files (alphabetically)
 const sortTree = (nodes) => {
@@ -27,12 +35,24 @@ const sortTree = (nodes) => {
     });
 };
 
-const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = false }) => {
+const dirname = (p) => p.replace(/[/\\][^/\\]+$/, "") || p;
+const joinPath = (parent, name) => (parent.endsWith("/") || parent.endsWith("\\") ? parent + name : parent + "/" + name);
+
+const FileTreeNode = ({
+  node,
+  onSelect,
+  selectedPath,
+  level = 0,
+  defaultOpen = false,
+  projectRoot,
+  onRefresh,
+}) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
   const [iconError, setIconError] = useState(false);
   const isDirectory = node.type === "directory";
   const isSelected = selectedPath === node.path;
   const hasChildren = isDirectory && node.children && node.children.length > 0;
+  const parentPath = isDirectory ? node.path : dirname(node.path);
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -54,6 +74,59 @@ const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = f
     onSelect(node);
   };
 
+  const handleNewFile = async () => {
+    const name = prompt("File name:");
+    if (!name?.trim()) return;
+    const targetPath = joinPath(parentPath, name.trim());
+    try {
+      await API.createFile(projectRoot, targetPath, "file", "");
+      toast.success("File created");
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err?.message || "Failed to create file");
+    }
+  };
+
+  const handleNewFolder = async () => {
+    const name = prompt("Folder name:");
+    if (!name?.trim()) return;
+    const targetPath = joinPath(parentPath, name.trim());
+    try {
+      await API.createFile(projectRoot, targetPath, "directory");
+      toast.success("Folder created");
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err?.message || "Failed to create folder");
+    }
+  };
+
+  const handleRename = async () => {
+    const newName = prompt("New name:", node.name);
+    if (newName == null || newName.trim() === "" || newName.trim() === node.name) return;
+    const newPath = joinPath(dirname(node.path), newName.trim());
+    try {
+      await API.renamePath(projectRoot, node.path, newPath);
+      toast.success("Renamed");
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err?.message || "Failed to rename");
+    }
+  };
+
+  const handleDelete = async () => {
+    const msg = isDirectory
+      ? `Delete folder "${node.name}" and its contents?`
+      : `Delete file "${node.name}"?`;
+    if (!confirm(msg)) return;
+    try {
+      await API.deletePath(projectRoot, node.path);
+      toast.success("Deleted");
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete");
+    }
+  };
+
   const iconName = isDirectory ? getFolderIcon(node.name, isOpen) : getFileIcon(node.name);
 
   // If the iconName is just "file" or "folder", we use Lucide by default
@@ -71,52 +144,74 @@ const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = f
 
   return (
     <div className="select-none">
-      <motion.div
-        className={cn(
-          "flex items-center py-1.5 px-2 hover:bg-white/5 cursor-pointer transition-colors text-sm group rounded-lg mx-1",
-          isSelected
-            ? "bg-primary/10 text-primary font-medium"
-            : "text-foreground/70 hover:text-foreground"
-        )}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
-        onClick={handleSelect}
-        whileHover={{ x: 2 }}
-        transition={{ duration: 0.15 }}
-      >
-        <span
-          className="mr-1.5 flex items-center justify-center w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity"
-          onClick={isDirectory ? handleToggle : undefined}
-        >
-          {isDirectory ? (
-            <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </motion.div>
-          ) : (
-            <span className="w-4" />
-          )}
-        </span>
-        <div className="flex items-center flex-1 min-w-0">
-          {useLucide ? (
-            isDirectory ? (
-              isOpen ? (
-                <FolderOpen className="h-4 w-4 mr-2 text-primary shrink-0" />
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <motion.div
+            className={cn(
+              "flex items-center py-1.5 px-2 hover:bg-white/5 cursor-pointer transition-colors text-sm group rounded-lg mx-1",
+              isSelected
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-foreground/70 hover:text-foreground"
+            )}
+            style={{ paddingLeft: `${level * 12 + 8}px` }}
+            onClick={handleSelect}
+            whileHover={{ x: 2 }}
+            transition={{ duration: 0.15 }}
+          >
+            <span
+              className="mr-1.5 flex items-center justify-center w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity"
+              onClick={isDirectory ? handleToggle : undefined}
+            >
+              {isDirectory ? (
+                <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </motion.div>
               ) : (
-                <Folder className="h-4 w-4 mr-2 text-primary/80 shrink-0" />
-              )
-            ) : (
-              <File className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
-            )
-          ) : (
-            <img
-              src={iconUrl}
-              className="h-4 w-4 mr-2 shrink-0 object-contain"
-              alt=""
-              onError={() => setIconError(true)}
-            />
+                <span className="w-4" />
+              )}
+            </span>
+            <div className="flex items-center flex-1 min-w-0">
+              {useLucide ? (
+                isDirectory ? (
+                  isOpen ? (
+                    <FolderOpen className="h-4 w-4 mr-2 text-primary shrink-0" />
+                  ) : (
+                    <Folder className="h-4 w-4 mr-2 text-primary/80 shrink-0" />
+                  )
+                ) : (
+                  <File className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />
+                )
+              ) : (
+                <img
+                  src={iconUrl}
+                  className="h-4 w-4 mr-2 shrink-0 object-contain"
+                  alt=""
+                  onError={() => setIconError(true)}
+                />
+              )}
+              <span className="truncate">{node.name}</span>
+            </div>
+          </motion.div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          {isDirectory && (
+            <>
+              <ContextMenuItem onSelect={handleNewFile}>
+                <FilePlus className="h-4 w-4 mr-2" /> New File
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={handleNewFolder}>
+                <FolderPlus className="h-4 w-4 mr-2" /> New Folder
+              </ContextMenuItem>
+            </>
           )}
-          <span className="truncate">{node.name}</span>
-        </div>
-      </motion.div>
+          <ContextMenuItem onSelect={handleRename}>
+            <Pencil className="h-4 w-4 mr-2" /> Rename
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={handleDelete} className="text-destructive focus:text-destructive">
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       <AnimatePresence>
         {isOpen && hasChildren && (
           <motion.div
@@ -133,6 +228,8 @@ const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = f
                 onSelect={onSelect}
                 selectedPath={selectedPath}
                 level={level + 1}
+                projectRoot={projectRoot}
+                onRefresh={onRefresh}
               />
             ))}
           </motion.div>
@@ -142,7 +239,7 @@ const FileTreeNode = ({ node, onSelect, selectedPath, level = 0, defaultOpen = f
   );
 };
 
-export default function FileTree({ files, onSelectFile, selectedPath }) {
+export default function FileTree({ files, onSelectFile, selectedPath, projectRoot, onRefresh }) {
   // Sort files: folders first, then files
   const sortedFiles = useMemo(() => {
     return sortTree(files);
@@ -162,6 +259,8 @@ export default function FileTree({ files, onSelectFile, selectedPath }) {
           node={node}
           onSelect={onSelectFile}
           selectedPath={selectedPath}
+          projectRoot={projectRoot}
+          onRefresh={onRefresh}
         />
       ))}
     </div>

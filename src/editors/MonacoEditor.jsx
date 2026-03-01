@@ -1,10 +1,25 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
 
-const MonacoEditor = ({ value, onChange, onSave, language = "javascript", theme = "vs-dark" }) => {
+const MonacoEditor = ({
+  value,
+  onChange,
+  onSave,
+  language = "javascript",
+  theme = "vs-dark",
+  scrollToLine,
+}) => {
+  const editorRef = useRef(null);
+
   const handleEditorChange = (value) => {
     onChange(value);
   };
+
+  useEffect(() => {
+    if (scrollToLine != null && editorRef.current) {
+      editorRef.current.revealLineInCenter(Math.max(1, scrollToLine));
+    }
+  }, [scrollToLine]);
 
   return (
     <div className="h-full w-full overflow-hidden">
@@ -17,17 +32,27 @@ const MonacoEditor = ({ value, onChange, onSave, language = "javascript", theme 
         theme={theme}
         onChange={handleEditorChange}
         onMount={(editor, monaco) => {
+          editorRef.current = editor;
+          if (scrollToLine != null) {
+            editor.revealLineInCenter(Math.max(1, scrollToLine));
+          }
           if (monaco?.languages?.javascriptDefaults && monaco?.languages?.typescriptDefaults) {
-            monaco.languages.javascriptDefaults.setCompilerOptions({
+            const jsTsOpts = {
               allowNonTsExtensions: true,
               checkJs: true,
               jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-              target: monaco.languages.ScriptTarget.ESNext,
-            });
-
+              target: monaco.languages.typescript.ScriptTarget.ESNext,
+              module: monaco.languages.typescript.ModuleKind.ESNext,
+              moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+            };
+            monaco.languages.javascriptDefaults.setCompilerOptions(jsTsOpts);
             monaco.languages.typescriptDefaults.setCompilerOptions({
-              jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-              target: monaco.languages.ScriptTarget.ESNext,
+              ...jsTsOpts,
+              strict: true,
+            });
+            monaco.languages.typescriptDefaults.setDiagnosticsOptions({
+              noSemanticValidation: false,
+              noSyntaxValidation: false,
             });
           }
 
@@ -50,14 +75,25 @@ const MonacoEditor = ({ value, onChange, onSave, language = "javascript", theme 
           </div>
         }
         options={{
-          minimap: { enabled: false },
+          minimap: { enabled: true },
           fontSize: 14,
           scrollBeyondLastLine: true,
           automaticLayout: true,
           wordWrap: "off",
           suggestOnTriggerCharacters: true,
-          quickSuggestions: true,
-
+          quickSuggestions: {
+            other: true,
+            comments: false,
+            strings: true,
+          },
+          quickSuggestionsDelay: 10,
+          parameterHints: { enabled: true },
+          suggest: {
+            showKeywords: true,
+            showSnippets: true,
+          },
+          folding: true,
+          bracketPairColorization: { enabled: true },
           scrollbar: {
             horizontal: "auto",
             horizontalScrollbarSize: 10,
