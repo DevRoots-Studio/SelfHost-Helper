@@ -245,13 +245,13 @@ export default function Dashboard() {
         if (currentProject) {
           loadFileTree(currentProject.path);
           if (lastWatchedPathRef.current) {
-            API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+            await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
           }
           API.watchFolder(currentProject.path);
           lastWatchedPathRef.current = currentProject.path;
         } else {
           if (lastWatchedPathRef.current) {
-            API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+            await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
             lastWatchedPathRef.current = null;
           }
         }
@@ -292,7 +292,7 @@ export default function Dashboard() {
     } else {
       setStats(null);
       if (lastWatchedPathRef.current) {
-        API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+        await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
         lastWatchedPathRef.current = null;
       }
     }

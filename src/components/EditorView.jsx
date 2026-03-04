@@ -347,7 +347,8 @@ export default function EditorView({
   };
 
   const handleOpenSearchResult = (filePath, lineNumber) => {
-    if (filePath !== currentFileRef.current) {
+    const current = currentFileRef.current;
+    if (normalizePath(filePath) !== normalizePath(current)) {
       loadFile(filePath).then(() => {
         // Defer scroll until after React has committed the new content so Monaco scrolls in the correct file
         requestAnimationFrame(() => requestAnimationFrame(() => setScrollToLine(lineNumber)));
