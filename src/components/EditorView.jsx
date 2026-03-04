@@ -169,24 +169,51 @@ export default function EditorView({
   const TREE_MIN = 200;
   const TREE_MAX = 600;
 
+  // Bottom panels (Search/Git) resize state
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(() => {
+    const saved = localStorage.getItem("editorBottomPanelHeight");
+    return saved ? parseInt(saved, 10) : 224; // default ~h-56
+  });
+  const [isBottomResizing, setIsBottomResizing] = useState(false);
+  const bottomResizeStartRef = useRef({ y: 0, height: 0 });
+  const BOTTOM_MIN = 140;
+  const BOTTOM_MAX = 600;
+
   useEffect(() => {
     const onMouseMove = (e) => {
-      if (!isTreeResizing || !treeRef.current) return;
-      const rect = treeRef.current.getBoundingClientRect();
-      let newWidth = e.clientX - rect.left;
-      if (newWidth < TREE_MIN) newWidth = TREE_MIN;
-      if (newWidth > TREE_MAX) newWidth = TREE_MAX;
-      setTreeWidth(newWidth);
+      if (isTreeResizing && treeRef.current) {
+        const rect = treeRef.current.getBoundingClientRect();
+        let newWidth = e.clientX - rect.left;
+        if (newWidth < TREE_MIN) newWidth = TREE_MIN;
+        if (newWidth > TREE_MAX) newWidth = TREE_MAX;
+        setTreeWidth(newWidth);
+      }
+
+      if (isBottomResizing) {
+        const start = bottomResizeStartRef.current;
+        const delta = start.y - e.clientY;
+        let newHeight = start.height + delta;
+        if (newHeight < BOTTOM_MIN) newHeight = BOTTOM_MIN;
+        if (newHeight > BOTTOM_MAX) newHeight = BOTTOM_MAX;
+        setBottomPanelHeight(newHeight);
+      }
     };
 
     const onMouseUp = () => {
-      if (!isTreeResizing) return;
-      setIsTreeResizing(false);
-      localStorage.setItem("editorFileTreeWidth", String(treeWidth));
-      document.body.style.userSelect = "";
+      if (isTreeResizing) {
+        setIsTreeResizing(false);
+        localStorage.setItem("editorFileTreeWidth", String(treeWidth));
+      }
+      if (isBottomResizing) {
+        setIsBottomResizing(false);
+        localStorage.setItem("editorBottomPanelHeight", String(bottomPanelHeight));
+      }
+      if (isTreeResizing || isBottomResizing) {
+        document.body.style.userSelect = "";
+      }
     };
 
-    if (isTreeResizing) {
+    if (isTreeResizing || isBottomResizing) {
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
       document.body.style.userSelect = "none";
@@ -197,7 +224,7 @@ export default function EditorView({
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.userSelect = "";
     };
-  }, [isTreeResizing, treeWidth]);
+  }, [isTreeResizing, isBottomResizing, treeWidth, bottomPanelHeight]);
 
   useEffect(() => {
     if (initialFile) {
@@ -531,27 +558,49 @@ export default function EditorView({
               </div>
             )}
           </div>
-          {searchOpen && (
-            <div className="h-56 shrink-0 border-t border-white/5">
-              <SearchPanel
-                projectRoot={projectPath}
-                projectPathLabel
-                onOpenResult={handleOpenSearchResult}
-                isOpen={searchOpen}
-                onClose={() => setSearchOpen(false)}
+          {(searchOpen || gitOpen) && (
+            <>
+              <div
+                className="h-1 cursor-row-resize bg-transparent hover:bg-primary/40"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  bottomResizeStartRef.current = {
+                    y: e.clientY,
+                    height: bottomPanelHeight,
+                  };
+                  setIsBottomResizing(true);
+                }}
               />
-            </div>
-          )}
-          {gitOpen && (
-            <div className="h-64 shrink-0 border-t border-white/5">
-              <GitPanel
-                projectPath={projectPath}
-                isOpen={gitOpen}
-                onClose={() => setGitOpen(false)}
-                onRefreshFileTree={onRefreshFileTree}
-                onStatusChange={applyGitStatusToMap}
-              />
-            </div>
+              <div
+                className="shrink-0 border-t border-white/5"
+                style={{ height: bottomPanelHeight }}
+              >
+                <div className="flex flex-col h-full">
+                  {searchOpen && (
+                    <div className={gitOpen ? "flex-1 border-b border-white/5" : "h-full"}>
+                      <SearchPanel
+                        projectRoot={projectPath}
+                        projectPathLabel
+                        onOpenResult={handleOpenSearchResult}
+                        isOpen={searchOpen}
+                        onClose={() => setSearchOpen(false)}
+                      />
+                    </div>
+                  )}
+                  {gitOpen && (
+                    <div className={searchOpen ? "flex-1" : "h-full"}>
+                      <GitPanel
+                        projectPath={projectPath}
+                        isOpen={gitOpen}
+                        onClose={() => setGitOpen(false)}
+                        onRefreshFileTree={onRefreshFileTree}
+                        onStatusChange={applyGitStatusToMap}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
