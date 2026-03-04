@@ -11,8 +11,10 @@
     "build": "vite build && electron-builder",
     "build:dev": "vite build && cross-env NODE_ENV=development electron-builder --config.extraMetadata.appId=com.selfhosthelper.dev --config.directories.output=release-dev --config.productName=\"SelfHost Helper Dev\"",
     "build:prod": "vite build && cross-env NODE_ENV=production electron-builder",
+    "build:web": "vite build",
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -81,6 +83,7 @@
   },
   "license": "ISC",
   "devDependencies": {
+    "@eslint/js": "latest",
     "@vitejs/plugin-react": "latest",
     "autoprefixer": "latest",
     "concurrently": "latest",
