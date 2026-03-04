@@ -479,6 +479,24 @@ export const registerHandlers = () => {
     }
   });
 
+  ipcMain.handle("git:init", async (_, projectPath) => {
+    try {
+      return await gitService.gitInit(projectPath);
+    } catch (e) {
+      logger.error("Git init error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:addRemote", async (_, projectPath, name, url) => {
+    try {
+      return await gitService.gitAddRemote(projectPath, name, url);
+    } catch (e) {
+      logger.error("Git addRemote error:", e);
+      throw e;
+    }
+  });
+
   ipcMain.handle("lsp:start", async (_, projectPath) => {
     try {
       return await startLspForProject(projectPath);

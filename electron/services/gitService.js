@@ -124,3 +124,29 @@ export async function gitRemoteUrl(projectPath) {
   if (!origin?.refs?.fetch) return null;
   return origin.refs.fetch;
 }
+
+export async function gitInit(projectPath) {
+  const git = getGit(projectPath);
+  const isRepo = await git.checkIsRepo();
+  if (isRepo) return { initialized: false, alreadyRepo: true };
+  await git.init();
+  return { initialized: true, alreadyRepo: false };
+}
+
+export async function gitAddRemote(projectPath, name, url) {
+  if (!name || !url) throw new Error("Remote name and URL are required");
+  const git = getGit(projectPath);
+  const isRepo = await git.checkIsRepo();
+  if (!isRepo) {
+    throw new Error("Cannot add remote: Git repository is not initialized for this project.");
+  }
+  const remotes = await git.getRemotes(true);
+  const existing = remotes.find((r) => r.name === name);
+  if (existing) {
+    // Update existing remote URL
+    await git.remote(["set-url", name, url]);
+  } else {
+    await git.addRemote(name, url);
+  }
+  return true;
+}

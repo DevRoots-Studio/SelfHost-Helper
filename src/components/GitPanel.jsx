@@ -60,6 +60,16 @@ export default function GitPanel({
   const [loadingPush, setLoadingPush] = useState(false);
   const [loadingPull, setLoadingPull] = useState(false);
   const [loadingBranch, setLoadingBranch] = useState(false);
+  const [isInitializingRepo, setIsInitializingRepo] = useState(false);
+  const [githubTokenKnown, setGithubTokenKnown] = useState(false);
+  const [hasGithubToken, setHasGithubToken] = useState(false);
+  const [githubTokenInput, setGithubTokenInput] = useState("");
+  const [isSavingToken, setIsSavingToken] = useState(false);
+  const [isCreatingGithubRepo, setIsCreatingGithubRepo] = useState(false);
+  const [githubRepoName, setGithubRepoName] = useState("");
+  const [githubRepoPrivate, setGithubRepoPrivate] = useState(true);
+  const [githubInitLocal, setGithubInitLocal] = useState(true);
+  const githubTokenRef = React.useRef(null);
 
   const stagedFiles = status?.files?.filter((f) => f.index && f.index !== " ") || [];
   const workingFiles =
@@ -93,8 +103,29 @@ export default function GitPanel({
   };
 
   useEffect(() => {
-    if (isOpen && projectPath) loadGitStatus();
+    if (isOpen && projectPath) {
+      loadGitStatus();
+    }
   }, [isOpen, projectPath]);
+
+  // Load GitHub token info once when panel opens
+  useEffect(() => {
+    if (!isOpen || githubTokenKnown) return;
+    const loadToken = async () => {
+      try {
+        const settings = await API.getSettings?.();
+        const token = settings?.githubToken;
+        githubTokenRef.current = token || null;
+        setHasGithubToken(!!token);
+      } catch {
+        githubTokenRef.current = null;
+        setHasGithubToken(false);
+      } finally {
+        setGithubTokenKnown(true);
+      }
+    };
+    loadToken();
+  }, [isOpen, githubTokenKnown]);
 
   const handleAddAll = async () => {
     if (!projectPath) return;
@@ -279,6 +310,230 @@ export default function GitPanel({
       </div>
       <div className="flex-1 overflow-auto p-3 space-y-3">
         {error && <p className="text-muted-foreground text-xs">{error}</p>}
+        {!status?.isRepo && (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 flex flex-col gap-2">
+              <div className="font-medium text-xs uppercase tracking-wide text-muted-foreground">
+                Initialize local Git repository
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Set up Git for this project folder so you can track changes, commit, and sync with remotes.
+              </p>
+              <Button
+                size="sm"
+                className="mt-1 cursor-pointer text-xs self-start"
+                disabled={isInitializingRepo}
+                onClick={async () => {
+                  if (!projectPath) return;
+                  setIsInitializingRepo(true);
+                  try {
+                    const res = await API.gitInit(projectPath);
+                    if (res?.alreadyRepo) {
+                      toast.info("Git is already initialized for this folder.");
+                    } else {
+                      toast.success("Initialized Git repository for this project.");
+                    }
+                    await loadGitStatus();
+                  } catch (err) {
+                    toast.error(err?.message ?? "Failed to initialize Git repository");
+                  } finally {
+                    setIsInitializingRepo(false);
+                  }
+                }}
+              >
+                {isInitializingRepo ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" /> Initializing...
+                  </>
+                ) : (
+                  "Initialize Git here"
+                )}
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 flex flex-col gap-3">
+              <div className="font-medium text-xs uppercase tracking-wide text-muted-foreground">
+                Create GitHub repository and link
+              </div>
+              {!hasGithubToken && (
+                <div className="space-y-2 rounded-md border border-amber-400/40 bg-amber-500/10 p-2">
+                  <p className="text-[11px] text-amber-100">
+                    To create repositories on GitHub from here, add a{" "}
+                    <span className="font-semibold">personal access token</span> with{" "}
+                    <code className="px-1 py-0.5 rounded bg-black/40 border border-white/10 text-[10px]">
+                      repo
+                    </code>{" "}
+                    permissions.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={githubTokenInput}
+                      onChange={(e) => setGithubTokenInput(e.target.value)}
+                      placeholder="GitHub personal access token..."
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-black/40 border border-white/20 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer text-[11px] shrink-0"
+                      type="button"
+                      onClick={() =>
+                        API.openExternal(
+                          "https://github.com/settings/tokens/new?scopes=repo&description=SelfHost%20Helper"
+                        )
+                      }
+                    >
+                      Get token
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="cursor-pointer text-[11px] mt-1"
+                    disabled={isSavingToken || !githubTokenInput.trim()}
+                    onClick={async () => {
+                      if (!githubTokenInput.trim()) return;
+                      setIsSavingToken(true);
+                      try {
+                        await API.updateSettings?.({ githubToken: githubTokenInput.trim() });
+                        githubTokenRef.current = githubTokenInput.trim();
+                        setHasGithubToken(true);
+                        setGithubTokenInput("");
+                        toast.success("Saved GitHub token securely in app settings.");
+                      } catch (err) {
+                        toast.error(err?.message ?? "Failed to save GitHub token");
+                      } finally {
+                        setIsSavingToken(false);
+                      }
+                    }}
+                  >
+                    {isSavingToken ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving...
+                      </>
+                    ) : (
+                      "Save token"
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {hasGithubToken && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Create a repository under your GitHub account and optionally initialize and connect this
+                    folder as its local clone.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={githubRepoName}
+                        onChange={(e) => setGithubRepoName(e.target.value)}
+                        placeholder="Repository name (e.g. my-selfhost-project)"
+                        className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-black/30 border border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <select
+                        value={githubRepoPrivate ? "private" : "public"}
+                        onChange={(e) => setGithubRepoPrivate(e.target.value === "private")}
+                        className="px-2 py-1.5 text-[11px] bg-black/40 border border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="private">Private</option>
+                        <option value="public">Public</option>
+                      </select>
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="h-3 w-3 rounded border-white/30 bg-transparent"
+                        checked={githubInitLocal}
+                        onChange={(e) => setGithubInitLocal(e.target.checked)}
+                      />
+                      <span>Initialize local Git repo here and connect as origin</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="cursor-pointer text-xs"
+                      disabled={isCreatingGithubRepo || !githubRepoName.trim()}
+                      onClick={async () => {
+                        if (!projectPath || !githubRepoName.trim()) return;
+                        const token = githubTokenRef.current;
+                        if (!token) {
+                          toast.error("GitHub token missing. Please add it above.");
+                          setHasGithubToken(false);
+                          return;
+                        }
+                        setIsCreatingGithubRepo(true);
+                        try {
+                          const response = await fetch("https://api.github.com/user/repos", {
+                            method: "POST",
+                            headers: {
+                              Accept: "application/vnd.github+json",
+                              Authorization: `Bearer ${token}`,
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                              name: githubRepoName.trim(),
+                              private: githubRepoPrivate,
+                            }),
+                          });
+                          if (!response.ok) {
+                            const text = await response.text();
+                            throw new Error(
+                              `GitHub API error (${response.status}): ${text || response.statusText}`
+                            );
+                          }
+                          const data = await response.json();
+                          const remote = data.clone_url || data.ssh_url;
+
+                          if (githubInitLocal) {
+                            const initRes = await API.gitInit(projectPath);
+                            if (!initRes?.alreadyRepo) {
+                              toast.success("Initialized local Git repository.");
+                            }
+                            await API.gitAddRemote(projectPath, "origin", remote);
+                          }
+
+                          toast.success("GitHub repository created and linked.");
+                          // Prefer the HTML URL to open in browser
+                          if (data.html_url) {
+                            setRemoteUrl(data.html_url);
+                          }
+                          await loadGitStatus();
+                        } catch (err) {
+                          toast.error(err?.message ?? "Failed to create GitHub repository");
+                        } finally {
+                          setIsCreatingGithubRepo(false);
+                        }
+                      }}
+                    >
+                      {isCreatingGithubRepo ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" /> Creating on GitHub...
+                        </>
+                      ) : (
+                        "Create on GitHub and link"
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="cursor-pointer text-[11px]"
+                      type="button"
+                      onClick={() =>
+                        API.openExternal("https://github.com/new?source=SelfHost%20Helper")
+                      }
+                    >
+                      Open GitHub new repo page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {status?.isRepo && (
           <>
             <div className="flex items-center gap-2 flex-wrap">

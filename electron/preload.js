@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("git:checkout", projectPath, branchOrRef),
   gitClone: (repoUrl, targetPath) => ipcRenderer.invoke("git:clone", repoUrl, targetPath),
   gitRemoteUrl: (projectPath) => ipcRenderer.invoke("git:remoteUrl", projectPath),
+  gitInit: (projectPath) => ipcRenderer.invoke("git:init", projectPath),
+  gitAddRemote: (projectPath, name, url) =>
+    ipcRenderer.invoke("git:addRemote", projectPath, name, url),
   lspStart: (projectPath) => ipcRenderer.invoke("lsp:start", projectPath),
   lspStop: (projectPath) => ipcRenderer.invoke("lsp:stop", projectPath),
   sendInput: (id, data) => ipcRenderer.invoke("project:input", { id, data }),
