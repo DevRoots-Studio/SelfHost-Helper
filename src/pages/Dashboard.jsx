@@ -212,7 +212,8 @@ export default function Dashboard() {
       if (event === "change") return;
       if (fileChangeDebounceTimer) clearTimeout(fileChangeDebounceTimer);
       fileChangeDebounceTimer = setTimeout(() => {
-        loadFileTree(projectPath);
+        const currentPath = selectedProjectPathRef.current;
+        if (currentPath) loadFileTree(currentPath);
       }, 150);
     });
 
