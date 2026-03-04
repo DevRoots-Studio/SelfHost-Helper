@@ -331,7 +331,7 @@ export const registerHandlers = () => {
       if (!projectRoot || !targetPath || !type) {
         throw new Error("projectRoot, targetPath, and type are required");
       }
-      const resolved = path.resolve(targetPath);
+      const resolved = path.resolve(projectRoot, targetPath);
       if (!isUnderRoot(resolved, projectRoot)) {
         throw new Error("Path must be inside project");
       }
@@ -352,7 +352,7 @@ export const registerHandlers = () => {
   ipcMain.handle("file:delete", async (_, { projectRoot, targetPath }) => {
     try {
       if (!projectRoot || !targetPath) throw new Error("projectRoot and targetPath required");
-      const resolved = path.resolve(targetPath);
+      const resolved = path.resolve(projectRoot, targetPath);
       if (!isUnderRoot(resolved, projectRoot)) throw new Error("Path must be inside project");
       const stat = await fs.stat(resolved);
       await fs.rm(resolved, { recursive: stat.isDirectory(), force: true });
@@ -367,8 +367,8 @@ export const registerHandlers = () => {
     try {
       if (!projectRoot || !oldPath || !newPath)
         throw new Error("projectRoot, oldPath, newPath required");
-      const resolvedOld = path.resolve(oldPath);
-      const resolvedNew = path.resolve(newPath);
+      const resolvedOld = path.resolve(projectRoot, oldPath);
+      const resolvedNew = path.resolve(projectRoot, newPath);
       if (!isUnderRoot(resolvedOld, projectRoot) || !isUnderRoot(resolvedNew, projectRoot)) {
         throw new Error("Paths must be inside project");
       }
