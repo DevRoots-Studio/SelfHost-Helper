@@ -83,6 +83,9 @@ contextBridge.exposeInMainWorld("api", {
   gitInit: (projectPath) => ipcRenderer.invoke("git:init", projectPath),
   gitAddRemote: (projectPath, name, url) =>
     ipcRenderer.invoke("git:addRemote", projectPath, name, url),
+  gitRemotes: (projectPath) => ipcRenderer.invoke("git:remotes", projectPath),
+  gitRemoveRemote: (projectPath, name) =>
+    ipcRenderer.invoke("git:removeRemote", projectPath, name),
   lspStart: (projectPath) => ipcRenderer.invoke("lsp:start", projectPath),
   lspStop: (projectPath) => ipcRenderer.invoke("lsp:stop", projectPath),
   sendInput: (id, data) => ipcRenderer.invoke("project:input", { id, data }),

@@ -125,6 +125,43 @@ export async function gitRemoteUrl(projectPath) {
   return origin.refs.fetch;
 }
 
+/**
+ * List all remotes. Returns [] if not a repo.
+ * Each item: { name, fetch, push } (push may equal fetch if not set).
+ */
+export async function gitRemotes(projectPath) {
+  const git = getGit(projectPath);
+  const isRepo = await git.checkIsRepo();
+  if (!isRepo) return [];
+  const raw = await git.getRemotes(true);
+  // simple-git can return array or object keyed by name
+  const list = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw || {}).map(([name, refs]) => ({
+        name,
+        refs: refs?.refs ?? refs,
+      }));
+  return list.map((r) => {
+    const refs = r.refs ?? r;
+    const fetchUrl = refs.fetch ?? "";
+    const pushUrl = refs.push ?? fetchUrl;
+    return {
+      name: r.name ?? "",
+      fetch: typeof fetchUrl === "string" ? fetchUrl : "",
+      push: typeof pushUrl === "string" ? pushUrl : fetchUrl,
+    };
+  });
+}
+
+export async function gitRemoveRemote(projectPath, name) {
+  if (!name || !name.trim()) throw new Error("Remote name is required");
+  const git = getGit(projectPath);
+  const isRepo = await git.checkIsRepo();
+  if (!isRepo) throw new Error("Not a Git repository.");
+  await git.removeRemote(name.trim());
+  return true;
+}
+
 export async function gitInit(projectPath) {
   const git = getGit(projectPath);
   const isRepo = await git.checkIsRepo();

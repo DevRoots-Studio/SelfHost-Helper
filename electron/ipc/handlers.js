@@ -497,6 +497,24 @@ export const registerHandlers = () => {
     }
   });
 
+  ipcMain.handle("git:remotes", async (_, projectPath) => {
+    try {
+      return await gitService.gitRemotes(projectPath);
+    } catch (e) {
+      logger.error("Git remotes error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:removeRemote", async (_, projectPath, name) => {
+    try {
+      return await gitService.gitRemoveRemote(projectPath, name);
+    } catch (e) {
+      logger.error("Git removeRemote error:", e);
+      throw e;
+    }
+  });
+
   ipcMain.handle("lsp:start", async (_, projectPath) => {
     try {
       return await startLspForProject(projectPath);
