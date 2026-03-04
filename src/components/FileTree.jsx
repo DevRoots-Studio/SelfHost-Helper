@@ -279,15 +279,12 @@ const FileTreeNode = ({
               {gitStatus && gitStatus !== " " && FILE_TAG_MODE === "letters" && (
                 <span
                   className={cn(
-                    "ml-2 inline-flex items-center justify-center rounded-full h-5 w-5 text-[11px] font-semibold border border-white/10",
-                    gitStatus === "U" &&
-                      "bg-emerald-500/20 text-emerald-50 border-emerald-400/70",
-                    gitStatus === "M" &&
-                      "bg-amber-500/20 text-amber-50 border-amber-400/70",
-                    gitStatus === "A" && "bg-sky-500/20 text-sky-50 border-sky-400/70",
-                    gitStatus === "D" && "bg-rose-500/20 text-rose-50 border-rose-400/70",
-                    gitStatus === "S" &&
-                      "bg-indigo-500/20 text-indigo-50 border-indigo-400/70"
+                    "ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold uppercase tracking-tight border bg-white/5 shadow-sm/40 border-white/15",
+                    gitStatus === "U" && "border-emerald-400 text-emerald-300",
+                    gitStatus === "M" && "border-amber-400 text-amber-300",
+                    gitStatus === "A" && "border-sky-400 text-sky-300",
+                    gitStatus === "D" && "border-rose-400 text-rose-300",
+                    gitStatus === "S" && "border-indigo-400 text-indigo-300"
                   )}
                   title={
                     gitStatus === "U"
