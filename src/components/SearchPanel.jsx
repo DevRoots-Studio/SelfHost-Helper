@@ -88,11 +88,7 @@ export default function SearchPanel({
           onClick={handleSearch}
           disabled={isSearching || !query.trim()}
         >
-          {isSearching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <>Search</>
-          )}
+          {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Search</>}
         </Button>
         <Button
           size="sm"
@@ -147,26 +143,28 @@ export default function SearchPanel({
           </p>
         )}
         {!error && results.length > 0 && (
-          <ul className="space-y-0.5">
+          <ul className="space-y-0.5 min-w-0">
             {results.map((r, i) => (
-              <li key={`${r.filePath}-${r.lineNumber}-${i}`}>
+              <li key={`${r.filePath}-${r.lineNumber}-${i}`} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => onOpenResult(r.filePath, r.lineNumber)}
                   className={cn(
-                    "w-full text-left px-2 py-1.5 rounded-lg text-sm hover:bg-white/10 transition-colors flex gap-2"
+                    "w-full min-w-0 text-left px-2 py-1.5 rounded-lg text-sm hover:bg-white/10 transition-colors flex gap-2 overflow-hidden"
                   )}
                 >
                   <FileCode className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 overflow-hidden">
                     <div className="truncate text-foreground">
                       {projectPathLabel
                         ? r.filePath.replace(projectRoot, "").replace(/^[/\\]/, "")
                         : r.filePath}
                       :{r.lineNumber}
                     </div>
-                    <div className="text-muted-foreground truncate text-xs mt-0.5">
-                      {renderHighlightedLine(r.lineText, r.matchText || query.trim())}
+                    <div className="text-muted-foreground text-xs mt-0.5 overflow-hidden">
+                      <span className="block truncate">
+                        {renderHighlightedLine(r.lineText, r.matchText || query.trim())}
+                      </span>
                     </div>
                   </div>
                 </button>
