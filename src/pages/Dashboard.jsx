@@ -295,6 +295,13 @@ export default function Dashboard() {
         lastWatchedPathRef.current = null;
       }
     }
+
+    return () => {
+      if (lastWatchedPathRef.current) {
+        API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+        lastWatchedPathRef.current = null;
+      }
+    };
   }, [selectedProjectId]);
 
   useEffect(() => {

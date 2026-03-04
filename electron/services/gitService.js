@@ -125,6 +125,14 @@ export async function gitRemoteUrl(projectPath) {
   return origin.refs.fetch;
 }
 
+function getRemotesList(raw) {
+  if (Array.isArray(raw)) return raw;
+  return Object.entries(raw || {}).map(([n, refs]) => ({
+    name: n,
+    refs: refs?.refs ?? refs,
+  }));
+}
+
 /**
  * List all remotes. Returns [] if not a repo.
  * Each item: { name, fetch, push } (push may equal fetch if not set).
@@ -134,13 +142,7 @@ export async function gitRemotes(projectPath) {
   const isRepo = await git.checkIsRepo();
   if (!isRepo) return [];
   const raw = await git.getRemotes(true);
-  // simple-git can return array or object keyed by name
-  const list = Array.isArray(raw)
-    ? raw
-    : Object.entries(raw || {}).map(([name, refs]) => ({
-        name,
-        refs: refs?.refs ?? refs,
-      }));
+  const list = getRemotesList(raw);
   return list.map((r) => {
     const refs = r.refs ?? r;
     const fetchUrl = refs.fetch ?? "";
@@ -177,8 +179,9 @@ export async function gitAddRemote(projectPath, name, url) {
   if (!isRepo) {
     throw new Error("Cannot add remote: Git repository is not initialized for this project.");
   }
-  const remotes = await git.getRemotes(true);
-  const existing = remotes.find((r) => r.name === name);
+  const raw = await git.getRemotes(true);
+  const list = getRemotesList(raw);
+  const existing = list.find((r) => (r.name ?? r) === name);
   if (existing) {
     // Update existing remote URL
     await git.remote(["set-url", name, url]);
