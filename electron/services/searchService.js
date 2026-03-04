@@ -7,8 +7,13 @@ let rgPath = null;
 async function getRgPath() {
   if (rgPath) return rgPath;
   const mod = await import("@vscode/ripgrep");
-  rgPath = mod.rgPath ?? mod.default?.rgPath;
-  if (!rgPath) throw new Error("ripgrep binary path not found");
+  let bin = mod.rgPath ?? mod.default?.rgPath;
+  if (!bin) throw new Error("ripgrep binary path not found");
+  // Production: binary is unpacked from asar; path from module points inside asar and cannot be executed
+  if (bin.includes("app.asar") && !bin.includes("app.asar.unpacked")) {
+    bin = bin.replace("app.asar", "app.asar.unpacked");
+  }
+  rgPath = bin;
   return rgPath;
 }
 

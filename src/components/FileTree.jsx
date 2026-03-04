@@ -22,6 +22,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import { FILE_TAG_MODE } from "@/config/fileTagConfig";
 
@@ -338,6 +339,12 @@ const FileTreeNode = ({
           </motion.div>
         </ContextMenuTrigger>
         <ContextMenuContent>
+          {!isDirectory && (
+            <ContextMenuItem onSelect={() => onSelect(node)}>
+              <File className="h-4 w-4 mr-2" /> Open
+            </ContextMenuItem>
+          )}
+          {!isDirectory && <ContextMenuSeparator />}
           {isDirectory && (
             <>
               <ContextMenuItem onSelect={handleNewFile}>
@@ -346,6 +353,7 @@ const FileTreeNode = ({
               <ContextMenuItem onSelect={handleNewFolder}>
                 <FolderPlus className="h-4 w-4 mr-2" /> New Folder
               </ContextMenuItem>
+              <ContextMenuSeparator />
             </>
           )}
           <ContextMenuItem onSelect={handleRename}>
@@ -403,26 +411,73 @@ export default function FileTree({
     return { sortedFiles: sorted, folderChangesByPath: folderChanges };
   }, [files, gitStatusByPath]);
 
-  if (!files || files.length === 0) {
-    return (
-      <div className="p-4 text-xs text-muted-foreground italic text-center">No files found</div>
-    );
-  }
+  const handleNewFileAtRoot = async () => {
+    if (!projectRoot) return;
+    const name = prompt("File name:");
+    if (!name?.trim()) return;
+    const trimmed = name.trim().replace(/^[\\/]+/, "");
+    const relativeTarget = trimmed;
+    try {
+      await API.createFile(projectRoot, relativeTarget, "file", "");
+      toast.success("File created");
+      onRefresh?.();
+      const fullPath = joinPath(
+        (projectRoot || "").replace(/\\/g, "/").replace(/\/$/, ""),
+        trimmed
+      );
+      onSelectFile?.({ type: "file", path: fullPath, name: trimmed });
+    } catch (err) {
+      toast.error(err?.message || "Failed to create file");
+    }
+  };
+
+  const handleNewFolderAtRoot = async () => {
+    if (!projectRoot) return;
+    const name = prompt("Folder name:");
+    if (!name?.trim()) return;
+    const trimmed = name.trim().replace(/^[\\/]+/, "");
+    const relativeTarget = trimmed;
+    try {
+      await API.createFile(projectRoot, relativeTarget, "directory");
+      toast.success("Folder created");
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err?.message || "Failed to create folder");
+    }
+  };
 
   return (
-    <div className="overflow-auto h-full pb-4">
-      {sortedFiles.map((node) => (
-        <FileTreeNode
-          key={node.path}
-          node={node}
-          onSelect={onSelectFile}
-          selectedPath={selectedPath}
-          projectRoot={projectRoot}
-          onRefresh={onRefresh}
-          gitStatusByPath={gitStatusByPath}
-          folderChangesByPath={folderChangesByPath}
-        />
-      ))}
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="overflow-auto h-full pb-4 min-h-[120px]">
+          {!files || files.length === 0 ? (
+            <div className="p-4 text-xs text-muted-foreground italic text-center">
+              No files found
+            </div>
+          ) : (
+            sortedFiles.map((node) => (
+              <FileTreeNode
+                key={node.path}
+                node={node}
+                onSelect={onSelectFile}
+                selectedPath={selectedPath}
+                projectRoot={projectRoot}
+                onRefresh={onRefresh}
+                gitStatusByPath={gitStatusByPath}
+                folderChangesByPath={folderChangesByPath}
+              />
+            ))
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={handleNewFileAtRoot}>
+          <FilePlus className="h-4 w-4 mr-2" /> New File
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={handleNewFolderAtRoot}>
+          <FolderPlus className="h-4 w-4 mr-2" /> New Folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

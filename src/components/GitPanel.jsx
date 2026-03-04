@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   GitBranch,
   Upload,
@@ -91,7 +91,9 @@ export default function GitPanel({
       setRemoteUrl(url);
       setRemotes(Array.isArray(remotesList) ? remotesList : []);
       if (!s?.isRepo) {
-        setError("Git is not initialized for this project. Initialize a repository to use Git features.");
+        setError(
+          "Git is not initialized for this project. Initialize a repository to use Git features."
+        );
       }
       onStatusChange?.(s);
     } catch (err) {
@@ -236,6 +238,9 @@ export default function GitPanel({
     }
   };
 
+  const loadGitStatusRef = useRef(loadGitStatus);
+  loadGitStatusRef.current = loadGitStatus;
+
   useEffect(() => {
     if (!isOpen || !projectPath || !API.onFileChange) return;
     let debounceTimer = null;
@@ -248,7 +253,7 @@ export default function GitPanel({
       if (!fp.startsWith(root)) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        loadGitStatus();
+        loadGitStatusRef.current?.();
       }, 400);
     });
 
@@ -256,7 +261,6 @@ export default function GitPanel({
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, projectPath]);
 
   if (!isOpen) return null;
@@ -301,7 +305,8 @@ export default function GitPanel({
                 Initialize local Git repository
               </div>
               <p className="text-xs text-muted-foreground">
-                Set up Git for this project folder so you can track changes, commit, and sync with remotes.
+                Set up Git for this project folder so you can track changes, commit, and sync with
+                remotes.
               </p>
               <Button
                 size="sm"
@@ -414,7 +419,11 @@ export default function GitPanel({
                         if (!projectPath || !remoteFormName.trim() || !remoteFormUrl.trim()) return;
                         setSavingRemote(true);
                         try {
-                          await API.gitAddRemote(projectPath, remoteFormName.trim(), remoteFormUrl.trim());
+                          await API.gitAddRemote(
+                            projectPath,
+                            remoteFormName.trim(),
+                            remoteFormUrl.trim()
+                          );
                           toast.success(`Remote ${remoteFormName.trim()} added`);
                           setRemoteAddOpen(false);
                           setRemoteFormName("");
@@ -445,7 +454,9 @@ export default function GitPanel({
                 </div>
               )}
               {remotes.length === 0 && !remoteAddOpen && (
-                <p className="text-[11px] text-muted-foreground">No remotes. Add one to push/pull.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  No remotes. Add one to push/pull.
+                </p>
               )}
               <ul className="space-y-1">
                 {remotes.map((r) => (
@@ -495,10 +506,16 @@ export default function GitPanel({
                       </div>
                     ) : (
                       <>
-                        <span className="font-mono text-muted-foreground shrink-0 w-14 truncate" title={r.name}>
+                        <span
+                          className="font-mono text-muted-foreground shrink-0 w-14 truncate"
+                          title={r.name}
+                        >
                           {r.name}
                         </span>
-                        <span className="flex-1 min-w-0 truncate text-muted-foreground" title={r.fetch}>
+                        <span
+                          className="flex-1 min-w-0 truncate text-muted-foreground"
+                          title={r.fetch}
+                        >
                           {r.fetch || r.push}
                         </span>
                         <Button
@@ -552,10 +569,7 @@ export default function GitPanel({
                         const { code, tone, label } = getFileDisplayStatus(f);
                         return (
                           <li key={`staged-${f.path}`} className="flex items-center gap-1 group">
-                            <span
-                              className={cn("w-4 text-center font-mono", tone)}
-                              title={label}
-                            >
+                            <span className={cn("w-4 text-center font-mono", tone)} title={label}>
                               {code}
                             </span>
                             <button
@@ -604,10 +618,7 @@ export default function GitPanel({
                         const { code, tone, label } = getFileDisplayStatus(f);
                         return (
                           <li key={`working-${f.path}`} className="flex items-center gap-1 group">
-                            <span
-                              className={cn("w-4 text-center font-mono", tone)}
-                              title={label}
-                            >
+                            <span className={cn("w-4 text-center font-mono", tone)} title={label}>
                               {code}
                             </span>
                             <button
@@ -713,9 +724,7 @@ export default function GitPanel({
                 onClick={handleCommit}
                 disabled={loadingCommit || !commitMessage.trim()}
               >
-                {loadingCommit ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : null}
+                {loadingCommit ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                 Commit
               </Button>
             </div>

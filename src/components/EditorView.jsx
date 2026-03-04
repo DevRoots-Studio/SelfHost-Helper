@@ -301,9 +301,9 @@ export default function EditorView({
     setFileLoadError(null);
     setCurrentFile(filePath);
 
-    // If we have unsaved changes for this file, load them instead of reading from disk
-    if (unsavedChanges[filePath] !== undefined) {
-      setEditorContent(unsavedChanges[filePath]);
+    // Use ref so callers (e.g. onFileChange) always see latest unsaved state
+    if (unsavedChangesRef.current[filePath] !== undefined) {
+      setEditorContent(unsavedChangesRef.current[filePath]);
       setIsFileLoading(false);
       onFileSelect?.(filePath);
       return;
@@ -422,7 +422,9 @@ export default function EditorView({
               size="sm"
               variant="ghost"
               className="h-7 w-7 p-0 cursor-pointer"
+              disabled={!projectPath}
               onClick={async () => {
+                if (!projectPath) return;
                 const name = prompt("File name:");
                 if (!name?.trim()) return;
                 const relativeName = name.trim().replace(/^[\\/]+/, "");
@@ -431,8 +433,8 @@ export default function EditorView({
                   await API.createFile(projectPath, targetPath, "file", "");
                   toast.success("File created");
                   onRefreshFileTree?.();
-                  const fullPath =
-                    projectPath.replace(/[/\\]$/, "") + "/" + relativeName.replace(/^[\\/]+/, "");
+                  const base = (projectPath || "").replace(/\\/g, "/").replace(/\/$/, "");
+                  const fullPath = base ? base + "/" + relativeName : relativeName;
                   loadFile(fullPath);
                 } catch (err) {
                   toast.error(err?.message || "Failed to create file");
@@ -446,7 +448,9 @@ export default function EditorView({
               size="sm"
               variant="ghost"
               className="h-7 w-7 p-0 cursor-pointer"
+              disabled={!projectPath}
               onClick={async () => {
+                if (!projectPath) return;
                 const name = prompt("Folder name:");
                 if (!name?.trim()) return;
                 const relativeName = name.trim().replace(/^[\\/]+/, "");
