@@ -230,13 +230,31 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     if (selectedProjectId) {
       setStats(null); // Immediately clear stats on project switch
-      const syncProjectStatus = async () => {
+
+      (async () => {
         const list = normalizeProjectList(await API.getProjects());
+        if (cancelled) return;
         setProjects(list);
-      };
-      syncProjectStatus();
+
+        // Use fresh list so we find the newly selected project (projects state was stale before)
+        const currentProject = list.find((p) => p.id === selectedProjectId);
+        if (currentProject) {
+          loadFileTree(currentProject.path);
+          if (lastWatchedPathRef.current) {
+            API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+          }
+          API.watchFolder(currentProject.path);
+          lastWatchedPathRef.current = currentProject.path;
+        } else {
+          if (lastWatchedPathRef.current) {
+            API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+            lastWatchedPathRef.current = null;
+          }
+        }
+      })();
 
       API.getLogHistory(selectedProjectId).then((history) => {
         if (history && history.length > 0) {
@@ -247,24 +265,6 @@ export default function Dashboard() {
         }
       });
 
-      // Load File Tree and start file watcher
-      const currentProject = projects.find((p) => p.id === selectedProjectId);
-      if (currentProject) {
-        loadFileTree(currentProject.path);
-        // Start watching project folder for external changes
-        if (lastWatchedPathRef.current) {
-          API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
-        }
-        API.watchFolder(currentProject.path);
-        lastWatchedPathRef.current = currentProject.path;
-      } else {
-        if (lastWatchedPathRef.current) {
-          API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
-          lastWatchedPathRef.current = null;
-        }
-      }
-
-      // Initialize Tunnel State
       API.getTunnelStatus(selectedProjectId).then((status) => {
         if (status) {
           setTunnelState((prev) => ({
@@ -297,6 +297,7 @@ export default function Dashboard() {
     }
 
     return () => {
+      cancelled = true;
       if (lastWatchedPathRef.current) {
         API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
         lastWatchedPathRef.current = null;

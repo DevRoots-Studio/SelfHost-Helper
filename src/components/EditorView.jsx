@@ -233,9 +233,7 @@ export default function EditorView({
         setIsInnerBottomResizing(false);
         localStorage.setItem("editorSearchPanelHeight", String(searchPanelHeight));
       }
-      if (isTreeResizing || isBottomResizing || isInnerBottomResizing) {
-        document.body.style.userSelect = "";
-      }
+      document.body.style.userSelect = "";
     };
 
     if (isTreeResizing || isBottomResizing || isInnerBottomResizing) {
@@ -249,7 +247,14 @@ export default function EditorView({
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.userSelect = "";
     };
-  }, [isTreeResizing, isBottomResizing, isInnerBottomResizing, treeWidth, bottomPanelHeight, searchPanelHeight]);
+  }, [
+    isTreeResizing,
+    isBottomResizing,
+    isInnerBottomResizing,
+    treeWidth,
+    bottomPanelHeight,
+    searchPanelHeight,
+  ]);
 
   useEffect(() => {
     if (initialFile) {
@@ -336,7 +341,10 @@ export default function EditorView({
 
   const handleOpenSearchResult = (filePath, lineNumber) => {
     if (filePath !== currentFileRef.current) {
-      loadFile(filePath).then(() => setScrollToLine(lineNumber));
+      loadFile(filePath).then(() => {
+        // Defer scroll until after React has committed the new content so Monaco scrolls in the correct file
+        requestAnimationFrame(() => requestAnimationFrame(() => setScrollToLine(lineNumber)));
+      });
     } else {
       setScrollToLine(lineNumber);
     }
@@ -531,39 +539,39 @@ export default function EditorView({
           <div className="flex-1 min-h-0 relative">
             {currentFile ? (
               isFileLoading ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                  className="mb-4"
-                >
-                  <FileCode className="h-12 w-12 opacity-50" />
-                </motion.div>
-                <p className="text-sm">Loading file...</p>
-              </div>
-                ) : fileLoadError ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
-                <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
-                <p className="text-sm text-destructive mb-4 text-center">{fileLoadError}</p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const node = {
-                      type: "file",
-                      path: currentFile,
-                    };
-                    handleFileSelect(node);
-                  }}
-                  className="cursor-pointer"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" /> Retry
-                </Button>
-              </div>
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className="mb-4"
+                  >
+                    <FileCode className="h-12 w-12 opacity-50" />
+                  </motion.div>
+                  <p className="text-sm">Loading file...</p>
+                </div>
+              ) : fileLoadError ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                  <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
+                  <p className="text-sm text-destructive mb-4 text-center">{fileLoadError}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const node = {
+                        type: "file",
+                        path: currentFile,
+                      };
+                      handleFileSelect(node);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" /> Retry
+                  </Button>
+                </div>
               ) : (
                 <div className="absolute inset-0">
                   <MonacoEditor

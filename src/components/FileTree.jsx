@@ -50,8 +50,11 @@ const sortTree = (nodes) => {
 };
 
 const dirname = (p) => p.replace(/[/\\][^/\\]+$/, "") || p;
-const joinPath = (parent, name) =>
-  parent.endsWith("/") || parent.endsWith("\\") ? parent + name : parent + "/" + name;
+// Normalize to forward slashes so paths are never mixed (backend accepts both)
+const joinPath = (parent, name) => {
+  const p = (parent || "").replace(/\\/g, "/");
+  return p.endsWith("/") ? p + name : p + "/" + name;
+};
 const normalizePath = (p) => (p || "").replace(/\\/g, "/");
 
 // Build a map of directories that contain any changed files (directly or nested)
@@ -100,13 +103,9 @@ const FileTreeNode = ({
   const hasChildren = isDirectory && node.children && node.children.length > 0;
   const parentPath = isDirectory ? node.path : dirname(node.path);
   const gitStatus =
-    !isDirectory && gitStatusByPath
-      ? gitStatusByPath[normalizePath(node.path)] || null
-      : null;
+    !isDirectory && gitStatusByPath ? gitStatusByPath[normalizePath(node.path)] || null : null;
   const hasNestedChanges =
-    isDirectory && folderChangesByPath
-      ? !!folderChangesByPath[normalizePath(node.path)]
-      : false;
+    isDirectory && folderChangesByPath ? !!folderChangesByPath[normalizePath(node.path)] : false;
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -183,7 +182,9 @@ const FileTreeNode = ({
       ? oldNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
       : oldNorm;
     const relNew = normalizePath(newPath).startsWith(projectNorm)
-      ? normalizePath(newPath).slice(projectNorm.length).replace(/^[/\\]/, "")
+      ? normalizePath(newPath)
+          .slice(projectNorm.length)
+          .replace(/^[/\\]/, "")
       : newPath;
     try {
       await API.renamePath(projectRoot, relOld, relNew);
@@ -290,14 +291,14 @@ const FileTreeNode = ({
                     gitStatus === "U"
                       ? "Untracked"
                       : gitStatus === "M"
-                      ? "Modified"
-                      : gitStatus === "A"
-                      ? "Added"
-                      : gitStatus === "D"
-                      ? "Deleted"
-                      : gitStatus === "S"
-                      ? "Staged"
-                      : "Changed"
+                        ? "Modified"
+                        : gitStatus === "A"
+                          ? "Added"
+                          : gitStatus === "D"
+                            ? "Deleted"
+                            : gitStatus === "S"
+                              ? "Staged"
+                              : "Changed"
                   }
                 >
                   {gitStatus}
@@ -310,14 +311,14 @@ const FileTreeNode = ({
                     gitStatus === "U"
                       ? "Untracked"
                       : gitStatus === "M"
-                      ? "Modified"
-                      : gitStatus === "A"
-                      ? "Added"
-                      : gitStatus === "D"
-                      ? "Deleted"
-                      : gitStatus === "S"
-                      ? "Staged"
-                      : "Changed"
+                        ? "Modified"
+                        : gitStatus === "A"
+                          ? "Added"
+                          : gitStatus === "D"
+                            ? "Deleted"
+                            : gitStatus === "S"
+                              ? "Staged"
+                              : "Changed"
                   }
                 >
                   {gitStatus === "U" && <Plus className="h-3.5 w-3.5 text-emerald-400" />}
@@ -350,7 +351,10 @@ const FileTreeNode = ({
           <ContextMenuItem onSelect={handleRename}>
             <Pencil className="h-4 w-4 mr-2" /> Rename
           </ContextMenuItem>
-          <ContextMenuItem onSelect={handleDelete} className="text-destructive focus:text-destructive">
+          <ContextMenuItem
+            onSelect={handleDelete}
+            className="text-destructive focus:text-destructive"
+          >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </ContextMenuItem>
         </ContextMenuContent>
