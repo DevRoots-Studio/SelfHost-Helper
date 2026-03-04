@@ -745,7 +745,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                           {editingProjectId === p.id ? (
                             <input
                               autoFocus
-                              className="bg-transparent border-none outline-none text-sm font-medium flex-1 text-primary"
+                              className="bg-transparent border-none outline-none text-sm font-medium flex-1 text-primary min-w-0"
                               value={editProjectName}
                               onChange={(e) => setEditProjectName(e.target.value)}
                               onKeyDown={(e) => {
@@ -754,6 +754,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                               }}
                               onBlur={() => setEditingProjectId(null)}
                               onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
                             />
                           ) : (
                             <span className="font-medium truncate text-sm flex-1">{p.name}</span>
@@ -911,10 +912,13 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 )}
               >
                 {isAddingCategory && !isCollapsed && (
-                  <div className="px-2 py-1 bg-white/5 rounded-lg flex items-center gap-2 border border-primary/20">
+                  <div
+                    className="relative z-10 px-2 py-1 bg-white/5 rounded-lg flex items-center gap-2 border border-primary/20"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
                     <input
                       autoFocus
-                      className="bg-transparent border-none outline-none text-sm flex-1 pl-1"
+                      className="bg-transparent border-none outline-none text-sm flex-1 pl-1 min-w-0"
                       placeholder="Category Name..."
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
@@ -925,6 +929,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                       onBlur={() => {
                         setTimeout(() => setIsAddingCategory(false), 200);
                       }}
+                      onPointerDown={(e) => e.stopPropagation()}
                     />
                     <Button
                       size="icon"
@@ -993,9 +998,8 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                 "rounded-xl border transition-all duration-500",
                                                 isCategoryCollapsed
                                                   ? cn(
-                                                      "bg-primary/[0.07] border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-lg",
-                                                      categoryProjects.length === 0 &&
-                                                        "min-h-[4.25rem]"
+                                                      "bg-primary/[0.07] border-white/5 hover:bg-white/6 hover:border-white/10 hover:shadow-lg",
+                                                      categoryProjects.length === 0 && "min-h-17"
                                                     )
                                                   : "bg-primary/[0.07] border-primary/20 p-1.5 shadow-2xl shadow-black/40"
                                               ),
@@ -1016,8 +1020,13 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                               "flex items-center gap-2 flex-1 min-w-0 cursor-pointer select-none",
                                               isCollapsed ? "w-12 h-12 justify-center" : ""
                                             )}
-                                            onClick={() => toggleCategory(categoryId)}
-                                            {...providedCat.dragHandleProps}
+                                            onClick={() =>
+                                              editingCategoryId !== categoryId &&
+                                              toggleCategory(categoryId)
+                                            }
+                                            {...(editingCategoryId !== categoryId
+                                              ? providedCat.dragHandleProps
+                                              : {})}
                                           >
                                             {isCollapsed ? (
                                               renderFolderLogo(categoryId, {
@@ -1045,7 +1054,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                 {editingCategoryId === categoryId ? (
                                                   <input
                                                     autoFocus
-                                                    className="bg-transparent border-none outline-none text-xs font-bold uppercase tracking-wider flex-1 text-primary"
+                                                    className="bg-transparent border-none outline-none text-xs font-bold uppercase tracking-wider flex-1 text-primary min-w-0"
                                                     value={editCategoryName}
                                                     onChange={(e) =>
                                                       setEditCategoryName(e.target.value)
@@ -1055,6 +1064,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                         handleUpdateCategory(categoryId);
                                                     }}
                                                     onBlur={() => setEditingCategoryId(null)}
+                                                    onPointerDown={(e) => e.stopPropagation()}
                                                   />
                                                 ) : (
                                                   <span
@@ -1109,7 +1119,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                     {...providedProj.droppableProps}
                                                     ref={providedProj.innerRef}
                                                     className={cn(
-                                                      "space-y-1 min-h-[2rem] transition-all duration-300 rounded-lg",
+                                                      "space-y-1 min-h-8 transition-all duration-300 rounded-lg",
                                                       snapshotProj.isDraggingOver &&
                                                         "bg-primary/10",
                                                       isCollapsed ? "pb-2" : "mt-1.5 mb-1"
@@ -1267,29 +1277,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               </motion.div>
             )}
           </AnimatePresence>
-
-          <motion.div layout>
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/settings")}
-              className={cn(
-                "w-full flex items-center gap-2 transition-all duration-200 text-muted-foreground hover:text-foreground cursor-pointer",
-                isCollapsed ? "justify-center px-0" : "justify-start px-3"
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              {!isCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0, x: -5 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -5 }}
-                  className="truncate"
-                >
-                  Settings
-                </motion.span>
-              )}
-            </Button>
-          </motion.div>
         </div>
       </motion.aside>
     </>

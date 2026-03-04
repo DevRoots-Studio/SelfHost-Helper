@@ -34,7 +34,11 @@ import {
   clearTunnelLogs,
   getTunnelStatus,
 } from "../services/tunnelManager.js";
-import { watchFolder } from "../services/filesWatcher.js";
+import { watchFolder, stopWatching } from "../services/filesWatcher.js";
+import { isIgnoredDirName } from "../services/ignorePatterns.js";
+import { searchInProject } from "../services/searchService.js";
+import * as gitService from "../services/gitService.js";
+import { startLspForProject, stopLspForProject } from "../services/lspBridge.js";
 import settingsService from "../services/settingsService.js";
 import logger from "../services/logger.js";
 
@@ -182,6 +186,8 @@ export const registerHandlers = () => {
   ipcMain.handle("project:stop", async (_, id) => stopProject(id));
   ipcMain.handle("project:restart", async (_, id) => restartProject(id));
 
+  const isFileNotFound = (e) => e?.code === "ENOENT";
+
   ipcMain.handle("file:read", async (_, filePath) => {
     try {
       if (!filePath) {
@@ -190,6 +196,10 @@ export const registerHandlers = () => {
       const content = await fs.readFile(filePath, "utf-8");
       return content;
     } catch (e) {
+      if (isFileNotFound(e)) {
+        logger.info(`File no longer exists (read): ${filePath}`);
+        throw new Error("File no longer exists (deleted or moved).");
+      }
       logger.error(`Error reading file ${filePath}:`, e);
       const errorMessage = e.message || e.toString() || "Unknown error";
       throw new Error(`Failed to read file: ${errorMessage}`);
@@ -201,6 +211,10 @@ export const registerHandlers = () => {
       await fs.writeFile(filePath, content, "utf-8");
       return true;
     } catch (e) {
+      if (isFileNotFound(e)) {
+        logger.info(`File no longer exists (write): ${filePath}`);
+        throw new Error("File no longer exists (deleted or moved).");
+      }
       logger.error(`Error writing file ${filePath}:`, e);
       throw e;
     }
@@ -208,6 +222,11 @@ export const registerHandlers = () => {
 
   ipcMain.handle("watcher:watch", async (_, folderPath) => {
     watchFolder(folderPath);
+    return true;
+  });
+
+  ipcMain.handle("watcher:stop", async (_, folderPath) => {
+    await stopWatching(folderPath);
     return true;
   });
 
@@ -308,6 +327,228 @@ export const registerHandlers = () => {
     } else {
       return filePaths[0];
     }
+  });
+
+  // Help ensure paths stay under project root
+  const isUnderRoot = (fullPath, root) => {
+    const normalized = path.normalize(path.resolve(fullPath));
+    const normalizedRoot = path.normalize(path.resolve(root));
+    return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
+  };
+
+  ipcMain.handle("file:create", async (_, { projectRoot, targetPath, type, content }) => {
+    try {
+      if (!projectRoot || !targetPath || !type) {
+        throw new Error("projectRoot, targetPath, and type are required");
+      }
+      const resolved = path.resolve(projectRoot, targetPath);
+      if (!isUnderRoot(resolved, projectRoot)) {
+        throw new Error("Path must be inside project");
+      }
+      if (type === "directory") {
+        try {
+          await fs.mkdir(resolved, { recursive: true });
+          return true;
+        } catch (e) {
+          if (e.code === "EEXIST") {
+            const stat = await fs.stat(resolved).catch(() => null);
+            if (stat?.isDirectory()) {
+              logger.info(`Directory already exists: ${targetPath}`);
+              return { alreadyExisted: true };
+            }
+            throw new Error("A file with that name already exists.");
+          }
+          throw e;
+        }
+      } else {
+        const dir = path.dirname(resolved);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(resolved, content ?? "", "utf-8");
+        return true;
+      }
+    } catch (e) {
+      logger.error(`Error creating ${type} at ${targetPath}:`, e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("file:delete", async (_, { projectRoot, targetPath }) => {
+    try {
+      if (!projectRoot || !targetPath) throw new Error("projectRoot and targetPath required");
+      const resolved = path.resolve(projectRoot, targetPath);
+      if (!isUnderRoot(resolved, projectRoot)) throw new Error("Path must be inside project");
+      const stat = await fs.stat(resolved);
+      await fs.rm(resolved, { recursive: stat.isDirectory(), force: true });
+      return true;
+    } catch (e) {
+      logger.error(`Error deleting ${targetPath}:`, e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("file:rename", async (_, { projectRoot, oldPath, newPath }) => {
+    try {
+      if (!projectRoot || !oldPath || !newPath)
+        throw new Error("projectRoot, oldPath, newPath required");
+      const resolvedOld = path.resolve(projectRoot, oldPath);
+      const resolvedNew = path.resolve(projectRoot, newPath);
+      if (!isUnderRoot(resolvedOld, projectRoot) || !isUnderRoot(resolvedNew, projectRoot)) {
+        throw new Error("Paths must be inside project");
+      }
+      await fs.rename(resolvedOld, resolvedNew);
+      return true;
+    } catch (e) {
+      logger.error(`Error renaming ${oldPath} to ${newPath}:`, e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("search:inProject", async (_, projectRoot, query, options = {}) => {
+    try {
+      return await searchInProject(projectRoot, query, options);
+    } catch (e) {
+      logger.error("Search error:", e);
+      throw e;
+    }
+  });
+
+  // Git
+  ipcMain.handle("git:status", async (_, projectPath) => {
+    try {
+      return await gitService.gitStatus(projectPath);
+    } catch (e) {
+      logger.error("Git status error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:diff", async (_, projectPath, filePath) => {
+    try {
+      return await gitService.gitDiff(projectPath, filePath);
+    } catch (e) {
+      logger.error("Git diff error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:add", async (_, projectPath, paths) => {
+    try {
+      return await gitService.gitAdd(projectPath, paths ?? []);
+    } catch (e) {
+      logger.error("Git add error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:unstage", async (_, projectPath, paths) => {
+    try {
+      return await gitService.gitUnstage(projectPath, paths ?? []);
+    } catch (e) {
+      logger.error("Git unstage error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:commit", async (_, projectPath, message) => {
+    try {
+      return await gitService.gitCommit(projectPath, message);
+    } catch (e) {
+      logger.error("Git commit error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:push", async (_, projectPath) => {
+    try {
+      return await gitService.gitPush(projectPath);
+    } catch (e) {
+      logger.error("Git push error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:pull", async (_, projectPath) => {
+    try {
+      return await gitService.gitPull(projectPath);
+    } catch (e) {
+      logger.error("Git pull error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:branches", async (_, projectPath) => {
+    try {
+      return await gitService.gitBranches(projectPath);
+    } catch (e) {
+      logger.error("Git branches error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:checkout", async (_, projectPath, branchOrRef) => {
+    try {
+      return await gitService.gitCheckout(projectPath, branchOrRef);
+    } catch (e) {
+      logger.error("Git checkout error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:clone", async (_, repoUrl, targetPath) => {
+    try {
+      return await gitService.gitClone(repoUrl, targetPath);
+    } catch (e) {
+      logger.error("Git clone error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("git:remoteUrl", async (_, projectPath) => {
+    try {
+      return await gitService.gitRemoteUrl(projectPath);
+    } catch (e) {
+      logger.error("Git remoteUrl error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:init", async (_, projectPath) => {
+    try {
+      return await gitService.gitInit(projectPath);
+    } catch (e) {
+      logger.error("Git init error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:addRemote", async (_, projectPath, name, url) => {
+    try {
+      return await gitService.gitAddRemote(projectPath, name, url);
+    } catch (e) {
+      logger.error("Git addRemote error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:remotes", async (_, projectPath) => {
+    try {
+      return await gitService.gitRemotes(projectPath);
+    } catch (e) {
+      logger.error("Git remotes error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("git:removeRemote", async (_, projectPath, name) => {
+    try {
+      return await gitService.gitRemoveRemote(projectPath, name);
+    } catch (e) {
+      logger.error("Git removeRemote error:", e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("lsp:start", async (_, projectPath) => {
+    try {
+      return await startLspForProject(projectPath);
+    } catch (e) {
+      logger.error("LSP start error:", e);
+      throw e;
+    }
+  });
+  ipcMain.handle("lsp:stop", async (_, projectPath) => {
+    await stopLspForProject(projectPath);
+    return true;
   });
 
   // File System (Recursive list)

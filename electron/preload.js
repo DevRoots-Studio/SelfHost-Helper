@@ -33,7 +33,14 @@ contextBridge.exposeInMainWorld("api", {
 
   readFile: (filePath) => ipcRenderer.invoke("file:read", filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke("file:write", filePath, content),
+  createFile: (projectRoot, targetPath, type, content) =>
+    ipcRenderer.invoke("file:create", { projectRoot, targetPath, type, content }),
+  deletePath: (projectRoot, targetPath) =>
+    ipcRenderer.invoke("file:delete", { projectRoot, targetPath }),
+  renamePath: (projectRoot, oldPath, newPath) =>
+    ipcRenderer.invoke("file:rename", { projectRoot, oldPath, newPath }),
   watchFolder: (folderPath) => ipcRenderer.invoke("watcher:watch", folderPath),
+  stopWatchingFolder: (folderPath) => ipcRenderer.invoke("watcher:stop", folderPath),
 
   getLogs: (id) => ipcRenderer.invoke("logs:get", id),
   clearLogs: (id) => ipcRenderer.invoke("logs:clear", id),
@@ -58,6 +65,28 @@ contextBridge.exposeInMainWorld("api", {
   selectDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   selectFile: () => ipcRenderer.invoke("dialog:openFile"),
   readDirectory: (path) => ipcRenderer.invoke("files:readDirectory", path),
+  searchInProject: (projectRoot, query, options) =>
+    ipcRenderer.invoke("search:inProject", projectRoot, query, options),
+
+  gitStatus: (projectPath) => ipcRenderer.invoke("git:status", projectPath),
+  gitDiff: (projectPath, filePath) => ipcRenderer.invoke("git:diff", projectPath, filePath),
+  gitAdd: (projectPath, paths) => ipcRenderer.invoke("git:add", projectPath, paths),
+  gitUnstage: (projectPath, paths) => ipcRenderer.invoke("git:unstage", projectPath, paths),
+  gitCommit: (projectPath, message) => ipcRenderer.invoke("git:commit", projectPath, message),
+  gitPush: (projectPath) => ipcRenderer.invoke("git:push", projectPath),
+  gitPull: (projectPath) => ipcRenderer.invoke("git:pull", projectPath),
+  gitBranches: (projectPath) => ipcRenderer.invoke("git:branches", projectPath),
+  gitCheckout: (projectPath, branchOrRef) =>
+    ipcRenderer.invoke("git:checkout", projectPath, branchOrRef),
+  gitClone: (repoUrl, targetPath) => ipcRenderer.invoke("git:clone", repoUrl, targetPath),
+  gitRemoteUrl: (projectPath) => ipcRenderer.invoke("git:remoteUrl", projectPath),
+  gitInit: (projectPath) => ipcRenderer.invoke("git:init", projectPath),
+  gitAddRemote: (projectPath, name, url) =>
+    ipcRenderer.invoke("git:addRemote", projectPath, name, url),
+  gitRemotes: (projectPath) => ipcRenderer.invoke("git:remotes", projectPath),
+  gitRemoveRemote: (projectPath, name) => ipcRenderer.invoke("git:removeRemote", projectPath, name),
+  lspStart: (projectPath) => ipcRenderer.invoke("lsp:start", projectPath),
+  lspStop: (projectPath) => ipcRenderer.invoke("lsp:stop", projectPath),
   sendInput: (id, data) => ipcRenderer.invoke("project:input", { id, data }),
   getLogHistory: (id) => ipcRenderer.invoke("logs:get", id),
 

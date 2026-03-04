@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.10.9",
+  "version": "0.12.15",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -11,8 +11,10 @@
     "build": "vite build && electron-builder",
     "build:dev": "vite build && cross-env NODE_ENV=development electron-builder --config.extraMetadata.appId=com.selfhosthelper.dev --config.directories.output=release-dev --config.productName=\"SelfHost Helper Dev\"",
     "build:prod": "vite build && cross-env NODE_ENV=production electron-builder",
+    "build:web": "vite build",
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -22,7 +24,8 @@
     "asar": true,
     "asarUnpack": [
       "**/job.node",
-      "**/node_modules/cloudflared/bin/**/*"
+      "**/node_modules/cloudflared/bin/**/*",
+      "**/node_modules/@vscode/ripgrep/bin/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -81,13 +84,14 @@
   },
   "license": "ISC",
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
     "@vitejs/plugin-react": "latest",
     "autoprefixer": "latest",
     "concurrently": "latest",
     "cross-env": "latest",
     "electron": "latest",
     "electron-builder": "latest",
-    "eslint": "latest",
+    "eslint": "^9.17.0",
     "eslint-plugin-react": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
@@ -107,6 +111,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",
+    "@vscode/ripgrep": "^1.17.0",
     "@xterm/addon-clipboard": "^0.1.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
@@ -128,8 +133,12 @@
     "react-router-dom": "^7.11.0",
     "react-toastify": "^11.0.5",
     "sequelize": "latest",
+    "simple-git": "^3.32.3",
     "sqlite3": "latest",
     "st.db": "^7.2.10",
-    "tailwind-merge": "latest"
+    "tailwind-merge": "latest",
+    "typescript": "^5.9.3",
+    "typescript-language-server": "^5.1.3",
+    "ws": "^8.19.0"
   }
 }

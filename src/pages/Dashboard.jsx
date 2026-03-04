@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAtom, useSetAtom, useAtomValue } from "jotai";
 import * as atoms from "@/store/atoms";
 import { toast } from "react-toastify";
@@ -85,6 +85,10 @@ export default function Dashboard() {
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
 
   const setCategories = useSetAtom(atoms.categoriesAtom);
+  const lastWatchedPathRef = useRef(null);
+  const selectedProjectPathRef = useRef(null);
+
+  selectedProjectPathRef.current = selectedProject?.path ?? null;
 
   const loadData = async () => {
     const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
@@ -193,7 +197,29 @@ export default function Dashboard() {
       });
     });
 
+    let fileChangeDebounceTimer = null;
+    const cleanupFileChange = API.onFileChange(({ event, filePath }) => {
+      const projectPath = selectedProjectPathRef.current;
+      if (!projectPath || !filePath) return;
+      const normalizedPath = filePath.replace(/\\/g, "/");
+      const normalizedProject = projectPath.replace(/\\/g, "/");
+      if (
+        normalizedPath !== normalizedProject &&
+        !normalizedPath.startsWith(normalizedProject + "/")
+      )
+        return;
+      // Only reload tree when structure changes (add/remove), not on content "change" (e.g. save)
+      if (event === "change") return;
+      if (fileChangeDebounceTimer) clearTimeout(fileChangeDebounceTimer);
+      fileChangeDebounceTimer = setTimeout(() => {
+        const currentPath = selectedProjectPathRef.current;
+        if (currentPath) loadFileTree(currentPath);
+      }, 150);
+    });
+
     return () => {
+      if (fileChangeDebounceTimer) clearTimeout(fileChangeDebounceTimer);
+      cleanupFileChange();
       cleanupStatus();
       cleanupList();
       cleanupLogs();
@@ -205,13 +231,31 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     if (selectedProjectId) {
       setStats(null); // Immediately clear stats on project switch
-      const syncProjectStatus = async () => {
+
+      (async () => {
         const list = normalizeProjectList(await API.getProjects());
+        if (cancelled) return;
         setProjects(list);
-      };
-      syncProjectStatus();
+
+        // Use fresh list so we find the newly selected project (projects state was stale before)
+        const currentProject = list.find((p) => p.id === selectedProjectId);
+        if (currentProject) {
+          loadFileTree(currentProject.path);
+          if (lastWatchedPathRef.current) {
+            await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+          }
+          API.watchFolder(currentProject.path);
+          lastWatchedPathRef.current = currentProject.path;
+        } else {
+          if (lastWatchedPathRef.current) {
+            await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+            lastWatchedPathRef.current = null;
+          }
+        }
+      })();
 
       API.getLogHistory(selectedProjectId).then((history) => {
         if (history && history.length > 0) {
@@ -222,13 +266,6 @@ export default function Dashboard() {
         }
       });
 
-      // Load File Tree
-      const currentProject = projects.find((p) => p.id === selectedProjectId);
-      if (currentProject) {
-        loadFileTree(currentProject.path);
-      }
-
-      // Initialize Tunnel State
       API.getTunnelStatus(selectedProjectId).then((status) => {
         if (status) {
           setTunnelState((prev) => ({
@@ -254,7 +291,21 @@ export default function Dashboard() {
       });
     } else {
       setStats(null);
+      (async () => {
+        if (lastWatchedPathRef.current) {
+          await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+          lastWatchedPathRef.current = null;
+        }
+      })();
     }
+
+    return () => {
+      cancelled = true;
+      if (lastWatchedPathRef.current) {
+        API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+        lastWatchedPathRef.current = null;
+      }
+    };
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -385,7 +436,7 @@ export default function Dashboard() {
             <div className="flex-1 flex flex-col min-h-0">
               <ViewTabs viewMode={viewMode} onViewModeChange={setViewMode} />
 
-              <div className="flex-1 overflow-hidden relative bg-muted/40 backdrop-blur-md">
+              <div className="flex-1 min-h-0 overflow-hidden relative bg-muted/40 backdrop-blur-md">
                 {viewMode === "logs" ? (
                   <div className="h-full p-0">
                     <LogViewer
@@ -407,6 +458,7 @@ export default function Dashboard() {
                     isFileTreeLoading={isFileTreeLoading}
                     initialFile={selectedProjectEditorFile}
                     onFileSelect={(path) => handleEditorFileChange(selectedProject.id, path)}
+                    onRefreshFileTree={() => loadFileTree(selectedProject.path)}
                   />
                 )}
               </div>

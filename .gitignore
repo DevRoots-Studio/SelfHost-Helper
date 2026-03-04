@@ -156,3 +156,4 @@ electron/job/build/
 electron/job/node_modules/
 electron/job/package-lock.json
 build_log_cpp.txt
+MyToDo.md
