@@ -1,4 +1,5 @@
 import simpleGit from "simple-git";
+import path from "path";
 
 const gitInstances = {};
 
@@ -10,6 +11,12 @@ function getGit(projectPath) {
   return gitInstances[projectPath];
 }
 
+function normalizeWorkingDirFlag(raw) {
+  const flag = raw || "?";
+  if (flag === "?") return "U"; // Treat simple-git's "?" as Untracked
+  return flag;
+}
+
 export async function gitStatus(projectPath) {
   const git = getGit(projectPath);
   const isRepo = await git.checkIsRepo();
@@ -18,12 +25,18 @@ export async function gitStatus(projectPath) {
   return {
     isRepo: true,
     currentBranch: status.current ?? null,
-    files: status.files.map((f) => ({
-      path: f.path,
-      workingDir: f.working_dir ?? f.workingDir ?? "?",
-      index: f.index,
-      renamed: f.renamed ?? false,
-    })),
+    files: status.files.map((f) => {
+      const relPath = f.path;
+      const fullPath = path.resolve(projectPath, relPath);
+      const workingDir = normalizeWorkingDirFlag(f.working_dir ?? f.workingDir ?? "?");
+      return {
+        path: relPath,
+        fullPath,
+        workingDir,
+        index: f.index,
+        renamed: f.renamed ?? false,
+      };
+    }),
     ahead: status.ahead ?? 0,
     behind: status.behind ?? 0,
   };
@@ -32,7 +45,12 @@ export async function gitStatus(projectPath) {
 export async function gitDiff(projectPath, filePath = null) {
   const git = getGit(projectPath);
   if (filePath) {
-    return git.diff(["--", filePath]);
+    // Show any difference: staged vs HEAD or working tree vs HEAD
+    const [cached, working] = await Promise.all([
+      git.diff(["--cached", "--", filePath]),
+      git.diff(["--", filePath]),
+    ]);
+    return cached || working;
   }
   return git.diff();
 }
@@ -43,6 +61,16 @@ export async function gitAdd(projectPath, paths = []) {
     await git.add(paths);
   } else {
     await git.add(".");
+  }
+  return true;
+}
+
+export async function gitUnstage(projectPath, paths = []) {
+  const git = getGit(projectPath);
+  if (paths.length) {
+    await git.reset(["HEAD", "--", ...paths]);
+  } else {
+    await git.reset(["HEAD"]);
   }
   return true;
 }
@@ -92,7 +120,7 @@ export async function gitRemoteUrl(projectPath) {
   const isRepo = await git.checkIsRepo();
   if (!isRepo) return null;
   const remotes = await git.getRemotes(true);
-  const origin = remotes.origin;
+  const origin = remotes.find((r) => r.name === "origin");
   if (!origin?.refs?.fetch) return null;
   return origin.refs.fetch;
 }

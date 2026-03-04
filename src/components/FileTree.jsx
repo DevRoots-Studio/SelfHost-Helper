@@ -1,5 +1,14 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  File,
+  Folder,
+  FolderOpen,
+  FilePlus,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
@@ -36,7 +45,9 @@ const sortTree = (nodes) => {
 };
 
 const dirname = (p) => p.replace(/[/\\][^/\\]+$/, "") || p;
-const joinPath = (parent, name) => (parent.endsWith("/") || parent.endsWith("\\") ? parent + name : parent + "/" + name);
+const joinPath = (parent, name) =>
+  parent.endsWith("/") || parent.endsWith("\\") ? parent + name : parent + "/" + name;
+const normalizePath = (p) => (p || "").replace(/\\/g, "/");
 
 const FileTreeNode = ({
   node,
@@ -46,6 +57,7 @@ const FileTreeNode = ({
   defaultOpen = false,
   projectRoot,
   onRefresh,
+  gitStatusByPath,
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
   const [iconError, setIconError] = useState(false);
@@ -53,6 +65,10 @@ const FileTreeNode = ({
   const isSelected = selectedPath === node.path;
   const hasChildren = isDirectory && node.children && node.children.length > 0;
   const parentPath = isDirectory ? node.path : dirname(node.path);
+  const gitStatus =
+    !isDirectory && gitStatusByPath
+      ? gitStatusByPath[normalizePath(node.path)] || null
+      : null;
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -77,11 +93,23 @@ const FileTreeNode = ({
   const handleNewFile = async () => {
     const name = prompt("File name:");
     if (!name?.trim()) return;
-    const targetPath = joinPath(parentPath, name.trim());
+    const trimmed = name.trim();
+    const projectNorm = normalizePath(projectRoot);
+    const parentNorm = normalizePath(parentPath);
+    const relParent = parentNorm.startsWith(projectNorm)
+      ? parentNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+      : "";
+    const relativeTarget = relParent ? joinPath(relParent, trimmed) : trimmed;
+    const fullPath = joinPath(parentPath, trimmed);
     try {
-      await API.createFile(projectRoot, targetPath, "file", "");
+      await API.createFile(projectRoot, relativeTarget, "file", "");
       toast.success("File created");
       onRefresh?.();
+      onSelect?.({
+        type: "file",
+        path: fullPath,
+        name: trimmed,
+      });
     } catch (err) {
       toast.error(err?.message || "Failed to create file");
     }
@@ -90,9 +118,15 @@ const FileTreeNode = ({
   const handleNewFolder = async () => {
     const name = prompt("Folder name:");
     if (!name?.trim()) return;
-    const targetPath = joinPath(parentPath, name.trim());
+    const trimmed = name.trim();
+    const projectNorm = normalizePath(projectRoot);
+    const parentNorm = normalizePath(parentPath);
+    const relParent = parentNorm.startsWith(projectNorm)
+      ? parentNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+      : "";
+    const relativeTarget = relParent ? joinPath(relParent, trimmed) : trimmed;
     try {
-      await API.createFile(projectRoot, targetPath, "directory");
+      await API.createFile(projectRoot, relativeTarget, "directory");
       toast.success("Folder created");
       onRefresh?.();
     } catch (err) {
@@ -103,9 +137,18 @@ const FileTreeNode = ({
   const handleRename = async () => {
     const newName = prompt("New name:", node.name);
     if (newName == null || newName.trim() === "" || newName.trim() === node.name) return;
-    const newPath = joinPath(dirname(node.path), newName.trim());
+    const trimmed = newName.trim();
+    const newPath = joinPath(dirname(node.path), trimmed);
+    const projectNorm = normalizePath(projectRoot);
+    const oldNorm = normalizePath(node.path);
+    const relOld = oldNorm.startsWith(projectNorm)
+      ? oldNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+      : oldNorm;
+    const relNew = normalizePath(newPath).startsWith(projectNorm)
+      ? normalizePath(newPath).slice(projectNorm.length).replace(/^[/\\]/, "")
+      : newPath;
     try {
-      await API.renamePath(projectRoot, node.path, newPath);
+      await API.renamePath(projectRoot, relOld, relNew);
       toast.success("Renamed");
       onRefresh?.();
     } catch (err) {
@@ -118,8 +161,13 @@ const FileTreeNode = ({
       ? `Delete folder "${node.name}" and its contents?`
       : `Delete file "${node.name}"?`;
     if (!confirm(msg)) return;
+    const projectNorm = normalizePath(projectRoot);
+    const nodeNorm = normalizePath(node.path);
+    const relPath = nodeNorm.startsWith(projectNorm)
+      ? nodeNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+      : nodeNorm;
     try {
-      await API.deletePath(projectRoot, node.path);
+      await API.deletePath(projectRoot, relPath);
       toast.success("Deleted");
       onRefresh?.();
     } catch (err) {
@@ -189,7 +237,31 @@ const FileTreeNode = ({
                   onError={() => setIconError(true)}
                 />
               )}
-              <span className="truncate">{node.name}</span>
+              <span className="truncate flex-1">{node.name}</span>
+              {gitStatus && gitStatus !== " " && (
+                <span
+                  className={cn(
+                    "ml-2 text-[10px] font-mono rounded px-1 py-0.5 border border-white/10 bg-black/30",
+                    gitStatus === "U" && "text-emerald-400 border-emerald-500/40",
+                    gitStatus === "M" && "text-amber-300 border-amber-500/40",
+                    gitStatus === "A" && "text-sky-300 border-sky-500/40",
+                    gitStatus === "D" && "text-rose-300 border-rose-500/40"
+                  )}
+                  title={
+                    gitStatus === "U"
+                      ? "Untracked"
+                      : gitStatus === "M"
+                      ? "Modified"
+                      : gitStatus === "A"
+                      ? "Added"
+                      : gitStatus === "D"
+                      ? "Deleted"
+                      : "Changed"
+                  }
+                >
+                  {gitStatus}
+                </span>
+              )}
             </div>
           </motion.div>
         </ContextMenuTrigger>
@@ -230,6 +302,7 @@ const FileTreeNode = ({
                 level={level + 1}
                 projectRoot={projectRoot}
                 onRefresh={onRefresh}
+                gitStatusByPath={gitStatusByPath}
               />
             ))}
           </motion.div>
@@ -239,7 +312,14 @@ const FileTreeNode = ({
   );
 };
 
-export default function FileTree({ files, onSelectFile, selectedPath, projectRoot, onRefresh }) {
+export default function FileTree({
+  files,
+  onSelectFile,
+  selectedPath,
+  projectRoot,
+  onRefresh,
+  gitStatusByPath,
+}) {
   // Sort files: folders first, then files
   const sortedFiles = useMemo(() => {
     return sortTree(files);
@@ -261,6 +341,7 @@ export default function FileTree({ files, onSelectFile, selectedPath, projectRoo
           selectedPath={selectedPath}
           projectRoot={projectRoot}
           onRefresh={onRefresh}
+          gitStatusByPath={gitStatusByPath}
         />
       ))}
     </div>

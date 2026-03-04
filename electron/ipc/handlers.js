@@ -414,6 +414,14 @@ export const registerHandlers = () => {
       throw e;
     }
   });
+  ipcMain.handle("git:unstage", async (_, projectPath, paths) => {
+    try {
+      return await gitService.gitUnstage(projectPath, paths ?? []);
+    } catch (e) {
+      logger.error("Git unstage error:", e);
+      throw e;
+    }
+  });
   ipcMain.handle("git:commit", async (_, projectPath, message) => {
     try {
       return await gitService.gitCommit(projectPath, message);
@@ -484,33 +492,28 @@ export const registerHandlers = () => {
     return true;
   });
 
-  // File System (Recursive list) – skips library/dependency dirs (node_modules, venv, etc.)
+  // File System (Recursive list)
   ipcMain.handle("files:readDirectory", async (_, dirPath) => {
     async function getFiles(dir) {
       const dirents = await fs.readdir(dir, { withFileTypes: true });
       const files = await Promise.all(
-        dirents
-          .filter((dirent) => {
-            if (dirent.isDirectory() && isIgnoredDirName(dirent.name)) return false;
-            return true;
-          })
-          .map((dirent) => {
-            const res = path.resolve(dir, dirent.name);
-            if (dirent.isDirectory()) {
-              return getFiles(res).then((children) => ({
-                name: dirent.name,
-                path: res,
-                type: "directory",
-                children,
-              }));
-            } else {
-              return {
-                name: dirent.name,
-                path: res,
-                type: "file",
-              };
-            }
-          })
+        dirents.map((dirent) => {
+          const res = path.resolve(dir, dirent.name);
+          if (dirent.isDirectory()) {
+            return getFiles(res).then((children) => ({
+              name: dirent.name,
+              path: res,
+              type: "directory",
+              children,
+            }));
+          } else {
+            return {
+              name: dirent.name,
+              path: res,
+              type: "file",
+            };
+          }
+        })
       );
       return files;
     }

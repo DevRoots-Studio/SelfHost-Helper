@@ -98,6 +98,7 @@ export default function EditorView({
   const [searchOpen, setSearchOpen] = useState(false);
   const [gitOpen, setGitOpen] = useState(false);
   const [scrollToLine, setScrollToLine] = useState(null);
+  const [gitStatusByPath, setGitStatusByPath] = useState({});
 
   const editorContentRef = useRef(editorContent);
   const currentFileRef = useRef(currentFile);
@@ -114,6 +115,38 @@ export default function EditorView({
   useEffect(() => {
     unsavedChangesRef.current = unsavedChanges;
   }, [unsavedChanges]);
+
+  const normalizePath = (p) => (p || "").replace(/\\/g, "/");
+
+  const applyGitStatusToMap = useCallback(
+    (status) => {
+      if (!status || !status.files) {
+        setGitStatusByPath({});
+        return;
+      }
+      const rootNorm = normalizePath(projectPath);
+      const map = {};
+      status.files.forEach((f) => {
+        const full = normalizePath(f.fullPath || `${rootNorm}/${f.path}`);
+        map[full] = f.workingDir || f.working_dir || "?";
+      });
+      setGitStatusByPath(map);
+    },
+    [projectPath]
+  );
+
+  const loadGitStatus = useCallback(async () => {
+    if (!projectPath) {
+      setGitStatusByPath({});
+      return;
+    }
+    try {
+      const status = await API.gitStatus(projectPath);
+      applyGitStatusToMap(status);
+    } catch {
+      setGitStatusByPath({});
+    }
+  }, [projectPath, applyGitStatusToMap]);
 
   // File tree resize state and ref
   const treeRef = useRef(null);
@@ -165,6 +198,10 @@ export default function EditorView({
       setEditorContent("");
     }
   }, [projectId, initialFile]);
+
+  useEffect(() => {
+    loadGitStatus();
+  }, [loadGitStatus]);
 
   // Start TypeScript LSP for this project when editor is shown (WebSocket URL available for future client)
   useEffect(() => {
@@ -317,11 +354,15 @@ export default function EditorView({
               onClick={async () => {
                 const name = prompt("File name:");
                 if (!name?.trim()) return;
-                const targetPath = projectPath.replace(/[/\\]$/, "") + "/" + name.trim();
+                const relativeName = name.trim().replace(/^[\\/]+/, "");
+                const targetPath = relativeName;
                 try {
                   await API.createFile(projectPath, targetPath, "file", "");
                   toast.success("File created");
                   onRefreshFileTree?.();
+                  const fullPath =
+                    projectPath.replace(/[/\\]$/, "") + "/" + relativeName.replace(/^[\\/]+/, "");
+                  loadFile(fullPath);
                 } catch (err) {
                   toast.error(err?.message || "Failed to create file");
                 }
@@ -337,7 +378,8 @@ export default function EditorView({
               onClick={async () => {
                 const name = prompt("Folder name:");
                 if (!name?.trim()) return;
-                const targetPath = projectPath.replace(/[/\\]$/, "") + "/" + name.trim();
+                const relativeName = name.trim().replace(/^[\\/]+/, "");
+                const targetPath = relativeName;
                 try {
                   await API.createFile(projectPath, targetPath, "directory");
                   toast.success("Folder created");
@@ -371,6 +413,7 @@ export default function EditorView({
               selectedPath={currentFile}
               projectRoot={projectPath}
               onRefresh={onRefreshFileTree}
+              gitStatusByPath={gitStatusByPath}
             />
           )}
         </div>
@@ -392,7 +435,9 @@ export default function EditorView({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 text-xs cursor-pointer gap-1.5"
+              className={`h-8 text-xs cursor-pointer gap-1.5 ${
+                searchOpen ? "bg-primary/15 text-primary" : ""
+              }`}
               onClick={() => setSearchOpen((v) => !v)}
               title="Search in project"
             >
@@ -401,7 +446,9 @@ export default function EditorView({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 text-xs cursor-pointer gap-1.5"
+              className={`h-8 text-xs cursor-pointer gap-1.5 ${
+                gitOpen ? "bg-primary/15 text-primary" : ""
+              }`}
               onClick={() => setGitOpen((v) => !v)}
               title="Git"
             >
@@ -418,8 +465,9 @@ export default function EditorView({
           </div>
         </div>
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {currentFile ? (
-            isFileLoading ? (
+          <div className="flex-1 min-h-0 relative">
+            {currentFile ? (
+              isFileLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -434,7 +482,7 @@ export default function EditorView({
                 </motion.div>
                 <p className="text-sm">Loading file...</p>
               </div>
-            ) : fileLoadError ? (
+                ) : fileLoadError ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
                 <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
                 <p className="text-sm text-destructive mb-4 text-center">{fileLoadError}</p>
@@ -453,47 +501,45 @@ export default function EditorView({
                   <RefreshCw className="h-4 w-4 mr-2" /> Retry
                 </Button>
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="flex-1 min-h-0 relative">
-                  <div className="absolute inset-0">
-                    <MonacoEditor
-                      value={editorContent}
-                      onChange={handleEditorChange}
-                      onSave={handleSaveFile}
-                      language={getLanguageFromPath(currentFile)}
-                      scrollToLine={scrollToLine}
-                    />
-                  </div>
+              ) : (
+                <div className="absolute inset-0">
+                  <MonacoEditor
+                    value={editorContent}
+                    onChange={handleEditorChange}
+                    onSave={handleSaveFile}
+                    language={getLanguageFromPath(currentFile)}
+                    scrollToLine={scrollToLine}
+                  />
                 </div>
-                {searchOpen && (
-                  <div className="h-56 shrink-0 border-t border-white/5">
-                    <SearchPanel
-                      projectRoot={projectPath}
-                      projectPathLabel
-                      onOpenResult={handleOpenSearchResult}
-                      isOpen={searchOpen}
-                      onClose={() => setSearchOpen(false)}
-                    />
-                  </div>
-                )}
-                {gitOpen && (
-                  <div className="h-64 shrink-0 border-t border-white/5">
-                    <GitPanel
-                      projectPath={projectPath}
-                      isOpen={gitOpen}
-                      onClose={() => setGitOpen(false)}
-                      onRefreshFileTree={onRefreshFileTree}
-                    />
-                  </div>
-                )}
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-30">
+                <FolderOpen className="h-16 w-16 mb-4 stroke-[1.5]" />
+                <p className="text-lg font-medium">No File Selected</p>
+                <p className="text-xs">Select a file from the explorer to start editing</p>
               </div>
-            )
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-30">
-              <FolderOpen className="h-16 w-16 mb-4 stroke-[1.5]" />
-              <p className="text-lg font-medium">No File Selected</p>
-              <p className="text-xs">Select a file from the explorer to start editing</p>
+            )}
+          </div>
+          {searchOpen && (
+            <div className="h-56 shrink-0 border-t border-white/5">
+              <SearchPanel
+                projectRoot={projectPath}
+                projectPathLabel
+                onOpenResult={handleOpenSearchResult}
+                isOpen={searchOpen}
+                onClose={() => setSearchOpen(false)}
+              />
+            </div>
+          )}
+          {gitOpen && (
+            <div className="h-64 shrink-0 border-t border-white/5">
+              <GitPanel
+                projectPath={projectPath}
+                isOpen={gitOpen}
+                onClose={() => setGitOpen(false)}
+                onRefreshFileTree={onRefreshFileTree}
+                onStatusChange={applyGitStatusToMap}
+              />
             </div>
           )}
         </div>
