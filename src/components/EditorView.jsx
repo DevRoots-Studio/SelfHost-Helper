@@ -128,7 +128,18 @@ export default function EditorView({
       const map = {};
       status.files.forEach((f) => {
         const full = normalizePath(f.fullPath || `${rootNorm}/${f.path}`);
-        map[full] = f.workingDir || f.working_dir || "?";
+        const working = f.workingDir || f.working_dir || " ";
+        const index = f.index || " ";
+        let code = " ";
+        // Staged changes take priority in the explorer badge
+        if (index && index !== " ") {
+          code = "S"; // Staged
+        } else if (working === "U" || working === "?") {
+          code = "U"; // Untracked
+        } else if (working && working !== " ") {
+          code = working; // M, D, etc. from working tree
+        }
+        map[full] = code;
       });
       setGitStatusByPath(map);
     },

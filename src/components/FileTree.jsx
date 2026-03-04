@@ -245,7 +245,8 @@ const FileTreeNode = ({
                     gitStatus === "U" && "text-emerald-400 border-emerald-500/40",
                     gitStatus === "M" && "text-amber-300 border-amber-500/40",
                     gitStatus === "A" && "text-sky-300 border-sky-500/40",
-                    gitStatus === "D" && "text-rose-300 border-rose-500/40"
+                    gitStatus === "D" && "text-rose-300 border-rose-500/40",
+                    gitStatus === "S" && "text-indigo-300 border-indigo-500/40"
                   )}
                   title={
                     gitStatus === "U"
@@ -256,6 +257,8 @@ const FileTreeNode = ({
                       ? "Added"
                       : gitStatus === "D"
                       ? "Deleted"
+                      : gitStatus === "S"
+                      ? "Staged"
                       : "Changed"
                   }
                 >
