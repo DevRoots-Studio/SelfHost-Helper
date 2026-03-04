@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Dashboard from "./pages/Dashboard";
+import Settings from "./pages/Settings";
 // import TitleBar from "./components/ui/titleBar";
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 
@@ -25,6 +26,7 @@ function App() {
         <title>{import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}</title>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
         <ToastContainer
           position="bottom-right"
