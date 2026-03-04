@@ -8,6 +8,10 @@ import {
   FolderPlus,
   Pencil,
   Trash2,
+  Plus,
+  CircleDot,
+  Minus,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,6 +23,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { FILE_TAG_MODE } from "@/config/fileTagConfig";
 
 const API = window.api;
 // Sort function: folders first, then files (alphabetically)
@@ -271,15 +276,18 @@ const FileTreeNode = ({
                 />
               )}
               <span className="truncate flex-1">{node.name}</span>
-              {gitStatus && gitStatus !== " " && (
+              {gitStatus && gitStatus !== " " && FILE_TAG_MODE === "letters" && (
                 <span
                   className={cn(
-                    "ml-2 text-[10px] font-mono rounded px-1 py-0.5 border border-white/10 bg-black/30",
-                    gitStatus === "U" && "text-emerald-400 border-emerald-500/40",
-                    gitStatus === "M" && "text-amber-300 border-amber-500/40",
-                    gitStatus === "A" && "text-sky-300 border-sky-500/40",
-                    gitStatus === "D" && "text-rose-300 border-rose-500/40",
-                    gitStatus === "S" && "text-indigo-300 border-indigo-500/40"
+                    "ml-2 inline-flex items-center justify-center rounded-full h-5 w-5 text-[11px] font-semibold border border-white/10",
+                    gitStatus === "U" &&
+                      "bg-emerald-500/20 text-emerald-50 border-emerald-400/70",
+                    gitStatus === "M" &&
+                      "bg-amber-500/20 text-amber-50 border-amber-400/70",
+                    gitStatus === "A" && "bg-sky-500/20 text-sky-50 border-sky-400/70",
+                    gitStatus === "D" && "bg-rose-500/20 text-rose-50 border-rose-400/70",
+                    gitStatus === "S" &&
+                      "bg-indigo-500/20 text-indigo-50 border-indigo-400/70"
                   )}
                   title={
                     gitStatus === "U"
@@ -296,6 +304,30 @@ const FileTreeNode = ({
                   }
                 >
                   {gitStatus}
+                </span>
+              )}
+              {gitStatus && gitStatus !== " " && FILE_TAG_MODE === "icons" && (
+                <span
+                  className="ml-2 flex items-center justify-center"
+                  title={
+                    gitStatus === "U"
+                      ? "Untracked"
+                      : gitStatus === "M"
+                      ? "Modified"
+                      : gitStatus === "A"
+                      ? "Added"
+                      : gitStatus === "D"
+                      ? "Deleted"
+                      : gitStatus === "S"
+                      ? "Staged"
+                      : "Changed"
+                  }
+                >
+                  {gitStatus === "U" && <Plus className="h-3.5 w-3.5 text-emerald-400" />}
+                  {gitStatus === "M" && <CircleDot className="h-3.5 w-3.5 text-amber-300" />}
+                  {gitStatus === "A" && <Plus className="h-3.5 w-3.5 text-sky-400" />}
+                  {gitStatus === "D" && <Minus className="h-3.5 w-3.5 text-rose-400" />}
+                  {gitStatus === "S" && <Check className="h-3.5 w-3.5 text-indigo-300" />}
                 </span>
               )}
               {isDirectory && hasNestedChanges && !gitStatus && (
