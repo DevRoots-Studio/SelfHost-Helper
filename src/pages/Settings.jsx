@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Terminal } from "lucide-react";
+import { ArrowLeft, Terminal, FolderOpen, FileUp, RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 const API = window.api;
 
@@ -11,12 +12,27 @@ export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
   const [appVersion, setAppVersion] = useState("");
+  const [userDataPath, setUserDataPath] = useState("");
+  const [backupCandidates, setBackupCandidates] = useState([]);
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
     loadAutoLaunchStatus();
     loadAppVersion();
+    loadBackupInfo();
   }, []);
+
+  const loadBackupInfo = async () => {
+    try {
+      const path = await API.getUserDataPath();
+      setUserDataPath(path || "");
+      const list = await API.listLegacyBackupCandidates();
+      setBackupCandidates(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.error("Failed to load backup info", e);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -72,6 +88,45 @@ export default function Settings() {
     }
   };
 
+  const handleOpenDataFolder = async () => {
+    try {
+      if (userDataPath) await API.openPath(userDataPath);
+      else toast.error("Data folder path not available");
+    } catch (e) {
+      console.error("Failed to open data folder", e);
+      toast.error("Failed to open folder");
+    }
+  };
+
+  const handleRestoreFromPath = async (filePath, replaceExisting = true) => {
+    if (!filePath) return;
+    setRestoreLoading(true);
+    try {
+      const result = await API.restoreFromLegacyBackup(filePath, replaceExisting);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      const { projects = 0, categories = 0 } = result?.restored ?? {};
+      toast.success(`Restored ${projects} projects and ${categories} categories. The project list will refresh.`);
+      loadBackupInfo();
+    } catch (e) {
+      console.error("Restore failed", e);
+      toast.error(e?.message || "Restore failed");
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  const handleChooseBackupFile = async () => {
+    try {
+      const filePath = await API.openBackupFileDialog();
+      if (filePath) await handleRestoreFromPath(filePath, true);
+    } catch (e) {
+      console.error("Failed to open backup dialog or restore", e);
+    }
+  };
+
   return (
     <div className="p-8 max-w-4xl mx-auto h-screen overflow-y-auto">
       <div className="flex items-center gap-4 mb-8">
@@ -118,6 +173,72 @@ export default function Settings() {
                 onCheckedChange={handleClearLogsToggle}
               />
             </div>
+          </div>
+        </section>
+
+        {/* Data & backup – restore from legacy/backup */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">
+            Data &amp; backup
+          </h2>
+
+          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-4">
+            <p className="text-sm text-muted-foreground">
+              If you lost your projects after updating (e.g. from an older version), you can
+              restore from a backup. Backups are created automatically when the app migrates an
+              old database. Put your backup file in the data folder, or choose it from anywhere.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleOpenDataFolder}
+                disabled={!userDataPath}
+                className="gap-2"
+              >
+                <FolderOpen className="h-4 w-4" />
+                Open data folder
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleChooseBackupFile}
+                disabled={restoreLoading}
+                className="gap-2"
+              >
+                <FileUp className="h-4 w-4" />
+                Choose backup file…
+              </Button>
+            </div>
+
+            {backupCandidates.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <p className="text-sm font-medium">Backup files in data folder:</p>
+                <ul className="space-y-1">
+                  {backupCandidates.map((c) => (
+                    <li key={c.path} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate text-muted-foreground" title={c.path}>
+                        {c.name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRestoreFromPath(c.path, true)}
+                        disabled={restoreLoading}
+                        className="gap-1 shrink-0"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Restore
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 

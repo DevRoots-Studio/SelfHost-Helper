@@ -14,6 +14,9 @@ import {
   deleteCategory,
   updateCategory,
   reorderCategories,
+  getUserDataPath,
+  listLegacyBackupCandidates,
+  restoreFromLegacyBackup,
 } from "../services/database.js";
 import {
   startProject,
@@ -651,5 +654,28 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("path:join", (_, ...args) => {
     return path.join(...args);
+  });
+
+  ipcMain.handle("database:getUserDataPath", () => getUserDataPath());
+  ipcMain.handle("database:listLegacyBackupCandidates", () => listLegacyBackupCandidates());
+  ipcMain.handle("database:restoreFromLegacyBackup", async (_, filePath, replaceExisting = true) => {
+    const result = await restoreFromLegacyBackup(filePath, replaceExisting);
+    if (result.error) return result;
+    notifyProjectListChanged();
+    return result;
+  });
+  ipcMain.handle("dialog:openBackupFile", async () => {
+    const userDataPath = getUserDataPath();
+    const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
+      title: "Select legacy database or backup file",
+      defaultPath: userDataPath,
+      filters: [
+        { name: "SQLite / Backup", extensions: ["sqlite", "db"] },
+        { name: "All", extensions: ["*"] },
+      ],
+      properties: ["openFile"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
   });
 };
