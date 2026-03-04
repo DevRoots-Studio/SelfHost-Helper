@@ -49,6 +49,34 @@ const joinPath = (parent, name) =>
   parent.endsWith("/") || parent.endsWith("\\") ? parent + name : parent + "/" + name;
 const normalizePath = (p) => (p || "").replace(/\\/g, "/");
 
+// Build a map of directories that contain any changed files (directly or nested)
+const buildFolderChangeMap = (nodes, gitStatusByPath) => {
+  const result = {};
+  if (!nodes || !Array.isArray(nodes) || !gitStatusByPath) return result;
+
+  const walk = (node) => {
+    const nodePathNorm = normalizePath(node.path);
+    if (node.type === "file") {
+      const code = gitStatusByPath[nodePathNorm];
+      return !!code && code !== " ";
+    }
+    if (!node.children || !Array.isArray(node.children)) return false;
+    let hasChangedDescendant = false;
+    for (const child of node.children) {
+      if (walk(child)) {
+        hasChangedDescendant = true;
+      }
+    }
+    if (hasChangedDescendant) {
+      result[nodePathNorm] = true;
+    }
+    return hasChangedDescendant;
+  };
+
+  nodes.forEach(walk);
+  return result;
+};
+
 const FileTreeNode = ({
   node,
   onSelect,
@@ -58,6 +86,7 @@ const FileTreeNode = ({
   projectRoot,
   onRefresh,
   gitStatusByPath,
+  folderChangesByPath,
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
   const [iconError, setIconError] = useState(false);
@@ -69,6 +98,10 @@ const FileTreeNode = ({
     !isDirectory && gitStatusByPath
       ? gitStatusByPath[normalizePath(node.path)] || null
       : null;
+  const hasNestedChanges =
+    isDirectory && folderChangesByPath
+      ? !!folderChangesByPath[normalizePath(node.path)]
+      : false;
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -265,6 +298,12 @@ const FileTreeNode = ({
                   {gitStatus}
                 </span>
               )}
+              {isDirectory && hasNestedChanges && !gitStatus && (
+                <span
+                  className="ml-2 h-2 w-2 rounded-full bg-amber-400/80 border border-amber-300/70"
+                  title="Contains changed files"
+                />
+              )}
             </div>
           </motion.div>
         </ContextMenuTrigger>
@@ -306,6 +345,7 @@ const FileTreeNode = ({
                 projectRoot={projectRoot}
                 onRefresh={onRefresh}
                 gitStatusByPath={gitStatusByPath}
+                folderChangesByPath={folderChangesByPath}
               />
             ))}
           </motion.div>
@@ -323,10 +363,12 @@ export default function FileTree({
   onRefresh,
   gitStatusByPath,
 }) {
-  // Sort files: folders first, then files
-  const sortedFiles = useMemo(() => {
-    return sortTree(files);
-  }, [files]);
+  // Sort files and compute which folders contain any changes
+  const { sortedFiles, folderChangesByPath } = useMemo(() => {
+    const sorted = sortTree(files);
+    const folderChanges = buildFolderChangeMap(sorted, gitStatusByPath);
+    return { sortedFiles: sorted, folderChangesByPath: folderChanges };
+  }, [files, gitStatusByPath]);
 
   if (!files || files.length === 0) {
     return (
@@ -345,6 +387,7 @@ export default function FileTree({
           projectRoot={projectRoot}
           onRefresh={onRefresh}
           gitStatusByPath={gitStatusByPath}
+          folderChangesByPath={folderChangesByPath}
         />
       ))}
     </div>
