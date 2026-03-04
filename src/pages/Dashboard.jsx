@@ -291,10 +291,12 @@ export default function Dashboard() {
       });
     } else {
       setStats(null);
-      if (lastWatchedPathRef.current) {
-        await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
-        lastWatchedPathRef.current = null;
-      }
+      (async () => {
+        if (lastWatchedPathRef.current) {
+          await API.stopWatchingFolder(lastWatchedPathRef.current).catch(() => {});
+          lastWatchedPathRef.current = null;
+        }
+      })();
     }
 
     return () => {

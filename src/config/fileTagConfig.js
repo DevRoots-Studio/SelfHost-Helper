@@ -5,4 +5,3 @@
 const rawMode = import.meta.env.VITE_FILE_TAG_MODE;
 
 export const FILE_TAG_MODE = rawMode === "letters" ? "letters" : "icons";
-
