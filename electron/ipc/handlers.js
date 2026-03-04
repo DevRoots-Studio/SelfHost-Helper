@@ -186,6 +186,8 @@ export const registerHandlers = () => {
   ipcMain.handle("project:stop", async (_, id) => stopProject(id));
   ipcMain.handle("project:restart", async (_, id) => restartProject(id));
 
+  const isFileNotFound = (e) => e?.code === "ENOENT";
+
   ipcMain.handle("file:read", async (_, filePath) => {
     try {
       if (!filePath) {
@@ -194,6 +196,10 @@ export const registerHandlers = () => {
       const content = await fs.readFile(filePath, "utf-8");
       return content;
     } catch (e) {
+      if (isFileNotFound(e)) {
+        logger.info(`File no longer exists (read): ${filePath}`);
+        throw new Error("File no longer exists (deleted or moved).");
+      }
       logger.error(`Error reading file ${filePath}:`, e);
       const errorMessage = e.message || e.toString() || "Unknown error";
       throw new Error(`Failed to read file: ${errorMessage}`);
@@ -205,6 +211,10 @@ export const registerHandlers = () => {
       await fs.writeFile(filePath, content, "utf-8");
       return true;
     } catch (e) {
+      if (isFileNotFound(e)) {
+        logger.info(`File no longer exists (write): ${filePath}`);
+        throw new Error("File no longer exists (deleted or moved).");
+      }
       logger.error(`Error writing file ${filePath}:`, e);
       throw e;
     }
@@ -336,13 +346,26 @@ export const registerHandlers = () => {
         throw new Error("Path must be inside project");
       }
       if (type === "directory") {
-        await fs.mkdir(resolved, { recursive: true });
+        try {
+          await fs.mkdir(resolved, { recursive: true });
+          return true;
+        } catch (e) {
+          if (e.code === "EEXIST") {
+            const stat = await fs.stat(resolved).catch(() => null);
+            if (stat?.isDirectory()) {
+              logger.info(`Directory already exists: ${targetPath}`);
+              return { alreadyExisted: true };
+            }
+            throw new Error("A file with that name already exists.");
+          }
+          throw e;
+        }
       } else {
         const dir = path.dirname(resolved);
         await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(resolved, content ?? "", "utf-8");
+        return true;
       }
-      return true;
     } catch (e) {
       logger.error(`Error creating ${type} at ${targetPath}:`, e);
       throw e;

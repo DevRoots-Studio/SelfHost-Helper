@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { useAtom } from "jotai";
 import * as atoms from "@/store/atoms";
@@ -323,9 +324,15 @@ export default function EditorView({
       setFileLoadError(null);
       onFileSelect?.(filePath);
     } catch (e) {
-      console.error("Failed to read file", e);
-      const errorMessage = e?.message || e?.toString() || "Unknown error";
-      setFileLoadError(`Failed to load file: ${errorMessage}`);
+      const msg = e?.message || e?.toString() || "";
+      const isDeleted = msg.includes("no longer exists") || e?.code === "ENOENT";
+      if (isDeleted) {
+        toast.info("This file was deleted or moved.");
+        setFileLoadError("This file was deleted or moved.");
+      } else {
+        console.error("Failed to read file", e);
+        setFileLoadError(`Failed to load file: ${msg || "Unknown error"}`);
+      }
       setEditorContent("");
     } finally {
       setIsFileLoading(false);
@@ -369,7 +376,13 @@ export default function EditorView({
           toast.error("Failed to save file");
         }
       } catch (err) {
-        toast.error(`Error saving file: ${err.message}`);
+        const isDeleted =
+          (err?.message && err.message.includes("no longer exists")) || err?.code === "ENOENT";
+        if (isDeleted) {
+          toast.info("File was deleted or moved; cannot save.");
+        } else {
+          toast.error(`Error saving file: ${err?.message || "Unknown error"}`);
+        }
       }
     }
   }, [setUnsavedChanges]);
@@ -559,8 +572,24 @@ export default function EditorView({
                 </div>
               ) : fileLoadError ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
-                  <FileCode className="h-12 w-12 mb-4 text-destructive opacity-50" />
-                  <p className="text-sm text-destructive mb-4 text-center">{fileLoadError}</p>
+                  <FileCode
+                    className={cn(
+                      "h-12 w-12 mb-4 opacity-50",
+                      fileLoadError.includes("deleted or moved")
+                        ? "text-amber-500"
+                        : "text-destructive"
+                    )}
+                  />
+                  <p
+                    className={cn(
+                      "text-sm mb-4 text-center",
+                      fileLoadError.includes("deleted or moved")
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-destructive"
+                    )}
+                  >
+                    {fileLoadError}
+                  </p>
                   <Button
                     size="sm"
                     variant="outline"

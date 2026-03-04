@@ -129,7 +129,7 @@ export default function Settings() {
             <div className="absolute top-0 right-0 p-32 bg-primary/20 blur-[100px] rounded-full pointer-events-none -mr-16 -mt-16 opacity-50 group-hover:opacity-70 transition-opacity" />
 
             <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 bg-gradient-to-br from-primary to-violet-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
+              <div className="w-14 h-14 bg-linear-to-br from-primary to-violet-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
                 <Terminal className="text-white h-8 w-8" />
               </div>
               <div>

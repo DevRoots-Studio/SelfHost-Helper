@@ -733,7 +733,10 @@ export default function GitPanel({
       </div>
 
       <Dialog open={!!diffFile} onOpenChange={(open) => !open && setDiffFile(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0">
+        <DialogContent
+          className="max-w-4xl max-h-[85vh] flex flex-col gap-0"
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle className="text-sm font-mono truncate pr-8">
               {diffFile ? `Diff: ${diffFile}` : "Diff"}

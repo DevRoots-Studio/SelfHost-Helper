@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   ChevronRight,
   File,
@@ -24,6 +24,15 @@ import {
   ContextMenuTrigger,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { FILE_TAG_MODE } from "@/config/fileTagConfig";
 
 const API = window.api;
@@ -94,6 +103,7 @@ const FileTreeNode = ({
   defaultOpen = false,
   projectRoot,
   onRefresh,
+  onRequestCreate,
   gitStatusByPath,
   folderChangesByPath,
 }) => {
@@ -128,48 +138,12 @@ const FileTreeNode = ({
     onSelect(node);
   };
 
-  const handleNewFile = async () => {
-    const name = prompt("File name:");
-    if (!name?.trim()) return;
-    const trimmed = name.trim();
-    const projectNorm = normalizePath(projectRoot);
-    const parentNorm = normalizePath(parentPath);
-    const relParent = parentNorm.startsWith(projectNorm)
-      ? parentNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
-      : "";
-    const relativeTarget = relParent ? joinPath(relParent, trimmed) : trimmed;
-    const fullPath = joinPath(parentPath, trimmed);
-    try {
-      await API.createFile(projectRoot, relativeTarget, "file", "");
-      toast.success("File created");
-      onRefresh?.();
-      onSelect?.({
-        type: "file",
-        path: fullPath,
-        name: trimmed,
-      });
-    } catch (err) {
-      toast.error(err?.message || "Failed to create file");
-    }
+  const handleNewFile = () => {
+    onRequestCreate?.("file", parentPath);
   };
 
-  const handleNewFolder = async () => {
-    const name = prompt("Folder name:");
-    if (!name?.trim()) return;
-    const trimmed = name.trim();
-    const projectNorm = normalizePath(projectRoot);
-    const parentNorm = normalizePath(parentPath);
-    const relParent = parentNorm.startsWith(projectNorm)
-      ? parentNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
-      : "";
-    const relativeTarget = relParent ? joinPath(relParent, trimmed) : trimmed;
-    try {
-      await API.createFile(projectRoot, relativeTarget, "directory");
-      toast.success("Folder created");
-      onRefresh?.();
-    } catch (err) {
-      toast.error(err?.message || "Failed to create folder");
-    }
+  const handleNewFolder = () => {
+    onRequestCreate?.("folder", parentPath);
   };
 
   const handleRename = async () => {
@@ -385,6 +359,7 @@ const FileTreeNode = ({
                 level={level + 1}
                 projectRoot={projectRoot}
                 onRefresh={onRefresh}
+                onRequestCreate={onRequestCreate}
                 gitStatusByPath={gitStatusByPath}
                 folderChangesByPath={folderChangesByPath}
               />
@@ -411,73 +386,133 @@ export default function FileTree({
     return { sortedFiles: sorted, folderChangesByPath: folderChanges };
   }, [files, gitStatusByPath]);
 
-  const handleNewFileAtRoot = async () => {
-    if (!projectRoot) return;
-    const name = prompt("File name:");
-    if (!name?.trim()) return;
-    const trimmed = name.trim().replace(/^[\\/]+/, "");
-    const relativeTarget = trimmed;
-    try {
-      await API.createFile(projectRoot, relativeTarget, "file", "");
-      toast.success("File created");
-      onRefresh?.();
-      const fullPath = joinPath(
-        (projectRoot || "").replace(/\\/g, "/").replace(/\/$/, ""),
-        trimmed
-      );
-      onSelectFile?.({ type: "file", path: fullPath, name: trimmed });
-    } catch (err) {
-      toast.error(err?.message || "Failed to create file");
-    }
-  };
+  const [pendingCreate, setPendingCreate] = useState(null);
+  const [newItemName, setNewItemName] = useState("");
 
-  const handleNewFolderAtRoot = async () => {
-    if (!projectRoot) return;
-    const name = prompt("Folder name:");
-    if (!name?.trim()) return;
-    const trimmed = name.trim().replace(/^[\\/]+/, "");
-    const relativeTarget = trimmed;
-    try {
-      await API.createFile(projectRoot, relativeTarget, "directory");
-      toast.success("Folder created");
-      onRefresh?.();
-    } catch (err) {
-      toast.error(err?.message || "Failed to create folder");
+  const openCreateDialog = useCallback(
+    (type, parentPath) => {
+      if (!projectRoot) return;
+      setPendingCreate({ type, parentPath });
+      setNewItemName("");
+    },
+    [projectRoot]
+  );
+
+  const closeCreateDialog = useCallback(() => {
+    setPendingCreate(null);
+    setNewItemName("");
+  }, []);
+
+  const handleCreateSubmit = useCallback(async () => {
+    const trimmed = newItemName.trim().replace(/^[\\/]+/, "");
+    if (!trimmed || !pendingCreate || !projectRoot) {
+      closeCreateDialog();
+      return;
     }
-  };
+    const { type, parentPath } = pendingCreate;
+    const projectNorm = normalizePath(projectRoot);
+    const parentNorm = normalizePath(parentPath);
+    const relParent = parentNorm.startsWith(projectNorm)
+      ? parentNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+      : "";
+    const relativeTarget = relParent ? joinPath(relParent, trimmed) : trimmed;
+    const isFolder = type === "folder" || type === "directory";
+    try {
+      if (isFolder) {
+        const result = await API.createFile(projectRoot, relativeTarget, "directory");
+        if (result?.alreadyExisted) {
+          toast.info("Folder already exists");
+        } else {
+          toast.success("Folder created");
+        }
+      } else {
+        await API.createFile(projectRoot, relativeTarget, "file", "");
+        toast.success("File created");
+        const fullPath = joinPath(parentPath.replace(/\\/g, "/").replace(/\/$/, ""), trimmed);
+        onSelectFile?.({ type: "file", path: fullPath, name: trimmed });
+      }
+      onRefresh?.();
+      closeCreateDialog();
+    } catch (err) {
+      toast.error(err?.message || (isFolder ? "Failed to create folder" : "Failed to create file"));
+    }
+  }, [newItemName, pendingCreate, projectRoot, onRefresh, onSelectFile, closeCreateDialog]);
+
+  const handleNewFileAtRoot = () =>
+    openCreateDialog("file", (projectRoot || "").replace(/\\/g, "/").replace(/\/$/, ""));
+  const handleNewFolderAtRoot = () =>
+    openCreateDialog("folder", (projectRoot || "").replace(/\\/g, "/").replace(/\/$/, ""));
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="overflow-auto h-full pb-4 min-h-[120px]">
-          {!files || files.length === 0 ? (
-            <div className="p-4 text-xs text-muted-foreground italic text-center">
-              No files found
-            </div>
-          ) : (
-            sortedFiles.map((node) => (
-              <FileTreeNode
-                key={node.path}
-                node={node}
-                onSelect={onSelectFile}
-                selectedPath={selectedPath}
-                projectRoot={projectRoot}
-                onRefresh={onRefresh}
-                gitStatusByPath={gitStatusByPath}
-                folderChangesByPath={folderChangesByPath}
-              />
-            ))
-          )}
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={handleNewFileAtRoot}>
-          <FilePlus className="h-4 w-4 mr-2" /> New File
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={handleNewFolderAtRoot}>
-          <FolderPlus className="h-4 w-4 mr-2" /> New Folder
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="overflow-auto h-full pb-4 min-h-[120px]">
+            {!files || files.length === 0 ? (
+              <div className="p-4 text-xs text-muted-foreground italic text-center">
+                No files found
+              </div>
+            ) : (
+              sortedFiles.map((node) => (
+                <FileTreeNode
+                  key={node.path}
+                  node={node}
+                  onSelect={onSelectFile}
+                  selectedPath={selectedPath}
+                  projectRoot={projectRoot}
+                  onRefresh={onRefresh}
+                  onRequestCreate={openCreateDialog}
+                  gitStatusByPath={gitStatusByPath}
+                  folderChangesByPath={folderChangesByPath}
+                />
+              ))
+            )}
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={handleNewFileAtRoot}>
+            <FilePlus className="h-4 w-4 mr-2" /> New File
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={handleNewFolderAtRoot}>
+            <FolderPlus className="h-4 w-4 mr-2" /> New Folder
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <Dialog open={!!pendingCreate} onOpenChange={(open) => !open && closeCreateDialog()}>
+        <DialogContent
+          className="sm:max-w-md"
+          aria-describedby={undefined}
+          onPointerDownOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {pendingCreate?.type === "folder" ? "New Folder" : "New File"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              autoFocus
+              placeholder={pendingCreate?.type === "folder" ? "Folder name" : "File name"}
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateSubmit();
+                if (e.key === "Escape") closeCreateDialog();
+              }}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={closeCreateDialog}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleCreateSubmit} disabled={!newItemName.trim()}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
