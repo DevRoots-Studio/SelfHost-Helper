@@ -23,8 +23,12 @@ function findFreePort() {
  * Returns { url } or throws.
  */
 export async function startLspForProject(projectPath) {
-  if (projectPath && projectServers.has(projectPath)) {
-    const existing = projectServers.get(projectPath);
+  if (!projectPath || typeof projectPath !== "string" || !projectPath.trim()) {
+    throw new Error("Project path is required");
+  }
+  const normalizedPath = projectPath.trim();
+  if (projectServers.has(normalizedPath)) {
+    const existing = projectServers.get(normalizedPath);
     return { url: `ws://127.0.0.1:${existing.port}` };
   }
 
@@ -53,7 +57,7 @@ export async function startLspForProject(projectPath) {
   }
 
   const lspProcess = spawn(process.execPath, [cliPath, "--stdio"], {
-    cwd: projectPath,
+    cwd: normalizedPath,
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env },
     windowsHide: true,
@@ -96,15 +100,17 @@ export async function startLspForProject(projectPath) {
       } catch {}
     }
     wss.close();
-    projectServers.delete(projectPath);
+    projectServers.delete(normalizedPath);
   });
 
-  projectServers.set(projectPath, { wss, lspProcess, port });
+  projectServers.set(normalizedPath, { wss, lspProcess, port });
   return { url: `ws://127.0.0.1:${port}` };
 }
 
 export async function stopLspForProject(projectPath) {
-  const entry = projectServers.get(projectPath);
+  if (!projectPath || typeof projectPath !== "string") return;
+  const normalizedPath = projectPath.trim();
+  const entry = projectServers.get(normalizedPath);
   if (!entry) return;
   try {
     entry.lspProcess?.kill();
@@ -112,5 +118,5 @@ export async function stopLspForProject(projectPath) {
   try {
     entry.wss?.close();
   } catch {}
-  projectServers.delete(projectPath);
+  projectServers.delete(normalizedPath);
 }

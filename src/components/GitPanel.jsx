@@ -112,7 +112,7 @@ export default function GitPanel({ projectPath, isOpen, onClose, onRefreshFileTr
   const openOnGitHub = () => {
     if (!remoteUrl) return;
     let url = remoteUrl.replace(/^git@github\.com:/, "https://github.com/").replace(/\.git$/, "");
-    if (status?.current) url += `/tree/${status.current}`;
+    if (status?.currentBranch) url += `/tree/${status.currentBranch}`;
     API.openExternal(url);
   };
 
