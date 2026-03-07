@@ -7,7 +7,7 @@
 
 <em>Simplify local project hosting, process management, and tunneling</em>
 
-**v0.10.9**
+**v0.17.1**
 
 <!-- BADGES -->
 <img src="https://img.shields.io/github/license/DevRoots-Studio/SelfHost-Helper?style=flat&logo=opensourceinitiative&logoColor=white&color=0080ff" alt="license">
@@ -45,6 +45,7 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Recent updates](#recent-updates)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -79,20 +80,39 @@ This project aims to provide developers with a robust, all-in-one solution for m
 
 ---
 
+## Recent updates
+
+Recent development has expanded SelfHost-Helper into a full-featured local dev workspace:
+
+- **Editor & LSP:** Monaco editor with LSP bridge for in-app code editing and language support per project.
+- **Search:** Ripgrep-based project search (`SearchPanel`) with case-sensitive, whole-word, and glob options and JSON line results.
+- **Git:** Full Git integration via `simple-git` — status, diff, add, unstage, commit, push, pull, branches, checkout, clone, init, remotes — with a dedicated **Git** tab (`GitPanel`) in the UI.
+- **File system:** Create, delete, and rename files and folders; read/write files and directory listing; folder watcher for live updates; ignore patterns for trees and search.
+- **Multi-workspace:** Multiple projects with categories, drag-and-drop reorder, and bulk reorder; each project is a workspace root.
+- **Backup & restore:** Legacy SQLite migration with automatic backup; **Settings → Data & backup** to restore from a file or open the data folder; see `docs/RESTORE_FROM_BACKUP.md` for recovery steps.
+- **Error handling & logging:** Central `logger.js`, IPC handlers logging errors, and debug logging for key operations.
+
+The roadmap and phased plan (editor stability, cloud integration planning, app capability preparation) are tracked in **MyToDo.md**.
+
+---
+
 ## Features
 
-|     | Component         | Details                                                                                                                                                                                                                                                                                                                      |
-| :-- | :---------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ⚙️  | **Architecture**  | <ul><li>Modular Electron-based desktop app with React frontend</li><li>Uses Vite for build tooling</li><li>Separation of main and renderer processes</li></ul>                                                                                                                                                               |
-| 🔩  | **Code Quality**  | <ul><li>Consistent code style with ESLint and Prettier</li><li>Path aliases via jsconfig.json</li><li>Well-structured project with clear separation of concerns</li></ul>                                                                                                                                                    |
-| 📄  | **Documentation** | <ul><li>Includes Dockerfile for containerization</li><li>README provides setup and usage instructions</li><li>In-code comments and README sections for dependencies and build steps</li></ul>                                                                                                                                |
-| 🔌  | **Integrations**  | <ul><li>Electron, React, Tailwind CSS, Vite, Electron-builder</li><li>Jotai for state; Framer Motion for animations</li><li>Monaco Editor and xterm for code/terminal</li><li>Radix UI, react-router-dom, cloudflared (tunnels), lucide-react</li><li>SQLite3 and Sequelize; @hello-pangea/dnd for sidebar reorder</li></ul> |
-| 🌐  | **Tunneling**     | <ul><li>Cloudflare quick and authenticated tunnels via cloudflared</li><li>Dedicated tunnel tab and log viewer in the UI</li><li>Optional auto-start tunnel with project</li></ul>                                                                                                                                           |
-| 🧩  | **Modularity**    | <ul><li>Component-based React architecture</li><li>Electron main and renderer processes separated</li><li>Custom hooks and utility modules</li></ul>                                                                                                                                                                         |
-| 🧪  | **Testing**       | <ul><li>No automated test suite yet; ESLint used for code quality</li></ul>                                                                                                                                                                                                                                                  |
-| ⚡️  | **Performance**   | <ul><li>Uses `pidusage` for process monitoring</li><li>Optimized build with Vite, Tailwind CSS, and React Fast Refresh</li></ul>                                                                                                                                                                                             |
-| 🛡️  | **Security**      | <ul><li>Electron security best practices (e.g., context isolation)</li><li>Secret store for encrypted tokens (safeStorage)</li></ul>                                                                                                                                                                                         |
-| 📦  | **Dependencies**  | <ul><li>React, Tailwind CSS, Electron, SQLite3, Sequelize, cloudflared, Jotai, Framer Motion, Monaco, xterm</li><li>Dev: ESLint, Prettier, Docker, Vite, Radix UI</li></ul>                                                                                                                                                  |
+|     | Component            | Details                                                                                                                                                                                                                                                                                                                                                                                 |
+| :-- | :------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⚙️  | **Architecture**     | <ul><li>Modular Electron-based desktop app with React frontend</li><li>Uses Vite for build tooling</li><li>Separation of main and renderer processes</li></ul>                                                                                                                                                                                                                          |
+| 🔩  | **Code Quality**     | <ul><li>Consistent code style with ESLint and Prettier</li><li>Path aliases via jsconfig.json</li><li>Well-structured project with clear separation of concerns</li></ul>                                                                                                                                                                                                               |
+| 📄  | **Documentation**    | <ul><li>Includes Dockerfile for containerization</li><li>README provides setup and usage instructions</li><li>In-code comments and README sections for dependencies and build steps</li><li>MyToDo.md for roadmap and phased plan; RESTORE_FROM_BACKUP.md for backup recovery</li></ul>                                                                                                 |
+| 🔌  | **Integrations**     | <ul><li>Electron, React, Tailwind CSS, Vite, Electron-builder</li><li>Jotai for state; Framer Motion for animations</li><li>Monaco Editor (LSP bridge) and xterm for code/terminal</li><li>Radix UI, react-router-dom, cloudflared (tunnels), lucide-react</li><li>SQLite3 and Sequelize; @hello-pangea/dnd for sidebar reorder</li><li>simple-git, @vscode/ripgrep, chokidar</li></ul> |
+| 🔍  | **Search**           | <ul><li>Ripgrep-based project search with SearchPanel in the UI</li><li>Case-sensitive, whole-word, and glob options; JSON line results</li></ul>                                                                                                                                                                                                                                       |
+| 📂  | **Git**              | <ul><li>Full Git integration via simple-git: status, diff, add, unstage, commit, push, pull</li><li>Branches, checkout, clone, init, remotes (add/remove); dedicated GitPanel tab</li></ul>                                                                                                                                                                                             |
+| 💾  | **Backup & restore** | <ul><li>Legacy SQLite migration with automatic backup on upgrade</li><li>Settings → Data & backup: restore from file or open data folder</li><li>See docs/RESTORE_FROM_BACKUP.md for recovery</li></ul>                                                                                                                                                                                 |
+| 🌐  | **Tunneling**        | <ul><li>Cloudflare quick and authenticated tunnels via cloudflared</li><li>Dedicated tunnel tab and log viewer in the UI</li><li>Optional auto-start tunnel with project</li></ul>                                                                                                                                                                                                      |
+| 🧩  | **Modularity**       | <ul><li>Component-based React architecture</li><li>Electron main and renderer processes separated</li><li>Custom hooks and utility modules</li></ul>                                                                                                                                                                                                                                    |
+| 🧪  | **Testing**          | <ul><li>No automated test suite yet; ESLint used for code quality</li></ul>                                                                                                                                                                                                                                                                                                             |
+| ⚡️  | **Performance**      | <ul><li>Uses `pidusage` for process monitoring</li><li>Optimized build with Vite, Tailwind CSS, and React Fast Refresh</li></ul>                                                                                                                                                                                                                                                        |
+| 🛡️  | **Security**         | <ul><li>Electron security best practices (e.g., context isolation)</li><li>Secret store for encrypted tokens (safeStorage)</li></ul>                                                                                                                                                                                                                                                    |
+| 📦  | **Dependencies**     | <ul><li>React, Tailwind CSS, Electron, SQLite3, Sequelize, cloudflared, Jotai, Framer Motion, Monaco, xterm</li><li>Dev: ESLint, Prettier, Docker, Vite, Radix UI</li></ul>                                                                                                                                                                                                             |
 
 ---
 
@@ -106,6 +126,7 @@ This project aims to provide developers with a robust, all-in-one solution for m
     ├── README.md
     ├── RELEASE_NOTES_v0.7.0.md
     ├── TODO.md
+    ├── MyToDo.md
     ├── database
     │   └── models
     ├── electron
@@ -713,7 +734,7 @@ There is no automated test suite yet. Code quality is enforced via ESLint (and P
 
 ## Roadmap
 
-The project roadmap is maintained in **[TODO.md](TODO.md)**. It covers core features, UX/UI improvements, and system robustness. See that file for the current list of planned and completed items.
+The project roadmap and phased development plan are maintained in **[MyToDo.md](MyToDo.md)** (current plan, phases 1–4) and **[TODO.md](TODO.md)**. They cover core features, editor stability, cloud integration planning, and system robustness. See those files for the current list of planned and completed items.
 
 ---
 
