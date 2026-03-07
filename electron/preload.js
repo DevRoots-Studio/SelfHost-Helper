@@ -166,4 +166,9 @@ contextBridge.exposeInMainWorld("api", {
   getTunnelLogs: (id) => ipcRenderer.invoke("tunnel:getLogs", id),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   updateSettings: (settings) => ipcRenderer.invoke("settings:update", settings),
+  getUserDataPath: () => ipcRenderer.invoke("database:getUserDataPath"),
+  listLegacyBackupCandidates: () => ipcRenderer.invoke("database:listLegacyBackupCandidates"),
+  restoreFromLegacyBackup: (filePath, replaceExisting) =>
+    ipcRenderer.invoke("database:restoreFromLegacyBackup", filePath, replaceExisting),
+  openBackupFileDialog: () => ipcRenderer.invoke("dialog:openBackupFile"),
 });

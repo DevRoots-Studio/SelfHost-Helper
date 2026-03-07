@@ -1189,6 +1189,18 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
             isCollapsed ? "p-3 space-y-3 flex flex-col items-center" : "p-4 space-y-2"
           )}
         >
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full shrink-0 gap-2",
+              isCollapsed ? "w-10 h-10 p-0 justify-center" : "justify-start"
+            )}
+            onClick={() => navigate("/settings")}
+            title="App Settings"
+          >
+            <Settings className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
+          </Button>
           <AnimatePresence mode="wait">
             {isCollapsed ? (
               <motion.div

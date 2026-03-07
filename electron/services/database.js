@@ -54,9 +54,21 @@ export const initializeDatabase = async () => {
 
 /**
  * Normalize a raw Project row from legacy SQLite (which may lack newer columns)
- * to the shape expected by the app, with model defaults for missing fields.
+ * to the shape expected by the app. Preserves every character of original data:
+ * - env: if valid JSON, parsed object; if invalid, raw string kept so nothing is lost.
+ * - All other fields use row value when present, defaults only for missing.
  */
 function normalizeProjectRow(row) {
+  const parseJsonOrPreserveRaw = (val, fallback) => {
+    if (val == null || val === "") return fallback;
+    if (typeof val === "object") return val;
+    try {
+      return JSON.parse(val);
+    } catch {
+      // Preserve raw string so we don't lose a single character (legacy/corrupted env)
+      return val;
+    }
+  };
   const parseJson = (val, fallback) => {
     if (val == null || val === "") return fallback;
     if (typeof val === "object") return val;
@@ -72,7 +84,7 @@ function normalizeProjectRow(row) {
     path: row.path ?? "",
     script: row.script ?? "npm start",
     autoStart: Boolean(row.autoStart ?? false),
-    env: parseJson(row.env, {}),
+    env: parseJsonOrPreserveRaw(row.env, {}),
     pid: row.pid ?? null,
     type: row.type ?? "node",
     description: row.description ?? null,
@@ -101,42 +113,83 @@ function normalizeCategoryRow(row) {
   };
 }
 
+const LEGACY_TABLE_NAMES = ["Categories", "Projects", "Project"];
+
 /**
- * Migration helper: read legacy SQLite with raw SQL (no model schema assumption),
- * then write normalized rows to st.db and backup the SQLite file.
+ * Try to read all rows from a SQLite table. Returns [] if the table does not exist
+ * (e.g. legacy DB with only Projects, no Categories). Used so we never skip migration
+ * when the old DB has only one table. Table name is whitelisted for safety.
+ */
+async function safeSelectAll(sequelize, tableName, QueryTypes) {
+  if (!LEGACY_TABLE_NAMES.includes(tableName)) {
+    return [];
+  }
+  try {
+    const rows = await sequelize.query(`SELECT * FROM ${tableName}`, {
+      type: QueryTypes.SELECT,
+    });
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    const msg = err?.message ?? String(err);
+    if (
+      msg.includes("no such table") ||
+      msg.includes("does not exist") ||
+      msg.toLowerCase().includes("sqlite_error")
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+/**
+ * Read legacy SQLite file and return normalized categories and projects.
+ * Does not rename or modify the file. Used by both startup migration and restore.
+ */
+async function readLegacySQLite(sqlitePath) {
+  const { Sequelize, QueryTypes } = await import("sequelize");
+  const tempSequelize = new Sequelize({
+    dialect: "sqlite",
+    storage: sqlitePath,
+    logging: false,
+  });
+
+  let categories = await safeSelectAll(tempSequelize, "Categories", QueryTypes);
+  let projects = await safeSelectAll(tempSequelize, "Projects", QueryTypes);
+  if (projects.length === 0) {
+    projects = await safeSelectAll(tempSequelize, "Project", QueryTypes);
+    if (projects.length > 0) {
+      logger.info("[Migration] Read projects from legacy 'Project' table (singular).");
+    }
+  }
+
+  await tempSequelize.close();
+  return {
+    categories: categories.map((row) => normalizeCategoryRow(row)),
+    projects: projects.map((row) => normalizeProjectRow(row)),
+  };
+}
+
+/**
+ * Migration helper: read legacy SQLite with raw SQL (no model schema assumption).
+ * Supports very old DBs that have only the Projects table (no Categories).
+ * Tries "Projects" then "Project" for project table name. Preserves every character
+ * of data; then writes normalized rows to st.db and backs up the SQLite file.
  */
 async function migrateFromSQLite(sqlitePath) {
   try {
-    const { Sequelize, QueryTypes } = await import("sequelize");
-    const tempSequelize = new Sequelize({
-      dialect: "sqlite",
-      storage: sqlitePath,
-      logging: false,
-    });
-
     let categories = [];
     let projects = [];
 
     try {
-      categories = await tempSequelize.query("SELECT * FROM Categories", {
-        type: QueryTypes.SELECT,
-      });
-      projects = await tempSequelize.query("SELECT * FROM Projects", {
-        type: QueryTypes.SELECT,
-      });
+      const result = await readLegacySQLite(sqlitePath);
+      categories = result.categories;
+      projects = result.projects;
     } catch (queryErr) {
       logger.warn(
-        "[Migration] Raw read failed (e.g. missing table). Skipping migration:",
+        "[Migration] Raw read failed. Skipping migration:",
         queryErr?.message ?? queryErr
       );
-      try {
-        await tempSequelize.close();
-      } catch (closeErr) {
-        logger.warn(
-          "[Migration] Failed to close SQLite connection during skip:",
-          closeErr?.message ?? closeErr
-        );
-      }
       const backupPath = sqlitePath + ".backup_skip_" + Date.now();
       await fs.promises.rename(sqlitePath, backupPath);
       return;
@@ -148,27 +201,20 @@ async function migrateFromSQLite(sqlitePath) {
       );
 
       for (const row of categories) {
-        const data = normalizeCategoryRow(row);
-        if (!(await categoryTable.has(data.id.toString()))) {
-          await categoryTable.set(data.id.toString(), data);
+        if (!(await categoryTable.has(row.id.toString()))) {
+          await categoryTable.set(row.id.toString(), row);
         }
       }
 
       for (const row of projects) {
-        const data = normalizeProjectRow(row);
-        if (!(await projectTable.has(data.id.toString()))) {
-          await projectTable.set(data.id.toString(), data);
+        if (!(await projectTable.has(row.id.toString()))) {
+          await projectTable.set(row.id.toString(), row);
         }
       }
 
       logger.info("[Migration] Data migration to st.db complete.");
     }
 
-    // Close the connection before renaming to avoid EBUSY
-    await tempSequelize.close();
-    logger.info("[Migration] SQLite connection closed.");
-
-    // Rename sqlite file to backup so we don't migrate again
     const backupPath =
       categories.length > 0 || projects.length > 0
         ? sqlitePath + ".backup_" + Date.now()
@@ -184,12 +230,21 @@ async function migrateFromSQLite(sqlitePath) {
 // ---------------- Helper Methods ----------------
 // Note: until initializeDatabase() completes, methods return []/null/false defaults.
 
+/** Ensure env is always an object for the UI; preserve raw string as __raw so no data is lost. */
+function normalizeEnvForOutput(env) {
+  if (env == null) return {};
+  if (typeof env === "object" && !Array.isArray(env)) return env;
+  if (typeof env === "string") return { __raw: env };
+  return {};
+}
+
 export const getProjects = async () => {
   if (!projectTable) return [];
   const entries = await projectTable.all();
   return entries
     .map((e) => {
       const data = { ...e.data };
+      data.env = normalizeEnvForOutput(data.env);
       if (data.encryptedTunnelToken) {
         data.encryptedTunnelToken = decryptSecret(data.encryptedTunnelToken);
       }
@@ -204,6 +259,7 @@ export const getProjectById = async (id) => {
   if (!storedData) return null;
 
   const data = { ...storedData };
+  data.env = normalizeEnvForOutput(data.env);
   if (data && data.encryptedTunnelToken) {
     data.encryptedTunnelToken = decryptSecret(data.encryptedTunnelToken);
   }
@@ -410,4 +466,85 @@ export const reorderCategories = async (orders) => {
     }
   }
   return true;
+};
+
+// ---------------- Restore from backup (for users who lost data before migration) ----------------
+
+/** Returns the app userData path where data.json and legacy backups live. */
+export const getUserDataPath = () => {
+  return app.getPath("userData");
+};
+
+/**
+ * List files in userData that look like legacy SQLite DBs or backups,
+ * so the user can pick one to restore. Includes projects.sqlite and projects.sqlite.backup_*
+ */
+export const listLegacyBackupCandidates = async () => {
+  const userDataPath = getUserDataPath();
+  try {
+    const names = await fs.promises.readdir(userDataPath);
+    const candidates = names.filter(
+      (n) =>
+        n === "projects.sqlite" ||
+        n === "projects-dev.sqlite" ||
+        (n.startsWith("projects") && (n.endsWith(".sqlite") || n.includes(".sqlite.backup")))
+    );
+    return candidates.map((name) => ({
+      name,
+      path: path.join(userDataPath, name),
+    }));
+  } catch (err) {
+    logger.warn("[Database] listLegacyBackupCandidates failed:", err?.message ?? err);
+    return [];
+  }
+};
+
+/**
+ * Restore projects and categories from a legacy SQLite or backup file.
+ * @param {string} filePath - Full path to the .sqlite or backup file
+ * @param {boolean} replaceExisting - If true, clear current projects/categories first
+ * @returns {{ restored: { projects: number, categories: number }, error?: string }}
+ */
+export const restoreFromLegacyBackup = async (filePath, replaceExisting = true) => {
+  if (!projectTable || !categoryTable) {
+    return { restored: { projects: 0, categories: 0 }, error: "Database not initialized." };
+  }
+
+  const normalizedPath = path.normalize(path.resolve(filePath));
+  if (!fs.existsSync(normalizedPath)) {
+    return { restored: { projects: 0, categories: 0 }, error: "File not found." };
+  }
+
+  try {
+    const { categories, projects } = await readLegacySQLite(normalizedPath);
+
+    if (replaceExisting) {
+      const projectEntries = await projectTable.all();
+      for (const e of projectEntries) {
+        const key = e.id ?? e.key ?? (e.data && String(e.data.id));
+        if (key != null) await projectTable.delete(String(key));
+      }
+      const categoryEntries = await categoryTable.all();
+      for (const e of categoryEntries) {
+        const key = e.id ?? e.key ?? (e.data && String(e.data.id));
+        if (key != null) await categoryTable.delete(String(key));
+      }
+    }
+
+    for (const row of categories) {
+      await categoryTable.set(row.id.toString(), row);
+    }
+    for (const row of projects) {
+      await projectTable.set(row.id.toString(), row);
+    }
+
+    logger.info(
+      `[Database] Restore complete: ${projects.length} projects, ${categories.length} categories.`
+    );
+    return { restored: { projects: projects.length, categories: categories.length } };
+  } catch (err) {
+    const message = err?.message ?? String(err);
+    logger.error("[Database] restoreFromLegacyBackup failed:", err);
+    return { restored: { projects: 0, categories: 0 }, error: message };
+  }
 };

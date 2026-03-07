@@ -35,9 +35,6 @@ export const initProjectModel = (sequelize) => {
           try {
             return JSON.parse(rawValue);
           } catch (e) {
-            // If the stored value is corrupted, return an empty object and log a warning
-            // This prevents the app from throwing when reading malformed env data
-            // during runtime while preserving the raw value in the DB.
             console.warn(`Project.env contains invalid JSON for project id=${this.id}:`, e);
             return {};
           }
