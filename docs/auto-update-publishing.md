@@ -2,6 +2,39 @@
 
 The app uses **electron-updater** with GitHub releases. To avoid 404 errors when users click "Check for updates", releases must follow this format.
 
+## 0. GitHub token (required for publish)
+
+electron-builder needs a **GitHub Personal Access Token** to create/update releases and upload assets. Without it you get:
+
+`GitHub Personal Access Token is not set, neither programmatically, nor using env "GH_TOKEN"`
+
+**Steps:**
+
+1. **Create a token**  
+   GitHub → Settings → Developer settings → Personal access tokens → Generate new token (classic).  
+   Enable scope **`repo`** (full control of private repositories).
+
+2. **Set the token when publishing** (PowerShell):
+
+   ```powershell
+   $env:GH_TOKEN = "ghp_your_token_here"
+   npx electron-builder --publish always
+   ```
+
+   Or in one line (replace with your token):
+
+   ```powershell
+   $env:GH_TOKEN = "ghp_xxxx"; npx electron-builder --publish always
+   ```
+
+   On bash/macOS/Linux:
+
+   ```bash
+   GH_TOKEN=ghp_your_token_here npx electron-builder --publish always
+   ```
+
+   You can also set `GH_TOKEN` in your environment or in a `.env` file that you load before running (do not commit the token).
+
 ## 1. Release tag format
 
 - Tag must be **`v` + version** (e.g. `v0.8.0`), not `0.8.0v` or `0.8.0`.
@@ -22,18 +55,21 @@ These are created and uploaded automatically when you **publish with electron-bu
 
 ## 3. How to publish correctly
 
-1. Set `version` in `package.json` (e.g. `0.8.0`).
-2. Build and publish to GitHub in one go:
+1. Set `version` in `package.json` (e.g. `0.18.1`).
+2. Set **`GH_TOKEN`** (see section 0 above).
+3. Build and publish:
 
    ```bash
    npm run build
    npx electron-builder --publish always
    ```
 
-   Or use a script that runs `electron-builder` with a publish option (`always`, `onTag`, etc.).
+   With token in PowerShell:
 
-3. Ensure **GitHub token** is set so electron-builder can create the release and upload assets:
-   - `GH_TOKEN` or `GITHUB_TOKEN` with `repo` scope.
+   ```powershell
+   npm run build
+   $env:GH_TOKEN = "ghp_your_token"; npx electron-builder --publish always
+   ```
 
 electron-builder will:
 
