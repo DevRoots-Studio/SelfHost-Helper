@@ -11,6 +11,7 @@ import {
   Download,
   RefreshCw,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,14 @@ const UPDATE_STATUS_DOWNLOADING = "downloading";
 const UPDATE_STATUS_DOWNLOADED = "downloaded";
 const UPDATE_STATUS_ERROR = "error";
 
+/**
+ * Render the main application Settings page for managing general preferences, data & backups,
+ * portable runtimes (Node & Python), and application updates.
+ *
+ * Provides UI and state handling for auto-launch, log clearing, restore from backups, listing and
+ * installing/uninstalling portable runtimes, update checks/installation, and displays app info.
+ * @returns {JSX.Element} The rendered Settings page component.
+ */
 export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
@@ -39,12 +48,67 @@ export default function Settings() {
   const [releaseNotes, setReleaseNotes] = useState("");
   const unsubUpdaterRef = useRef(null);
 
+  const [installedNodeRuntimes, setInstalledNodeRuntimes] = useState([]);
+  const [installedPythonRuntimes, setInstalledPythonRuntimes] = useState([]);
+  const [availableNodeVersions, setAvailableNodeVersions] = useState([]);
+  const [availablePythonVersions, setAvailablePythonVersions] = useState([]);
+  const [availableVersionsLoaded, setAvailableVersionsLoaded] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [runtimeInstallLoading, setRuntimeInstallLoading] = useState(false);
+  const [runtimeInstallProgress, setRuntimeInstallProgress] = useState(null);
+  const [runtimeInstallError, setRuntimeInstallError] = useState("");
+  /** { type: 'node'|'python', versionId: string } when an install is in progress */
+  const [installingRuntime, setInstallingRuntime] = useState(null);
+
   useEffect(() => {
     loadSettings();
     loadAutoLaunchStatus();
     loadAppVersion();
     loadBackupInfo();
+    loadRuntimesAndProjects();
   }, []);
+
+  const loadRuntimesAndProjects = async () => {
+    try {
+      if (API.runtimeListInstalled) {
+        const [nodeList, pythonList] = await Promise.all([
+          API.runtimeListInstalled("node"),
+          API.runtimeListInstalled("python"),
+        ]);
+        setInstalledNodeRuntimes(Array.isArray(nodeList) ? nodeList : []);
+        setInstalledPythonRuntimes(Array.isArray(pythonList) ? pythonList : []);
+      }
+      if (API.getProjects) {
+        const list = await API.getProjects();
+        setProjects(Array.isArray(list) ? list : []);
+      }
+      if (window.api?.runtimeListAvailable) {
+        const [nodeAvail, pythonAvail] = await Promise.allSettled([
+          window.api.runtimeListAvailable("node"),
+          window.api.runtimeListAvailable("python"),
+        ]);
+        const toArray = (v) => {
+          if (Array.isArray(v)) return v;
+          if (v && typeof v === "object" && typeof v.length === "number") return Array.from(v);
+          return [];
+        };
+        setAvailableNodeVersions(nodeAvail.status === "fulfilled" ? toArray(nodeAvail.value) : []);
+        setAvailablePythonVersions(
+          pythonAvail.status === "fulfilled" ? toArray(pythonAvail.value) : []
+        );
+        if (nodeAvail.status === "rejected")
+          console.error("Failed to load Node versions", nodeAvail.reason);
+        if (pythonAvail.status === "rejected")
+          console.error("Failed to load Python versions", pythonAvail.reason);
+      }
+    } catch (e) {
+      console.error("Failed to load runtimes/projects", e);
+      setAvailableNodeVersions([]);
+      setAvailablePythonVersions([]);
+    } finally {
+      setAvailableVersionsLoaded(true);
+    }
+  };
 
   useEffect(() => {
     const syncUpdateStatus = async () => {
@@ -67,6 +131,33 @@ export default function Settings() {
     });
     return () => {
       if (typeof unsubUpdaterRef.current === "function") unsubUpdaterRef.current();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!API.onRuntimeProgress) return;
+    const unsub = API.onRuntimeProgress((payload) => {
+      if (payload?.phase === "done") {
+        setRuntimeInstallProgress(null);
+        setRuntimeInstallLoading(false);
+        setInstallingRuntime(null);
+        setRuntimeInstallError("");
+        loadRuntimesAndProjects();
+        toast.success("Runtime installed successfully");
+      } else if (payload?.phase === "error") {
+        setRuntimeInstallError(payload?.error ?? "Install failed");
+        setRuntimeInstallProgress(null);
+        setRuntimeInstallLoading(false);
+        setInstallingRuntime(null);
+        toast.error(payload?.error ?? "Install failed");
+      } else if (payload?.phase === "download" && payload?.percent != null) {
+        setRuntimeInstallProgress({ phase: "download", percent: payload.percent });
+      } else if (payload?.phase === "extract") {
+        setRuntimeInstallProgress({ phase: "extract", percent: 50 });
+      }
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
     };
   }, []);
 
@@ -193,6 +284,56 @@ export default function Settings() {
 
   const handleRestartToApply = () => {
     API.restartToApplyUpdate?.();
+  };
+
+  const handleInstallRuntime = async (type, versionId) => {
+    if (!versionId?.trim()) return;
+    setRuntimeInstallLoading(true);
+    setRuntimeInstallError("");
+    setInstallingRuntime({ type, versionId: versionId.trim() });
+    setRuntimeInstallProgress({ phase: "download", percent: 0 });
+    try {
+      await API.runtimeInstall?.(type, versionId.trim());
+    } catch (e) {
+      setRuntimeInstallError(e?.message ?? "Install failed");
+      setRuntimeInstallProgress(null);
+      setRuntimeInstallLoading(false);
+      setInstallingRuntime(null);
+      toast.error(e?.message ?? "Install failed");
+    }
+  };
+
+  const isNodeVersionInstalled = (id) =>
+    installedNodeRuntimes.some((r) => r.id === id || r.version === id);
+  const isPythonVersionInstalled = (id) =>
+    installedPythonRuntimes.some((r) => r.id === id || r.version === id);
+  const isInstalling = (type, versionId) =>
+    installingRuntime?.type === type && installingRuntime?.versionId === versionId;
+
+  const handleUninstallRuntime = async (type, id) => {
+    const usedBy = projects.filter(
+      (p) =>
+        (type === "node" && (p.nodeVersionId === id || p.nodeVersionId === id?.toString())) ||
+        (type === "python" && (p.pythonVersionId === id || p.pythonVersionId === id?.toString()))
+    );
+    const force = usedBy.length > 0;
+    if (force) {
+      const names = usedBy.map((p) => p.name).join(", ");
+      if (
+        !confirm(
+          `This version is used by: ${names}. Remove anyway? Those projects will use system PATH until you pick another version.`
+        )
+      ) {
+        return;
+      }
+    }
+    try {
+      await API.runtimeUninstall?.(type, id, force);
+      toast.success("Runtime removed");
+      loadRuntimesAndProjects();
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to remove");
+    }
   };
 
   const renderReleaseNotes = (notes) => {
@@ -331,6 +472,259 @@ export default function Settings() {
             )}
           </div>
         </section>
+
+        {/* Portable runtimes (Node & Python) */}
+        {API.runtimeListInstalled && (
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold border-b border-white/10 pb-2">
+              Portable runtimes (Node &amp; Python)
+            </h2>
+            <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Install portable Node.js or Python versions once and use them per project. Each
+                version is stored in your data folder and can be selected in project settings.
+              </p>
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Installed</Label>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Node.js</p>
+                    {installedNodeRuntimes.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No Node versions installed.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {installedNodeRuntimes.map((r) => {
+                          const usedBy = projects.filter(
+                            (p) => p.nodeVersionId === r.id || p.nodeVersionId === r.version
+                          );
+                          return (
+                            <li
+                              key={r.id}
+                              className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-black/20 border border-white/5"
+                            >
+                              <div className="min-w-0">
+                                <span className="font-medium">{r.version || r.id}</span>
+                                <p
+                                  className="text-xs text-muted-foreground truncate"
+                                  title={r.path}
+                                >
+                                  {r.path}
+                                </p>
+                                {usedBy.length > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Used by: {usedBy.map((p) => p.name).join(", ")}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUninstallRuntime("node", r.id)}
+                                className="gap-1 shrink-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Remove
+                              </Button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Python</p>
+                    {installedPythonRuntimes.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No Python versions installed.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {installedPythonRuntimes.map((r) => {
+                          const usedBy = projects.filter(
+                            (p) => p.pythonVersionId === r.id || p.pythonVersionId === r.version
+                          );
+                          return (
+                            <li
+                              key={r.id}
+                              className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-black/20 border border-white/5"
+                            >
+                              <div className="min-w-0">
+                                <span className="font-medium">{r.version || r.id}</span>
+                                <p
+                                  className="text-xs text-muted-foreground truncate"
+                                  title={r.path}
+                                >
+                                  {r.path}
+                                </p>
+                                {usedBy.length > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Used by: {usedBy.map((p) => p.name).join(", ")}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUninstallRuntime("python", r.id)}
+                                className="gap-1 shrink-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Remove
+                              </Button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-base font-semibold">
+                    Available versions (from official APIs)
+                  </Label>
+                  {availableVersionsLoaded && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setAvailableVersionsLoaded(false);
+                        loadRuntimesAndProjects();
+                      }}
+                      className="gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Retry
+                    </Button>
+                  )}
+                </div>
+                {runtimeInstallError && (
+                  <p className="text-sm text-destructive">{runtimeInstallError}</p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Node.js</p>
+                    <ul className="space-y-1 max-h-64 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
+                      {!availableVersionsLoaded ? (
+                        <li className="text-sm text-muted-foreground py-2">Loading…</li>
+                      ) : availableNodeVersions.length === 0 ? (
+                        <li className="text-sm text-muted-foreground py-2 flex items-center gap-2">
+                          No versions (check connection or retry)
+                        </li>
+                      ) : (
+                        availableNodeVersions.map((v) => {
+                          const id = v.id || v.version;
+                          const installed = isNodeVersionInstalled(id);
+                          const installing = isInstalling("node", id);
+                          return (
+                            <li
+                              key={id}
+                              className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-white/5"
+                            >
+                              <span className="font-mono text-sm truncate">{v.version || id}</span>
+                              {installed ? (
+                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
+                                  Installed
+                                </span>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 gap-1 shrink-0"
+                                  disabled={runtimeInstallLoading}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleInstallRuntime("node", id);
+                                  }}
+                                >
+                                  {installing ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      {runtimeInstallProgress?.percent != null
+                                        ? `${runtimeInstallProgress.percent}%`
+                                        : "…"}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="h-3 w-3" />
+                                      Install
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Python</p>
+                    <ul className="space-y-1 max-h-64 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
+                      {!availableVersionsLoaded ? (
+                        <li className="text-sm text-muted-foreground py-2">Loading…</li>
+                      ) : availablePythonVersions.length === 0 ? (
+                        <li className="text-sm text-muted-foreground py-2">
+                          No versions (check connection or retry)
+                        </li>
+                      ) : (
+                        availablePythonVersions.map((v) => {
+                          const id = v.id || v.version;
+                          const installed = isPythonVersionInstalled(id);
+                          const installing = isInstalling("python", id);
+                          return (
+                            <li
+                              key={id}
+                              className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-white/5"
+                            >
+                              <span className="font-mono text-sm truncate">{v.version || id}</span>
+                              {installed ? (
+                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
+                                  Installed
+                                </span>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 gap-1 shrink-0"
+                                  disabled={runtimeInstallLoading}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleInstallRuntime("python", id);
+                                  }}
+                                >
+                                  {installing ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      {runtimeInstallProgress?.percent != null
+                                        ? `${runtimeInstallProgress.percent}%`
+                                        : "…"}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="h-3 w-3" />
+                                      Install
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Updates */}
         <section className="space-y-4">

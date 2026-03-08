@@ -53,10 +53,16 @@ export const initializeDatabase = async () => {
 };
 
 /**
- * Normalize a raw Project row from legacy SQLite (which may lack newer columns)
- * to the shape expected by the app. Preserves every character of original data:
- * - env: if valid JSON, parsed object; if invalid, raw string kept so nothing is lost.
- * - All other fields use row value when present, defaults only for missing.
+ * Normalize a legacy project database row into the application's current project shape.
+ *
+ * Parses and normalizes fields that may be missing or stored in legacy formats:
+ * - `env`: if valid JSON, returns the parsed object; if invalid JSON, preserves the raw string; if null/empty, returns an empty object.
+ * - `tunnelConfig`: parsed as JSON when possible, otherwise falls back to `{}`.
+ * - Boolean-like fields are coerced to booleans and numeric/nullable fields default to sensible values when absent.
+ * Includes `nodeVersionId` and `pythonVersionId`, defaulting to `null` when missing.
+ *
+ * @param {object} row - Raw project row from the legacy SQLite database.
+ * @returns {object} Normalized project object with keys: `id`, `name`, `path`, `script`, `autoStart`, `env`, `pid`, `type`, `description`, `icon`, `order`, `uuid`, `categoryId`, `tunnelMode`, `tunnelPort`, `encryptedTunnelToken`, `tunnelConfig`, `autoStartTunnel`, `clearLogsBeforeStart`, `nodeVersionId`, and `pythonVersionId`.
  */
 function normalizeProjectRow(row) {
   const parseJsonOrPreserveRaw = (val, fallback) => {
@@ -98,6 +104,8 @@ function normalizeProjectRow(row) {
     tunnelConfig: parseJson(row.tunnelConfig, {}),
     autoStartTunnel: Boolean(row.autoStartTunnel ?? false),
     clearLogsBeforeStart: Boolean(row.clearLogsBeforeStart ?? false),
+    nodeVersionId: row.nodeVersionId ?? null,
+    pythonVersionId: row.pythonVersionId ?? null,
   };
 }
 
