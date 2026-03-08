@@ -50,6 +50,23 @@ async function fetchReleaseNotesFromGitHub(version, retries = 2) {
   return null;
 }
 
+function formatUpdateError(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== "string") return rawMessage;
+  const is404 = rawMessage.includes("404") || rawMessage.includes("Not Found");
+  const isLatestYml = rawMessage.includes("latest.yml");
+  if (is404 && isLatestYml) {
+    return (
+      "Update server returned 404 (latest.yml not found). " +
+      "Ensure the GitHub release tag is vX.Y.Z (e.g. v0.8.0, not 0.8.0v) and the release includes latest.yml and installer files. " +
+      "Publish with: npm run build && npx electron-builder --publish always"
+    );
+  }
+  if (is404) {
+    return "Update server returned 404. Check that a GitHub release exists with tag vX.Y.Z and contains latest.yml (publish with electron-builder --publish always).";
+  }
+  return rawMessage;
+}
+
 function getReleaseNotesFromUpdateInfo(updateInfo) {
   if (!updateInfo) return null;
   if (typeof updateInfo.releaseNotes === "string") return updateInfo.releaseNotes;
@@ -191,7 +208,8 @@ export async function checkForUpdates() {
     sendStatus({ status: "available", version: updateVersion, releaseNotes });
   } catch (err) {
     updateStatus = "error";
-    updateError = err?.message || String(err);
+    const raw = err?.message || String(err);
+    updateError = formatUpdateError(raw);
     sendStatus({ status: "error", error: updateError });
   }
 }
@@ -206,7 +224,8 @@ export function startInstall() {
   sendStatus({ status: "downloading" });
   autoUpdater.downloadUpdate().catch((err) => {
     updateStatus = "error";
-    updateError = err?.message || String(err);
+    const raw = err?.message || String(err);
+    updateError = formatUpdateError(raw);
     sendStatus({ status: "error", error: updateError });
   });
 }
