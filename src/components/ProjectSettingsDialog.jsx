@@ -118,7 +118,7 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !window.api?.onRuntimeProgress) return;
+    if (!window.api?.onRuntimeProgress || (!isOpen && !installingRuntime)) return;
     const unsub = window.api.onRuntimeProgress((payload) => {
       if (payload?.phase === "done" || payload?.phase === "error") {
         setInstallingRuntime(null);
@@ -133,7 +133,7 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
       }
     });
     return () => (typeof unsub === "function" ? unsub() : undefined);
-  }, [isOpen]);
+  }, [isOpen, installingRuntime]);
 
   const handleBrowsePath = async () => {
     const selectedPath = await window.api.selectDirectory();

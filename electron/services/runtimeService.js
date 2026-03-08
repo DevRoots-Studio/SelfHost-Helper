@@ -57,7 +57,18 @@ function rebuildIndexFromFilesystem() {
 
 function readIndex() {
   const indexPath = getIndexPath();
-  if (!fs.existsSync(indexPath)) return [];
+
+  if (!fs.existsSync(indexPath)) {
+    const rebuilt = rebuildIndexFromFilesystem();
+    if (rebuilt.length > 0) {
+      writeIndex(rebuilt);
+      logger.info(
+        "[RuntimeService] Rebuilt missing runtimes index from filesystem:",
+        rebuilt.length
+      );
+    }
+    return rebuilt;
+  }
   try {
     const raw = fs.readFileSync(indexPath, "utf8");
     const data = JSON.parse(raw);
@@ -497,13 +508,17 @@ export async function uninstallRuntime(type, id, options = {}) {
   const entries = readIndex();
   const entry = entries.find((e) => e.type === type && (e.id === id || e.version === id));
   if (!entry) return { success: false, error: "Runtime not found." };
-
+  const matchesEntry = (value) => {
+    if (value == null) return false;
+    const str = value.toString();
+    return str === entry.id || str === entry.version;
+  };
   if (!force) {
     const projects = await getProjects();
     const usedBy = projects.filter(
       (p) =>
-        (type === "node" && (p.nodeVersionId === id || p.nodeVersionId === id?.toString())) ||
-        (type === "python" && (p.pythonVersionId === id || p.pythonVersionId === id?.toString()))
+        (type === "node" && matchesEntry(p.nodeVersionId)) ||
+        (type === "python" && matchesEntry(p.pythonVersionId))
     );
     if (usedBy.length > 0) {
       const names = usedBy.map((p) => p.name).join(", ");
@@ -514,10 +529,10 @@ export async function uninstallRuntime(type, id, options = {}) {
     }
   } else {
     const projects = await getProjects();
-    const idStr = id?.toString();
+
     for (const p of projects) {
-      const clearNode = p.nodeVersionId === id || p.nodeVersionId === idStr;
-      const clearPython = p.pythonVersionId === id || p.pythonVersionId === idStr;
+      const clearNode = matchesEntry(p.nodeVersionId);
+      const clearPython = matchesEntry(p.pythonVersionId);
       if (clearNode || clearPython) {
         const patch = { id: p.id };
         if (clearNode) patch.nodeVersionId = null;
