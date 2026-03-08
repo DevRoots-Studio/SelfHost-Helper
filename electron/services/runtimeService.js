@@ -445,7 +445,13 @@ export async function installRuntime(type, versionId) {
               if (fs.statSync(src).isDirectory()) {
                 const subEntries = fs.readdirSync(src);
                 for (const subName of subEntries) {
-                  fs.renameSync(path.join(src, subName), path.join(dest, subName));
+                  const destSub = path.join(dest, subName);
+                  const destSubDir = path.dirname(destSub);
+                  if (!fs.existsSync(destSubDir)) {
+                    fs.mkdirSync(destSubDir, { recursive: true });
+                  }
+
+                  fs.renameSync(path.join(src, subName), destSub);
                 }
                 fs.rmdirSync(src);
               } else {

@@ -151,7 +151,11 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
 
   const handleInstallRuntime = (type, versionId) => {
     setInstallingRuntime({ type, versionId });
-    window.api?.runtimeInstall?.(type, versionId)?.catch(() => setInstallingRuntime(null));
+    window.api?.runtimeInstall?.(type, versionId)?.catch((err) => {
+      setInstallingRuntime(null);
+      console.error("Runtime install failed:", err);
+      toast.error(err?.message ?? "Install failed");
+    });
   };
   const isInstalling = (type, id) =>
     installingRuntime?.type === type && installingRuntime?.versionId === id;
