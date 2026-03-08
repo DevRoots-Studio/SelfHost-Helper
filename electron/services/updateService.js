@@ -50,6 +50,38 @@ async function fetchReleaseNotesFromGitHub(version, retries = 2) {
   return null;
 }
 
+const UPDATE_METADATA_FILES = ["latest.yml", "latest-mac.yml", "latest-linux.yml"];
+
+function getMetadataFilenameForPlatform() {
+  switch (process.platform) {
+    case "darwin":
+      return "latest-mac.yml";
+    case "linux":
+      return "latest-linux.yml";
+    default:
+      return "latest.yml";
+  }
+}
+
+function formatUpdateError(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== "string") return rawMessage;
+  const is404 = rawMessage.includes("404") || rawMessage.includes("Not Found");
+  const isMetadataFile404 =
+    is404 && UPDATE_METADATA_FILES.some((name) => rawMessage.includes(name));
+  const metadataFile = getMetadataFilenameForPlatform();
+  if (isMetadataFile404) {
+    return (
+      `Update server returned 404 (${metadataFile} not found). ` +
+      `Ensure the GitHub release tag is vX.Y.Z (e.g. v0.8.0, not 0.8.0v) and the release includes ${metadataFile} and installer files. ` +
+      "Publish with: npm run build && npx electron-builder --publish always"
+    );
+  }
+  if (is404) {
+    return `Update server returned 404. Check that a GitHub release exists with tag vX.Y.Z and contains the update metadata file (e.g. ${metadataFile}) (publish with electron-builder --publish always).`;
+  }
+  return rawMessage;
+}
+
 function getReleaseNotesFromUpdateInfo(updateInfo) {
   if (!updateInfo) return null;
   if (typeof updateInfo.releaseNotes === "string") return updateInfo.releaseNotes;
@@ -147,7 +179,7 @@ export async function initUpdateService() {
 
     autoUpdater.on("error", (err) => {
       updateStatus = "error";
-      updateError = err?.message || String(err);
+      updateError = formatUpdateError(err?.message || String(err));
       logger.error("[UpdateService] Error:", err);
       sendStatus({ status: "error", error: updateError });
     });
@@ -191,7 +223,8 @@ export async function checkForUpdates() {
     sendStatus({ status: "available", version: updateVersion, releaseNotes });
   } catch (err) {
     updateStatus = "error";
-    updateError = err?.message || String(err);
+    const raw = err?.message || String(err);
+    updateError = formatUpdateError(raw);
     sendStatus({ status: "error", error: updateError });
   }
 }
@@ -206,7 +239,8 @@ export function startInstall() {
   sendStatus({ status: "downloading" });
   autoUpdater.downloadUpdate().catch((err) => {
     updateStatus = "error";
-    updateError = err?.message || String(err);
+    const raw = err?.message || String(err);
+    updateError = formatUpdateError(raw);
     sendStatus({ status: "error", error: updateError });
   });
 }
