@@ -13,6 +13,7 @@ const allowedListenerChannels = [
   "window:unmaximize",
   "app:shutting-down",
   "updater:status",
+  "runtime:progress",
 ];
 
 const removeAllListeners = (channel) => {
@@ -181,5 +182,17 @@ contextBridge.exposeInMainWorld("api", {
     const subscription = (_, payload) => callback(payload);
     ipcRenderer.on("updater:status", subscription);
     return () => ipcRenderer.removeListener("updater:status", subscription);
+  },
+
+  runtimeListAvailable: (type) => ipcRenderer.invoke("runtime:listAvailable", type),
+  runtimeListInstalled: (type) => ipcRenderer.invoke("runtime:listInstalled", type),
+  runtimeInstall: (type, versionId) => ipcRenderer.invoke("runtime:install", type, versionId),
+  runtimeUninstall: (type, id, force = false) =>
+    ipcRenderer.invoke("runtime:uninstall", type, id, force),
+  runtimeGetPath: (type, id) => ipcRenderer.invoke("runtime:getPath", type, id),
+  onRuntimeProgress: (callback) => {
+    const subscription = (_, payload) => callback(payload);
+    ipcRenderer.on("runtime:progress", subscription);
+    return () => ipcRenderer.removeListener("runtime:progress", subscription);
   },
 });

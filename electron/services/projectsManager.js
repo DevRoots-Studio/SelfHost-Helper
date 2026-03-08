@@ -9,6 +9,11 @@ import { createJob, assignPid } from "../job/index.js";
 import logger from "./logger.js";
 import os from "os";
 import settingsService from "./settingsService.js";
+import {
+  getRuntimePath,
+  getRuntimeDir,
+  quotePath,
+} from "./runtimeService.js";
 
 const numCPUs = os.cpus().length;
 
@@ -225,11 +230,37 @@ export const startProject = async (id) => {
     return { success: false, message: "Already running" };
   }
 
+  let nodePath = "node";
+  if (project.nodeVersionId) {
+    const p = getRuntimePath("node", project.nodeVersionId);
+    if (!p) {
+      return {
+        success: false,
+        message: "Selected Node version is not installed. Install it in Settings → Portable runtimes.",
+      };
+    }
+    nodePath = p;
+  }
+  let pythonPath = "python";
+  if (project.pythonVersionId) {
+    const p = getRuntimePath("python", project.pythonVersionId);
+    if (!p) {
+      return {
+        success: false,
+        message: "Selected Python version is not installed. Install it in Settings → Portable runtimes.",
+      };
+    }
+    pythonPath = p;
+  }
+
   const commandStr = project.script || "npm start";
-  const resolvedScript = resolveNpmScript(project.path, commandStr);
+  const resolvedCommand = commandStr
+    .replace(/\{\{node\}\}/g, quotePath(nodePath))
+    .replace(/\{\{python\}\}/g, quotePath(pythonPath));
+  const resolvedScript = resolveNpmScript(project.path, resolvedCommand);
 
   logger.info(
-    `Starting project ${id}: ${commandStr} (resolved: ${resolvedScript}) in ${project.path}`
+    `Starting project ${id}: ${resolvedCommand} (resolved: ${resolvedScript}) in ${project.path}`
   );
 
   // Safety: check if there's an existing process tree for this project already
@@ -262,19 +293,33 @@ export const startProject = async (id) => {
     clearProjectLogs(id);
   }
 
+  const pathDirs = [];
+  if (project.nodeVersionId) {
+    const nodeDir = getRuntimeDir("node", project.nodeVersionId);
+    if (nodeDir) pathDirs.push(nodeDir);
+  }
+  if (project.pythonVersionId) {
+    const pythonDir = getRuntimeDir("python", project.pythonVersionId);
+    if (pythonDir) pathDirs.push(pythonDir);
+  }
+  const baseEnv = {
+    ...process.env,
+    ...project.env,
+    TERM: "xterm-256color",
+    COLORTERM: "truecolor",
+    FORCE_COLOR: "1",
+    NPM_CONFIG_COLOR: "always",
+  };
+  if (pathDirs.length > 0) {
+    baseEnv.PATH = pathDirs.join(path.delimiter) + path.delimiter + (baseEnv.PATH || process.env.PATH || "");
+  }
+
   try {
-    const child = spawn(commandStr, {
+    const child = spawn(resolvedCommand, {
       cwd: project.path,
       shell: true,
       stdio: ["pipe", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        ...project.env,
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-        FORCE_COLOR: "1",
-        NPM_CONFIG_COLOR: "always",
-      },
+      env: baseEnv,
       detached: process.platform !== "win32",
     });
 

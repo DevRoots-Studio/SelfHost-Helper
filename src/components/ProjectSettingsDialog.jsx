@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FolderOpen, Loader2, Image as ImageIcon, Trash2 } from "lucide-react";
+import { FolderOpen, Loader2, Image as ImageIcon, Trash2, Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -45,6 +45,8 @@ const PROJECT_TYPES = [
   { value: "other", label: "Other", script: "" },
 ];
 
+const NODE_PROJECT_TYPES = ["node", "nodejs", "react", "vue", "static", "discord"];
+
 export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave, onDelete }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -55,10 +57,17 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
     description: "",
     icon: "",
     clearLogsBeforeStart: false,
+    nodeVersionId: null,
+    pythonVersionId: null,
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [iconPreview, setIconPreview] = useState(formData.icon);
+  const [installedNodeRuntimes, setInstalledNodeRuntimes] = useState([]);
+  const [installedPythonRuntimes, setInstalledPythonRuntimes] = useState([]);
+  const [availableNodeVersions, setAvailableNodeVersions] = useState([]);
+  const [availablePythonVersions, setAvailablePythonVersions] = useState([]);
+  const [installingRuntime, setInstallingRuntime] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -69,18 +78,62 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
 
   useEffect(() => {
     if (project) {
+      const type = project.type || "node";
       setFormData({
         name: project.name || "",
         path: project.path || "",
         script: project.script || "npm start",
         autoStart: project.autoStart || false,
-        type: project.type || "node",
+        type,
         description: project.description || "",
         icon: project.icon || "",
         clearLogsBeforeStart: project.clearLogsBeforeStart || false,
+        nodeVersionId: NODE_PROJECT_TYPES.includes(type) ? (project.nodeVersionId ?? null) : null,
+        pythonVersionId: type === "python" ? (project.pythonVersionId ?? null) : null,
       });
     }
   }, [project]);
+
+  useEffect(() => {
+    if (isOpen && window.api?.runtimeListInstalled) {
+      window.api
+        .runtimeListInstalled("node")
+        .then(setInstalledNodeRuntimes)
+        .catch(() => setInstalledNodeRuntimes([]));
+      window.api
+        .runtimeListInstalled("python")
+        .then(setInstalledPythonRuntimes)
+        .catch(() => setInstalledPythonRuntimes([]));
+    }
+    if (isOpen && window.api?.runtimeListAvailable) {
+      window.api
+        .runtimeListAvailable("node")
+        .then(setAvailableNodeVersions)
+        .catch(() => setAvailableNodeVersions([]));
+      window.api
+        .runtimeListAvailable("python")
+        .then(setAvailablePythonVersions)
+        .catch(() => setAvailablePythonVersions([]));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!window.api?.onRuntimeProgress || (!isOpen && !installingRuntime)) return;
+    const unsub = window.api.onRuntimeProgress((payload) => {
+      if (payload?.phase === "done" || payload?.phase === "error") {
+        setInstallingRuntime(null);
+        window.api
+          .runtimeListInstalled("node")
+          .then(setInstalledNodeRuntimes)
+          .catch(() => {});
+        window.api
+          .runtimeListInstalled("python")
+          .then(setInstalledPythonRuntimes)
+          .catch(() => {});
+      }
+    });
+    return () => (typeof unsub === "function" ? unsub() : undefined);
+  }, [isOpen, installingRuntime]);
 
   const handleBrowsePath = async () => {
     const selectedPath = await window.api.selectDirectory();
@@ -95,6 +148,29 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
       setFormData((prev) => ({ ...prev, icon: selectedFile }));
     }
   };
+
+  const handleInstallRuntime = (type, versionId) => {
+    setInstallingRuntime({ type, versionId });
+    window.api?.runtimeInstall?.(type, versionId)?.catch((err) => {
+      setInstallingRuntime(null);
+      console.error("Runtime install failed:", err);
+      toast.error(err?.message ?? "Install failed");
+    });
+  };
+  const isInstalling = (type, id) =>
+    installingRuntime?.type === type && installingRuntime?.versionId === id;
+  const notInstalledNode = availableNodeVersions.filter(
+    (v) =>
+      !installedNodeRuntimes.some(
+        (r) => r.id === (v.id || v.version) || r.version === (v.id || v.version)
+      )
+  );
+  const notInstalledPython = availablePythonVersions.filter(
+    (v) =>
+      !installedPythonRuntimes.some(
+        (r) => r.id === (v.id || v.version) || r.version === (v.id || v.version)
+      )
+  );
 
   const MIN_LOADING_TIME = 600;
 
@@ -129,6 +205,7 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
   };
 
   const resetForm = () => {
+    const type = project?.type || "node";
     setFormData({
       name: project?.name || "",
       path: project?.path || "",
@@ -137,10 +214,12 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
         (project?.type && PROJECT_TYPES.find((t) => t.value === project.type)?.script) ||
         "npm start",
       autoStart: project?.autoStart || false,
-      type: project?.type || "node",
+      type,
       description: project?.description || "",
       icon: project?.icon || "",
       clearLogsBeforeStart: project?.clearLogsBeforeStart || false,
+      nodeVersionId: NODE_PROJECT_TYPES.includes(type) ? (project?.nodeVersionId ?? null) : null,
+      pythonVersionId: type === "python" ? (project?.pythonVersionId ?? null) : null,
     });
   };
 
@@ -193,6 +272,8 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
                       ...prev,
                       type: value,
                       script: value !== "other" && typeInfo ? typeInfo.script : prev.script,
+                      nodeVersionId: NODE_PROJECT_TYPES.includes(value) ? prev.nodeVersionId : null,
+                      pythonVersionId: value === "python" ? prev.pythonVersionId : null,
                     }));
                   }}
                 >
@@ -253,6 +334,141 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
               </div>
             </div>
 
+            {(NODE_PROJECT_TYPES.includes(formData.type) || formData.type === "python") && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {NODE_PROJECT_TYPES.includes(formData.type) && (
+                  <div className="space-y-2">
+                    <Label>Node version</Label>
+                    <Select
+                      value={formData.nodeVersionId ?? "__system__"}
+                      onValueChange={(v) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          nodeVersionId: v === "__system__" ? null : v,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="bg-background/50">
+                        <SelectValue placeholder="System (PATH)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__system__">System (PATH)</SelectItem>
+                        {installedNodeRuntimes.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            <span className="flex items-center justify-between gap-2 w-full">
+                              {r.version || r.id}
+                              <span className="text-xs text-green-600 dark:text-green-400">
+                                Installed
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {notInstalledNode.length > 0 && (
+                      <div className="text-xs text-muted-foreground space-y-1 mt-1">
+                        <p>Install another version:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {notInstalledNode.slice(0, 8).map((v) => {
+                            const id = v.id || v.version;
+                            const installing = isInstalling("node", id);
+                            return (
+                              <Button
+                                key={id}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-6 gap-1 text-xs"
+                                disabled={!!installingRuntime}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleInstallRuntime("node", id);
+                                }}
+                              >
+                                {installing ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                                {v.version || id}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {formData.type === "python" && (
+                  <div className="space-y-2">
+                    <Label>Python version</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Portable Python does not include pip; dependencies must be pre-installed or
+                      use system Python for pip.
+                    </p>
+                    <Select
+                      value={formData.pythonVersionId ?? "__system__"}
+                      onValueChange={(v) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          pythonVersionId: v === "__system__" ? null : v,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="bg-background/50">
+                        <SelectValue placeholder="System (PATH)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__system__">System (PATH)</SelectItem>
+                        {installedPythonRuntimes.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            <span className="flex items-center justify-between gap-2 w-full">
+                              {r.version || r.id}
+                              <span className="text-xs text-green-600 dark:text-green-400">
+                                Installed
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {notInstalledPython.length > 0 && (
+                      <div className="text-xs text-muted-foreground space-y-1 mt-1">
+                        <p>Install another version:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {notInstalledPython.slice(0, 8).map((v) => {
+                            const id = v.id || v.version;
+                            const installing = isInstalling("python", id);
+                            return (
+                              <Button
+                                key={id}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-6 gap-1 text-xs"
+                                disabled={!!installingRuntime}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleInstallRuntime("python", id);
+                                }}
+                              >
+                                {installing ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                                {v.version || id}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="script">
                 Startup Command <span className="text-destructive">*</span>
@@ -264,6 +480,10 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
                 className="bg-background/50 font-mono"
                 placeholder="npm start"
               />
+              <p className="text-xs text-muted-foreground">
+                Use {"{{node}}"} or {"{{python}}"} to use the selected runtime executable in the
+                command.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="icon">Custom Icon Path</Label>
