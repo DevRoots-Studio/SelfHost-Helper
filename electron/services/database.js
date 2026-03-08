@@ -98,6 +98,8 @@ function normalizeProjectRow(row) {
     tunnelConfig: parseJson(row.tunnelConfig, {}),
     autoStartTunnel: Boolean(row.autoStartTunnel ?? false),
     clearLogsBeforeStart: Boolean(row.clearLogsBeforeStart ?? false),
+    nodeVersionId: row.nodeVersionId ?? null,
+    pythonVersionId: row.pythonVersionId ?? null,
   };
 }
 

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Folder as FolderIcon, Image as ImageIcon } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Folder as FolderIcon, Image as ImageIcon, Download, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,8 @@ const PROJECT_TYPES = [
   { value: "other", label: "Other", script: "", icon: "" },
 ];
 
+const NODE_PROJECT_TYPES = ["nodejs", "react"];
+
 export default function AddProjectDialog({ onProjectsChange }) {
   const [isOpen, setIsOpen] = useAtom(isAddProjectModalOpenAtom);
   const [newProject, setNewProject] = useState({
@@ -69,9 +71,51 @@ export default function AddProjectDialog({ onProjectsChange }) {
     script: "npm install && npm start",
     icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
     clearLogsBeforeStart: false,
+    nodeVersionId: null,
+    pythonVersionId: null,
   });
 
   const [iconPreview, setIconPreview] = useState(newProject.icon);
+  const [installedNodeRuntimes, setInstalledNodeRuntimes] = useState([]);
+  const [installedPythonRuntimes, setInstalledPythonRuntimes] = useState([]);
+  const [availableNodeVersions, setAvailableNodeVersions] = useState([]);
+  const [availablePythonVersions, setAvailablePythonVersions] = useState([]);
+  const [installingRuntime, setInstallingRuntime] = useState(null);
+
+  useEffect(() => {
+    if (isOpen && API.runtimeListInstalled) {
+      API.runtimeListInstalled("node")
+        .then(setInstalledNodeRuntimes)
+        .catch(() => setInstalledNodeRuntimes([]));
+      API.runtimeListInstalled("python")
+        .then(setInstalledPythonRuntimes)
+        .catch(() => setInstalledPythonRuntimes([]));
+    }
+    if (isOpen && API.runtimeListAvailable) {
+      API.runtimeListAvailable("node")
+        .then(setAvailableNodeVersions)
+        .catch(() => setAvailableNodeVersions([]));
+      API.runtimeListAvailable("python")
+        .then(setAvailablePythonVersions)
+        .catch(() => setAvailablePythonVersions([]));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !API.onRuntimeProgress) return;
+    const unsub = API.onRuntimeProgress((payload) => {
+      if (payload?.phase === "done" || payload?.phase === "error") {
+        setInstallingRuntime(null);
+        API.runtimeListInstalled("node")
+          .then(setInstalledNodeRuntimes)
+          .catch(() => {});
+        API.runtimeListInstalled("python")
+          .then(setInstalledPythonRuntimes)
+          .catch(() => {});
+      }
+    });
+    return () => (typeof unsub === "function" ? unsub() : undefined);
+  }, [isOpen]);
 
   const handleClearLogsToggle = (enabled) => {
     setNewProject((prev) => ({ ...prev, clearLogsBeforeStart: enabled }));
@@ -97,12 +141,33 @@ export default function AddProjectDialog({ onProjectsChange }) {
           type: "nodejs",
           script: "npm install && npm start",
           icon: "https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg",
+          nodeVersionId: null,
+          pythonVersionId: null,
         });
       } catch (error) {
         toast.error(`Failed to add project: ${error.message}`);
       }
     }
   };
+
+  const handleInstallRuntime = (type, versionId) => {
+    setInstallingRuntime({ type, versionId });
+    API.runtimeInstall?.(type, versionId)?.catch(() => setInstallingRuntime(null));
+  };
+  const isInstalling = (type, id) =>
+    installingRuntime?.type === type && installingRuntime?.versionId === id;
+  const notInstalledNode = availableNodeVersions.filter(
+    (v) =>
+      !installedNodeRuntimes.some(
+        (r) => r.id === (v.id || v.version) || r.version === (v.id || v.version)
+      )
+  );
+  const notInstalledPython = availablePythonVersions.filter(
+    (v) =>
+      !installedPythonRuntimes.some(
+        (r) => r.id === (v.id || v.version) || r.version === (v.id || v.version)
+      )
+  );
 
   const handleBrowseValues = async () => {
     const path = await API.selectDirectory();
@@ -175,6 +240,136 @@ export default function AddProjectDialog({ onProjectsChange }) {
               </SelectContent>
             </Select>
           </div>
+          {(NODE_PROJECT_TYPES.includes(newProject.type) || newProject.type === "python") && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {NODE_PROJECT_TYPES.includes(newProject.type) && (
+                <div className="grid gap-2">
+                  <Label>Node version</Label>
+                  <Select
+                    value={newProject.nodeVersionId ?? "__system__"}
+                    onValueChange={(v) =>
+                      setNewProject((prev) => ({
+                        ...prev,
+                        nodeVersionId: v === "__system__" ? null : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="System (PATH)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__system__">System (PATH)</SelectItem>
+                      {installedNodeRuntimes.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          <span className="flex items-center justify-between gap-2 w-full">
+                            {r.version || r.id}
+                            <span className="text-xs text-green-600 dark:text-green-400">
+                              Installed
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {notInstalledNode.length > 0 && (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>Install another version:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {notInstalledNode.slice(0, 8).map((v) => {
+                          const id = v.id || v.version;
+                          const installing = isInstalling("node", id);
+                          return (
+                            <Button
+                              key={id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 gap-1 text-xs"
+                              disabled={!!installingRuntime}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleInstallRuntime("node", id);
+                              }}
+                            >
+                              {installing ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              {v.version || id}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {newProject.type === "python" && (
+                <div className="grid gap-2">
+                  <Label>Python version</Label>
+                  <Select
+                    value={newProject.pythonVersionId ?? "__system__"}
+                    onValueChange={(v) =>
+                      setNewProject((prev) => ({
+                        ...prev,
+                        pythonVersionId: v === "__system__" ? null : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="System (PATH)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__system__">System (PATH)</SelectItem>
+                      {installedPythonRuntimes.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          <span className="flex items-center justify-between gap-2 w-full">
+                            {r.version || r.id}
+                            <span className="text-xs text-green-600 dark:text-green-400">
+                              Installed
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {notInstalledPython.length > 0 && (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>Install another version:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {notInstalledPython.slice(0, 8).map((v) => {
+                          const id = v.id || v.version;
+                          const installing = isInstalling("python", id);
+                          return (
+                            <Button
+                              key={id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 gap-1 text-xs"
+                              disabled={!!installingRuntime}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleInstallRuntime("python", id);
+                              }}
+                            >
+                              {installing ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              {v.version || id}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="script">
               Start Script <span className="text-destructive">*</span>
@@ -185,6 +380,10 @@ export default function AddProjectDialog({ onProjectsChange }) {
               onChange={(e) => setNewProject({ ...newProject, script: e.target.value })}
               placeholder="npm start"
             />
+            <p className="text-xs text-muted-foreground">
+              Use {"{{node}}"} or {"{{python}}"} to use the selected runtime executable in the
+              command.
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="icon">Icon URL or Path</Label>
