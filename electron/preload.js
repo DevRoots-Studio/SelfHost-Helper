@@ -12,6 +12,7 @@ const allowedListenerChannels = [
   "window:maximize",
   "window:unmaximize",
   "app:shutting-down",
+  "updater:status",
 ];
 
 const removeAllListeners = (channel) => {
@@ -171,4 +172,14 @@ contextBridge.exposeInMainWorld("api", {
   restoreFromLegacyBackup: (filePath, replaceExisting) =>
     ipcRenderer.invoke("database:restoreFromLegacyBackup", filePath, replaceExisting),
   openBackupFileDialog: () => ipcRenderer.invoke("dialog:openBackupFile"),
+
+  checkForUpdates: () => ipcRenderer.invoke("updater:check"),
+  startInstall: () => ipcRenderer.invoke("updater:startInstall"),
+  restartToApplyUpdate: () => ipcRenderer.invoke("updater:restartToApply"),
+  getUpdateStatus: () => ipcRenderer.invoke("updater:getStatus"),
+  onUpdaterStatus: (callback) => {
+    const subscription = (_, payload) => callback(payload);
+    ipcRenderer.on("updater:status", subscription);
+    return () => ipcRenderer.removeListener("updater:status", subscription);
+  },
 });

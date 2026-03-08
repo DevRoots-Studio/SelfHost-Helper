@@ -14,6 +14,8 @@ import {
   ChevronDown,
   Trash2,
   Edit2,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -554,8 +556,26 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   );
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [discordInfo, setDiscordInfo] = useState(null);
+  const [updateStatus, setUpdateStatus] = useState("idle");
+  const [updateVersion, setUpdateVersion] = useState("");
 
   const DISCORD_INVITE_CODE = "C62mj58Q2D";
+
+  useEffect(() => {
+    const sync = async () => {
+      try {
+        const s = await API.getUpdateStatus?.();
+        if (s?.status) setUpdateStatus(s.status);
+        if (s?.version != null) setUpdateVersion(s.version ?? "");
+      } catch (_) {}
+    };
+    sync();
+    const unsub = API.onUpdaterStatus?.((payload) => {
+      if (payload?.status) setUpdateStatus(payload.status);
+      if (payload?.version != null) setUpdateVersion(payload.version ?? "");
+    });
+    return () => (typeof unsub === "function" ? unsub() : undefined);
+  }, []);
 
   useEffect(() => {
     fetchDiscordInfo();
@@ -1189,6 +1209,110 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
             isCollapsed ? "p-3 space-y-3 flex flex-col items-center" : "p-4 space-y-2"
           )}
         >
+          {(updateStatus === "available" || updateStatus === "downloaded") && (
+            <AnimatePresence mode="wait">
+              {isCollapsed ? (
+                <motion.button
+                  key="update-collapsed"
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  onClick={() => navigate("/settings")}
+                  title={
+                    updateStatus === "downloaded"
+                      ? "Update ready — open Settings to restart"
+                      : "Update available — open Settings to install"
+                  }
+                  className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                    updateStatus === "downloaded"
+                      ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-400/20"
+                      : "bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20"
+                  )}
+                >
+                  {updateStatus === "downloaded" ? (
+                    <RefreshCw className="h-5 w-5" />
+                  ) : (
+                    <Download className="h-5 w-5" />
+                  )}
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="update-expanded"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                  onClick={() => navigate("/settings")}
+                  className={cn(
+                    "rounded-xl border overflow-hidden cursor-pointer transition-all duration-200",
+                    "hover:border-white/20 hover:shadow-lg hover:shadow-primary/5",
+                    updateStatus === "downloaded"
+                      ? "border-emerald-500/30 bg-linear-to-b from-emerald-950/40 via-black/30 to-black/40"
+                      : "border-white/10 bg-linear-to-b from-primary/10 via-black/20 to-black/30"
+                  )}
+                >
+                  <div className="relative p-4 space-y-3">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,var(--tw-gradient-from),transparent)] from-primary/10 to-transparent pointer-events-none" />
+                    <div className="relative z-10 flex items-start gap-3">
+                      <div
+                        className={cn(
+                          "shrink-0 w-11 h-11 rounded-xl flex items-center justify-center",
+                          updateStatus === "downloaded"
+                            ? "bg-emerald-500/25 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                            : "bg-primary/25 text-primary shadow-[0_0_20px_hsl(var(--primary)_/0.15)]"
+                        )}
+                      >
+                        {updateStatus === "downloaded" ? (
+                          <RefreshCw className="h-5 w-5" />
+                        ) : (
+                          <Download className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-foreground leading-tight">
+                          {updateStatus === "downloaded" ? "Update ready" : "Update available"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {updateStatus === "downloaded"
+                            ? "Restart the app to use the new version."
+                            : "A new version is ready to install."}
+                        </p>
+                        {updateVersion && (
+                          <span
+                            className={cn(
+                              "inline-block mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded",
+                              updateStatus === "downloaded"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "bg-primary/20 text-primary"
+                            )}
+                          >
+                            v{updateVersion}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative z-10">
+                      <span
+                        className={cn(
+                          "block w-full text-center py-2 rounded-lg text-xs font-medium transition-colors",
+                          updateStatus === "downloaded"
+                            ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                            : "bg-primary/25 text-primary-foreground hover:bg-primary/35"
+                        )}
+                      >
+                        {updateStatus === "downloaded"
+                          ? "Open Settings to restart"
+                          : "Open Settings to install"}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
           <Button
             variant="ghost"
             className={cn(

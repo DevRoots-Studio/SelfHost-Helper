@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -51,6 +51,13 @@
     ],
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "DevRoots-Studio",
+      "repo": "SelfHost-Helper",
+      "releaseType": "release",
+      "vPrefixedTagName": true
     },
     "win": {
       "target": "nsis",
@@ -117,6 +124,7 @@
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
     "auto-launch": "latest",
+    "electron-updater": "^4.0.0",
     "chalk": "^5.6.2",
     "chokidar": "latest",
     "class-variance-authority": "latest",
@@ -130,6 +138,7 @@
     "pidusage": "^4.0.1",
     "react": "latest",
     "react-dom": "latest",
+    "react-markdown": "latest",
     "react-router-dom": "^7.11.0",
     "react-toastify": "^11.0.5",
     "sequelize": "latest",

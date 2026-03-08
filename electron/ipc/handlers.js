@@ -43,6 +43,12 @@ import { searchInProject } from "../services/searchService.js";
 import * as gitService from "../services/gitService.js";
 import { startLspForProject, stopLspForProject } from "../services/lspBridge.js";
 import settingsService from "../services/settingsService.js";
+import {
+  checkForUpdates,
+  startInstall,
+  restartToApplyUpdate,
+  getUpdateStatus,
+} from "../services/updateService.js";
 import logger from "../services/logger.js";
 
 const appLauncher = new AutoLaunch({
@@ -658,12 +664,15 @@ export const registerHandlers = () => {
 
   ipcMain.handle("database:getUserDataPath", () => getUserDataPath());
   ipcMain.handle("database:listLegacyBackupCandidates", () => listLegacyBackupCandidates());
-  ipcMain.handle("database:restoreFromLegacyBackup", async (_, filePath, replaceExisting = true) => {
-    const result = await restoreFromLegacyBackup(filePath, replaceExisting);
-    if (result.error) return result;
-    notifyProjectListChanged();
-    return result;
-  });
+  ipcMain.handle(
+    "database:restoreFromLegacyBackup",
+    async (_, filePath, replaceExisting = true) => {
+      const result = await restoreFromLegacyBackup(filePath, replaceExisting);
+      if (result.error) return result;
+      notifyProjectListChanged();
+      return result;
+    }
+  );
   ipcMain.handle("dialog:openBackupFile", async () => {
     const userDataPath = getUserDataPath();
     const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
@@ -678,4 +687,9 @@ export const registerHandlers = () => {
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
+
+  ipcMain.handle("updater:check", () => checkForUpdates());
+  ipcMain.handle("updater:startInstall", () => startInstall());
+  ipcMain.handle("updater:restartToApply", () => restartToApplyUpdate());
+  ipcMain.handle("updater:getStatus", () => getUpdateStatus());
 };

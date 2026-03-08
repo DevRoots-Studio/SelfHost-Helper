@@ -600,6 +600,26 @@ export const startAutoStartProjects = async () => {
   }
 };
 
+//============================{Relaunch projects after app update}=============================
+export const relaunchProjectsAfterUpdate = async () => {
+  try {
+    const ids = await settingsService.get("projectsToRelaunchAfterUpdate");
+    if (!Array.isArray(ids) || ids.length === 0) return;
+
+    logger.info(`[ProjectsManager] Relaunching ${ids.length} projects after update.`);
+    for (const id of ids) {
+      if (!runningRuntimes[id]) {
+        await startProject(id).catch((err) =>
+          logger.error(`Relaunch after update failed for project ${id}:`, err)
+        );
+      }
+    }
+    await settingsService.set("projectsToRelaunchAfterUpdate", []);
+  } catch (error) {
+    logger.error("Failed to relaunch projects after update:", error);
+  }
+};
+
 //============================{Background Health Monitoring}=============================
 
 const cleanupProjectRuntime = async (id) => {
