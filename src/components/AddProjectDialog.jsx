@@ -62,6 +62,15 @@ const PROJECT_TYPES = [
 
 const NODE_PROJECT_TYPES = ["nodejs", "react"];
 
+/**
+ * Render a modal dialog that collects project metadata, allows selecting or installing Node/Python runtimes, and submits a new project to the backend.
+ *
+ * The dialog manages internal form state (name, path, type, start script, icon, runtime selections, and a clear-logs flag), fetches available and installed runtimes when opened, provides quick-install actions for missing runtimes, debounces the icon preview, and calls the backend API to add the project. On successful add the dialog closes, the form resets, and a success toast is shown; errors produce an error toast.
+ *
+ * @param {{ onProjectsChange?: () => void }} props - Component props.
+ * @param {() => void} [props.onProjectsChange] - Optional callback invoked after a project is successfully added.
+ * @returns {JSX.Element} The Add Project dialog component.
+ */
 export default function AddProjectDialog({ onProjectsChange }) {
   const [isOpen, setIsOpen] = useAtom(isAddProjectModalOpenAtom);
   const [newProject, setNewProject] = useState({

@@ -26,6 +26,14 @@ const UPDATE_STATUS_DOWNLOADING = "downloading";
 const UPDATE_STATUS_DOWNLOADED = "downloaded";
 const UPDATE_STATUS_ERROR = "error";
 
+/**
+ * Render the main application Settings page for managing general preferences, data & backups,
+ * portable runtimes (Node & Python), and application updates.
+ *
+ * Provides UI and state handling for auto-launch, log clearing, restore from backups, listing and
+ * installing/uninstalling portable runtimes, update checks/installation, and displays app info.
+ * @returns {JSX.Element} The rendered Settings page component.
+ */
 export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);

@@ -23,15 +23,37 @@ const NODE_FALLBACK_VERSIONS = [
 ];
 const PYTHON_FALLBACK_VERSIONS = ["3.13.0", "3.12.6", "3.12.5", "3.11.9", "3.11.8", "3.10.14"];
 
+/**
+ * Get the path to the runtimes directory inside the application's user data directory.
+ * @returns {string} The full filesystem path to the runtimes directory for this application.
+ */
 function getRuntimesDir() {
   return path.join(app.getPath("userData"), "runtimes");
 }
 
+/**
+ * Get the filesystem path to the runtimes index file.
+ * @returns {string} The full path to the runtimes index file (`index.json`) inside the runtimes directory.
+ */
 function getIndexPath() {
   return path.join(getRuntimesDir(), INDEX_FILENAME);
 }
 
-/** Rebuild index entries by scanning runtimes dir (node/* and python/*) for existing executables. */
+/**
+ * Scan the runtimes directory and build index entries for installed Node and Python runtimes.
+ *
+ * Searches the runtimes directory for "node" and "python" subfolders, detects installed runtime
+ * directories that contain the platform-specific executable, and returns a list of index entries.
+ *
+ * @returns {Array<{id: string, type: string, version: string, path: string, platform: string, arch: string}>}
+ * An array of runtime index entries where each entry contains:
+ * - `id`: the runtime identifier (e.g., "v18.16.0" for Node or "3.11.2" for Python),
+ * - `type`: `"node"` or `"python"`,
+ * - `version`: normalized version string (Node `id` without a leading `v`, Python same as `id`),
+ * - `path`: full filesystem path to the runtime installation directory,
+ * - `platform`: the current process.platform value captured when scanning,
+ * - `arch`: the current process.arch value captured when scanning.
+ */
 function rebuildIndexFromFilesystem() {
   const runtimesDir = getRuntimesDir();
   const platform = process.platform;
@@ -55,9 +77,17 @@ function rebuildIndexFromFilesystem() {
   return entries;
 }
 
+/**
+ * Read the runtimes index file from disk and return the stored entries.
+ *
+ * If the index file is missing, malformed, or cannot be read, this function
+ * attempts to rebuild the index from the filesystem; if rebuilding fails,
+ * it returns an empty array.
+ * @returns {Array<Object>} An array of runtime index entries, or an empty array if none are available.
+ */
 function readIndex() {
   const indexPath = getIndexPath();
-
+ 
   if (!fs.existsSync(indexPath)) {
     const rebuilt = rebuildIndexFromFilesystem();
     if (rebuilt.length > 0) {
@@ -69,6 +99,7 @@ function readIndex() {
     }
     return rebuilt;
   }
+  
   try {
     const raw = fs.readFileSync(indexPath, "utf8");
     const data = JSON.parse(raw);
@@ -88,12 +119,20 @@ function readIndex() {
   }
 }
 
+/**
+ * Persist the runtimes index to disk, ensuring the runtimes directory exists.
+ * @param {Array<Object>} entries - Array of runtime index entries to write to disk; each entry should include id, type, version, path, platform, and arch as applicable.
+ */
 function writeIndex(entries) {
   const dir = getRuntimesDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(getIndexPath(), JSON.stringify(entries, null, 2), "utf8");
 }
 
+/**
+ * Send a runtime progress update to the renderer window if one is available.
+ * @param {object} payload - Progress payload to send over the "runtime:progress" IPC channel (e.g., { phase, percent, id, message }).
+ */
 function sendProgress(payload) {
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     try {
@@ -104,13 +143,25 @@ function sendProgress(payload) {
   }
 }
 
-/** Choose http or https module based on URL protocol (handles redirects to http or https). */
+/**
+ * Selects the appropriate Node protocol module for a given URL.
+ * @param {string} urlStr - The URL whose protocol should determine the module.
+ * @returns {object} The Node `https` module if the URL uses the `https:` protocol, otherwise the `http` module.
+ */
 function getProtocolModule(urlStr) {
   const protocol = new URL(urlStr).protocol;
   return protocol === "https:" ? https : http;
 }
 
-/** Download url to dest path. Returns path. Uses http or https based on URL protocol. */
+/**
+ * Download a file from a URL to a local destination path.
+ *
+ * Follows HTTP(S) redirects, reports download progress via sendProgress, and
+ * removes partially written files on error.
+ * @param {string} url - The URL to download.
+ * @param {string} destPath - The local file path to write the downloaded content to.
+ * @returns {string} The destination path when the download completes successfully.
+ */
 function downloadFile(url, destPath) {
   const protocolModule = getProtocolModule(url);
   return new Promise((resolve, reject) => {
@@ -162,7 +213,15 @@ function downloadFile(url, destPath) {
   });
 }
 
-/** Extract zip to dir on Windows using PowerShell (async to avoid blocking the main process). */
+/**
+ * Extracts a ZIP archive into the specified destination directory on Windows using PowerShell.
+ *
+ * This operation is performed asynchronously and rejects on non-Windows platforms
+ * or when PowerShell returns a non-zero exit code.
+ *
+ * @param {string} zipPath - Path to the ZIP archive to extract.
+ * @param {string} destDir - Destination directory where files will be extracted.
+ * @returns {Promise<void>} Resolves when extraction completes successfully; rejects with an Error on failure.
 function extractZip(zipPath, destDir) {
   return new Promise((resolve, reject) => {
     if (process.platform !== "win32") {
@@ -184,7 +243,13 @@ function extractZip(zipPath, destDir) {
   });
 }
 
-/** GET a URL and parse response as JSON. Uses http or https based on URL protocol (handles redirects). */
+/**
+ * Fetches JSON from the given URL and parses the response.
+ * @param {string} urlStr - The request URL.
+ * @param {Object} [options] - Optional request settings.
+ * @param {Object} [options.headers] - HTTP request headers.
+ * @returns {any} The parsed JSON response.
+ */
 function httpsGetJson(urlStr, options = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
@@ -232,7 +297,12 @@ function httpsGetJson(urlStr, options = {}) {
   });
 }
 
-/** List available Node versions (remote). Falls back to a short list if API fails or returns no win-x64. */
+/**
+ * Fetches available Node.js versions that include Windows x64 binaries.
+ *
+ * Attempts to retrieve the official Node.js distribution index and returns up to 50 entries filtered to those that provide "win-x64" files. If the remote API fails or yields no suitable entries, returns a predefined fallback list.
+ * @returns {{version: string, id: string}[]} An array of objects where `version` is the version string without a leading "v" and `id` is the version identifier (prefixed with "v" when present or added).
+ */
 export async function listAvailableNode() {
   try {
     const data = await httpsGetJson(NODE_DIST_INDEX);
@@ -257,7 +327,13 @@ export async function listAvailableNode() {
   }
 }
 
-/** List available Python versions from official GitHub (cpython tags). Falls back if API fails. */
+/**
+ * Fetches recent stable CPython release tags from GitHub and returns them as version/id pairs.
+ *
+ * Filters tags matching the `vMAJOR.MINOR.PATCH` pattern, normalizes them by removing the `v`
+ * prefix, deduplicates by id, and limits the result to 60 entries.
+ * @returns {Array<{version: string, id: string}>} An array of objects with `version` and `id` for each Python release; if the GitHub API call fails, returns a predefined fallback list in the same shape.
+ */
 export async function listAvailablePython() {
   try {
     const data = await httpsGetJson(PYTHON_GITHUB_TAGS, {
@@ -285,14 +361,25 @@ export async function listAvailablePython() {
   }
 }
 
-/** List available runtimes by type (from official APIs). */
+/**
+ * Retrieve a list of available runtimes for the given type from official sources.
+ * @param {string} type - Runtime type to list; valid values are `"node"` or `"python"`.
+ * @returns {Promise<Array<{id: string, version: string}>>} An array of available runtime descriptors; each object contains `id` (identifier used for installs) and `version` (the human-readable version string). An empty array is returned for unknown `type`.
+ */
 export async function listAvailable(type) {
   if (type === "node") return listAvailableNode();
   if (type === "python") return await listAvailablePython();
   return [];
 }
 
-/** List installed runtimes; optionally filter by type. Verifies path and executable exist. */
+/**
+ * List installed runtimes, optionally filtered by type.
+ * 
+ * Only entries whose runtime directory and runtime executable exist on disk are returned.
+ * 
+ * @param {string|null} type - Optional runtime type to filter by (e.g., "node" or "python").
+ * @returns {Array<Object>} Array of installed runtime entries. Each entry includes properties such as `id`, `type`, `version`, `path`, `platform`, and `arch`.
+ */
 export function listInstalled(type = null) {
   const entries = readIndex();
   const platform = process.platform;
@@ -310,7 +397,12 @@ export function listInstalled(type = null) {
   return out;
 }
 
-/** Get directory containing the executable for a runtime (for PATH injection). */
+/**
+ * Return the installation directory that contains the runtime executable, suitable for adding to PATH.
+ * @param {string} type - Runtime type, either "node" or "python".
+ * @param {string} id - Runtime id or version to match (e.g., "v16.14.0" or "3.11.2").
+ * @returns {string|null} The directory path containing the runtime executable, or `null` if not found.
+ */
 export function getRuntimeDir(type, id) {
   const entries = listInstalled(type);
   const entry = entries.find(
@@ -324,7 +416,12 @@ export function getRuntimeDir(type, id) {
   return entry.path;
 }
 
-/** Get full path to node or python executable. Returns null if not installed. */
+/**
+ * Get the absolute path to the runtime executable for a given runtime type and id.
+ * @param {string} type - Runtime type, either `"node"` or `"python"`.
+ * @param {string} id - Runtime identifier or version string as used by the index.
+ * @returns {string|null} The absolute path to the executable if the runtime is installed, `null` otherwise.
+ */
 export function getRuntimePath(type, id) {
   const dir = getRuntimeDir(type, id);
   if (!dir) return null;
@@ -340,7 +437,11 @@ export function getRuntimePath(type, id) {
   return fs.existsSync(exePath) ? exePath : null;
 }
 
-/** Quote path for use in shell if it contains spaces. */
+/**
+ * Quote a filesystem path that contains spaces so it is safe to use in a shell.
+ * @param {string} p - The path to quote.
+ * @returns {string} The original path if it contains no spaces; otherwise the path wrapped in double quotes (on non-Windows internal double quotes are escaped).
+ */
 export function quotePath(p) {
   if (!p || !p.includes(" ")) return p;
   if (process.platform === "win32") return `"${p}"`;
@@ -352,6 +453,11 @@ const VALID_RUNTIME_TYPES = ["node", "python"];
 /** In-flight install promises per (type, id) to prevent concurrent install of same version. */
 const installLocks = new Map();
 
+/**
+ * Ensure the provided runtime type is one of the supported values.
+ * @param {string} type - Runtime type; must be either `"node"` or `"python"`.
+ * @throws {Error} If `type` is not a string or is not `"node"` or `"python"`.
+ */
 export function validateRuntimeType(type) {
   if (typeof type !== "string" || !VALID_RUNTIME_TYPES.includes(type)) {
     throw new Error(`Invalid runtime type: ${type}. Must be "node" or "python".`);
@@ -359,9 +465,12 @@ export function validateRuntimeType(type) {
 }
 
 /**
- * Install a runtime. type: 'node' | 'python', versionId: e.g. 'v20.10.0' or '3.12.0'.
- * Sends runtime:progress events: { phase: 'download'|'extract'|'done', percent?, error? }
- * Single-flights concurrent installs of the same (type, id).
+ * Install a portable Node or Python runtime into the application's runtimes directory.
+ *
+ * @param {string} type - Runtime type, either "node" or "python".
+ * @param {string} versionId - Version identifier (examples: "v20.10.0" or "3.12.0").
+ * @returns {{success: true, path: string, id: string}} An object containing `success: true`, the installation `path`, and the normalized runtime `id` on successful installation.
+ * @throws {Error} If `type` is invalid or `versionId` is missing/invalid, or if the installation fails.
  */
 export async function installRuntime(type, versionId) {
   validateRuntimeType(type);
@@ -506,8 +615,16 @@ export async function installRuntime(type, versionId) {
 }
 
 /**
- * Uninstall a runtime. Removes directory and index entry.
- * If any project uses this runtime (nodeVersionId/pythonVersionId), returns error unless options.force is true.
+ * Remove an installed runtime and its entry from the runtimes index.
+ *
+ * If the runtime is referenced by any project, the uninstall is prevented unless
+ * `options.force` is true.
+ *
+ * @param {string} type - Runtime type, either `"node"` or `"python"`.
+ * @param {string} id - Runtime identifier or version to uninstall.
+ * @param {Object} [options] - Optional settings.
+ * @param {boolean} [options.force=false] - When true, remove the runtime even if projects reference it.
+ * @returns {Object} `{ success: true }` on successful uninstall; `{ success: false, error: string }` on failure (e.g., runtime not found or in use).
  */
 export async function uninstallRuntime(type, id, options = {}) {
   const { force = false } = options;

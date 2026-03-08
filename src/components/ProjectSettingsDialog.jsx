@@ -47,6 +47,23 @@ const PROJECT_TYPES = [
 
 const NODE_PROJECT_TYPES = ["node", "nodejs", "react", "vue", "static", "discord"];
 
+/**
+ * Render a modal dialog that displays and edits settings for a single project.
+ *
+ * The dialog manages an internal form for project fields (name, path, script, type,
+ * description, icon, autoStart, clearLogsBeforeStart, nodeVersionId, pythonVersionId),
+ * loads available and installed runtimes when opened, and exposes controls to browse
+ * for files/directories and to install runtimes. User actions invoke the provided
+ * callbacks: `onSave` to persist changes, `onDelete` to remove the project, and
+ * `onClose` when the dialog should be closed.
+ *
+ * @param {{ id?: string, name?: string, path?: string, script?: string, autoStart?: boolean, type?: string, description?: string, icon?: string, clearLogsBeforeStart?: boolean, nodeVersionId?: string|null, pythonVersionId?: string|null }} project - Project object used to populate the form (may be partial or undefined for a new project).
+ * @param {boolean} isOpen - Whether the dialog is currently open.
+ * @param {function(): void} onClose - Callback invoked when the dialog is closed or cancelled.
+ * @param {function(object): Promise<any>} onSave - Callback called with the merged project data when the user saves changes; may return a promise.
+ * @param {function(string): void} [onDelete] - Optional callback called with the project id when the user confirms deletion.
+ * @returns {JSX.Element} The Project Settings dialog React element.
+ */
 export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave, onDelete }) {
   const [formData, setFormData] = useState({
     name: "",
