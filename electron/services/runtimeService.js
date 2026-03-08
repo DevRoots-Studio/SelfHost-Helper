@@ -5,7 +5,7 @@ import { spawn } from "child_process";
 import http from "http";
 import https from "https";
 import logger from "./logger.js";
-import { getProjects } from "./database.js";
+import { getProjects, updateProject } from "./database.js";
 
 const INDEX_FILENAME = "index.json";
 const NODE_DIST_INDEX = "https://nodejs.org/dist/index.json";
@@ -87,7 +87,19 @@ function rebuildIndexFromFilesystem() {
  */
 function readIndex() {
   const indexPath = getIndexPath();
-  if (!fs.existsSync(indexPath)) return [];
+ 
+  if (!fs.existsSync(indexPath)) {
+    const rebuilt = rebuildIndexFromFilesystem();
+    if (rebuilt.length > 0) {
+      writeIndex(rebuilt);
+      logger.info(
+        "[RuntimeService] Rebuilt missing runtimes index from filesystem:",
+        rebuilt.length
+      );
+    }
+    return rebuilt;
+  }
+  
   try {
     const raw = fs.readFileSync(indexPath, "utf8");
     const data = JSON.parse(raw);
@@ -462,6 +474,9 @@ export function validateRuntimeType(type) {
  */
 export async function installRuntime(type, versionId) {
   validateRuntimeType(type);
+  if (process.platform !== "win32") {
+    throw new Error("Portable runtimes are only supported on Windows in this version.");
+  }
   if (versionId == null || typeof versionId !== "string" || !versionId.trim()) {
     throw new Error("Version ID is required and must be a non-empty string.");
   }
@@ -539,7 +554,13 @@ export async function installRuntime(type, versionId) {
               if (fs.statSync(src).isDirectory()) {
                 const subEntries = fs.readdirSync(src);
                 for (const subName of subEntries) {
-                  fs.renameSync(path.join(src, subName), path.join(dest, subName));
+                  const destSub = path.join(dest, subName);
+                  const destSubDir = path.dirname(destSub);
+                  if (!fs.existsSync(destSubDir)) {
+                    fs.mkdirSync(destSubDir, { recursive: true });
+                  }
+
+                  fs.renameSync(path.join(src, subName), destSub);
                 }
                 fs.rmdirSync(src);
               } else {
@@ -610,13 +631,17 @@ export async function uninstallRuntime(type, id, options = {}) {
   const entries = readIndex();
   const entry = entries.find((e) => e.type === type && (e.id === id || e.version === id));
   if (!entry) return { success: false, error: "Runtime not found." };
-
+  const matchesEntry = (value) => {
+    if (value == null) return false;
+    const str = value.toString();
+    return str === entry.id || str === entry.version;
+  };
   if (!force) {
     const projects = await getProjects();
     const usedBy = projects.filter(
       (p) =>
-        (type === "node" && (p.nodeVersionId === id || p.nodeVersionId === id?.toString())) ||
-        (type === "python" && (p.pythonVersionId === id || p.pythonVersionId === id?.toString()))
+        (type === "node" && matchesEntry(p.nodeVersionId)) ||
+        (type === "python" && matchesEntry(p.pythonVersionId))
     );
     if (usedBy.length > 0) {
       const names = usedBy.map((p) => p.name).join(", ");
@@ -624,6 +649,19 @@ export async function uninstallRuntime(type, id, options = {}) {
         success: false,
         error: `This runtime is used by: ${names}. Unassign it in those projects first, or retry with force.`,
       };
+    }
+  } else {
+    const projects = await getProjects();
+
+    for (const p of projects) {
+      const clearNode = matchesEntry(p.nodeVersionId);
+      const clearPython = matchesEntry(p.pythonVersionId);
+      if (clearNode || clearPython) {
+        const patch = { id: p.id };
+        if (clearNode) patch.nodeVersionId = null;
+        if (clearPython) patch.pythonVersionId = null;
+        await updateProject(patch);
+      }
     }
   }
 

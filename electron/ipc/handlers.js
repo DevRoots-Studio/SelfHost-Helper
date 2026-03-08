@@ -49,6 +49,14 @@ import {
   restartToApplyUpdate,
   getUpdateStatus,
 } from "../services/updateService.js";
+import {
+  listAvailable,
+  listInstalled,
+  installRuntime,
+  uninstallRuntime,
+  getRuntimePath,
+  validateRuntimeType,
+} from "../services/runtimeService.js";
 import logger from "../services/logger.js";
 
 const appLauncher = new AutoLaunch({
@@ -692,4 +700,28 @@ export const registerHandlers = () => {
   ipcMain.handle("updater:startInstall", () => startInstall());
   ipcMain.handle("updater:restartToApply", () => restartToApplyUpdate());
   ipcMain.handle("updater:getStatus", () => getUpdateStatus());
+
+  ipcMain.handle("runtime:listAvailable", async (_, type) => {
+    validateRuntimeType(type);
+    const result = await listAvailable(type);
+    const arr = Array.isArray(result) ? result : [];
+    logger.info(`[IPC] runtime:listAvailable(${type}) returning ${arr.length} versions`);
+    return arr;
+  });
+  ipcMain.handle("runtime:listInstalled", (_, type) => {
+    validateRuntimeType(type);
+    return listInstalled(type);
+  });
+  ipcMain.handle("runtime:install", (_, type, versionId) => {
+    validateRuntimeType(type);
+    return installRuntime(type, versionId);
+  });
+  ipcMain.handle("runtime:uninstall", (_, type, id, force = false) => {
+    validateRuntimeType(type);
+    return uninstallRuntime(type, id, { force: !!force });
+  });
+  ipcMain.handle("runtime:getPath", (_, type, id) => {
+    validateRuntimeType(type);
+    return getRuntimePath(type, id);
+  });
 };
