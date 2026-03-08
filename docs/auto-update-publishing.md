@@ -81,6 +81,6 @@ electron-builder will:
 - Either **delete** that release and publish again with `electron-builder --publish always`,
 - Or **edit** the release:
   - Change the tag to `vX.Y.Z` (e.g. `v0.8.0`).
-  - Add the `latest.yml` and installer from a local electron-builder build (e.g. from `release/` or `dist/`) as release assets.
+  - Add the `latest.yml` and installer from the electron-builder output directory (`release/`, per `build.directories.output` in package.json) as release assets.
 
 After that, "Check for updates" and install should work.
