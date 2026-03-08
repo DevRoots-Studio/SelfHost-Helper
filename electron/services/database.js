@@ -312,6 +312,17 @@ export const deleteProject = async (id) => {
   return true;
 };
 
+/** Clear pid on all projects (e.g. during app shutdown). Uses st.db, not Sequelize. */
+export const clearAllProjectPids = async () => {
+  if (!projectTable) return;
+  const entries = await projectTable.all();
+  for (const entry of entries) {
+    if (entry?.data) {
+      await projectTable.set(entry.ID, { ...entry.data, pid: null });
+    }
+  }
+};
+
 export const getCategories = async () => {
   if (!categoryTable) return [];
   const entries = await categoryTable.all();

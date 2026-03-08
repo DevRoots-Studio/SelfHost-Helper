@@ -1,12 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Terminal, FolderOpen, FileUp, RotateCcw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import {
+  ArrowLeft,
+  Terminal,
+  FolderOpen,
+  FileUp,
+  RotateCcw,
+  Download,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 const API = window.api;
+
+const UPDATE_STATUS_IDLE = "idle";
+const UPDATE_STATUS_CHECKING = "checking";
+const UPDATE_STATUS_AVAILABLE = "available";
+const UPDATE_STATUS_DOWNLOADING = "downloading";
+const UPDATE_STATUS_DOWNLOADED = "downloaded";
+const UPDATE_STATUS_ERROR = "error";
 
 export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
@@ -16,11 +33,41 @@ export default function Settings() {
   const [backupCandidates, setBackupCandidates] = useState([]);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
+  const [updateStatus, setUpdateStatus] = useState(UPDATE_STATUS_IDLE);
+  const [updateVersion, setUpdateVersion] = useState("");
+  const [updateError, setUpdateError] = useState("");
+  const [releaseNotes, setReleaseNotes] = useState("");
+  const unsubUpdaterRef = useRef(null);
+
   useEffect(() => {
     loadSettings();
     loadAutoLaunchStatus();
     loadAppVersion();
     loadBackupInfo();
+  }, []);
+
+  useEffect(() => {
+    const syncUpdateStatus = async () => {
+      try {
+        const status = await API.getUpdateStatus?.();
+        if (status && typeof status.status === "string") {
+          setUpdateStatus(status.status);
+          setUpdateVersion(status.version ?? "");
+          setReleaseNotes(status.releaseNotes ?? "");
+          setUpdateError(status.error ?? "");
+        }
+      } catch (_) {}
+    };
+    syncUpdateStatus();
+    unsubUpdaterRef.current = API.onUpdaterStatus?.((payload) => {
+      if (payload?.status) setUpdateStatus(payload.status);
+      if (payload?.version != null) setUpdateVersion(payload.version ?? "");
+      if (payload?.releaseNotes != null) setReleaseNotes(payload.releaseNotes ?? "");
+      if (payload?.error != null) setUpdateError(payload.error ?? "");
+    });
+    return () => {
+      if (typeof unsubUpdaterRef.current === "function") unsubUpdaterRef.current();
+    };
   }, []);
 
   const loadBackupInfo = async () => {
@@ -108,7 +155,9 @@ export default function Settings() {
         return;
       }
       const { projects = 0, categories = 0 } = result?.restored ?? {};
-      toast.success(`Restored ${projects} projects and ${categories} categories. The project list will refresh.`);
+      toast.success(
+        `Restored ${projects} projects and ${categories} categories. The project list will refresh.`
+      );
       loadBackupInfo();
     } catch (e) {
       console.error("Restore failed", e);
@@ -125,6 +174,49 @@ export default function Settings() {
     } catch (e) {
       console.error("Failed to open backup dialog or restore", e);
     }
+  };
+
+  const handleCheckForUpdates = async () => {
+    setUpdateError("");
+    try {
+      await API.checkForUpdates?.();
+    } catch (e) {
+      setUpdateStatus(UPDATE_STATUS_ERROR);
+      setUpdateError(e?.message ?? "Failed to check for updates");
+    }
+  };
+
+  const handleStartInstall = () => {
+    setUpdateError("");
+    API.startInstall?.();
+  };
+
+  const handleRestartToApply = () => {
+    API.restartToApplyUpdate?.();
+  };
+
+  const renderReleaseNotes = (notes) => {
+    if (!notes || !notes.trim()) return null;
+    return (
+      <div className="mt-3 p-4 rounded-lg bg-black/20 border border-white/5 text-sm text-muted-foreground overflow-y-auto max-h-64 prose prose-invert prose-sm max-w-none">
+        <ReactMarkdown
+          components={{
+            a: ({ href, children }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline"
+              >
+                {children}
+              </a>
+            ),
+          }}
+        >
+          {notes}
+        </ReactMarkdown>
+      </div>
+    );
   };
 
   return (
@@ -178,15 +270,13 @@ export default function Settings() {
 
         {/* Data & backup – restore from legacy/backup */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">
-            Data &amp; backup
-          </h2>
+          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">Data &amp; backup</h2>
 
           <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-4">
             <p className="text-sm text-muted-foreground">
-              If you lost your projects after updating (e.g. from an older version), you can
-              restore from a backup. Backups are created automatically when the app migrates an
-              old database. Put your backup file in the data folder, or choose it from anywhere.
+              If you lost your projects after updating (e.g. from an older version), you can restore
+              from a backup. Backups are created automatically when the app migrates an old
+              database. Put your backup file in the data folder, or choose it from anywhere.
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -237,6 +327,90 @@ export default function Settings() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Updates */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">Updates</h2>
+
+          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Current version:{" "}
+              <span className="font-medium text-foreground">{appVersion || "—"}</span>
+            </p>
+
+            {updateStatus === UPDATE_STATUS_IDLE && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCheckForUpdates}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Check for updates
+              </Button>
+            )}
+
+            {updateStatus === UPDATE_STATUS_CHECKING && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking for updates…
+              </div>
+            )}
+
+            {updateStatus === UPDATE_STATUS_AVAILABLE && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-foreground">
+                  A new version <strong>v{updateVersion}</strong> is available.
+                </p>
+                {renderReleaseNotes(releaseNotes)}
+                <Button type="button" size="sm" onClick={handleStartInstall} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Install
+                </Button>
+              </div>
+            )}
+
+            {(updateStatus === UPDATE_STATUS_DOWNLOADING || updateStatus === "downloading") && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Downloading… Please wait.
+              </div>
+            )}
+
+            {updateStatus === UPDATE_STATUS_DOWNLOADED && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-green-500 dark:text-green-400">
+                  Installation complete. Please restart the app to use the new version.
+                </p>
+                {updateVersion && (
+                  <p className="text-sm text-muted-foreground">New version: v{updateVersion}</p>
+                )}
+                {renderReleaseNotes(releaseNotes)}
+                <Button type="button" size="sm" onClick={handleRestartToApply} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Restart
+                </Button>
+              </div>
+            )}
+
+            {updateStatus === UPDATE_STATUS_ERROR && (
+              <div className="space-y-2">
+                <p className="text-sm text-destructive">{updateError || "An error occurred."}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheckForUpdates}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Check for updates again
+                </Button>
               </div>
             )}
           </div>

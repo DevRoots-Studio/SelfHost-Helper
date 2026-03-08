@@ -194,7 +194,14 @@ logger.init();
 app
   .whenReady()
   .then(async () => {
-    logger.info("Application starting up (Ready)...");
+    try {
+      logger.info("Application starting up (Ready)...");
+    } catch (e) {
+      try {
+        const logPath = path.join(app.getPath("userData"), "main.log");
+        fs.appendFileSync(logPath, `[FATAL] Logger failed: ${String(e?.message || e)}\n`);
+      } catch (_) {}
+    }
     protocol.handle("media", async (request) => {
       try {
         const url = new URL(request.url);
@@ -317,11 +324,23 @@ app
     await initializeDatabase();
     registerHandlers(ipcMain);
 
+    const { initUpdateService } = await import("./services/updateService.js");
+    try {
+      await initUpdateService();
+    } catch (err) {
+      logger.error(
+        "[Startup] Update service init failed (continuing without updates):",
+        err?.message,
+        err?.stack
+      );
+    }
+
     // Auto-start projects and check for zombies
-    const { startAutoStartProjects, checkZombieProcesses } =
+    const { startAutoStartProjects, checkZombieProcesses, relaunchProjectsAfterUpdate } =
       await import("./services/projectsManager.js");
     await checkZombieProcesses();
     await startAutoStartProjects();
+    await relaunchProjectsAfterUpdate();
 
     const window = await createWindow();
     if (!window) {
@@ -408,12 +427,12 @@ app.on("before-quit", async (e) => {
   try {
     const { stopAllProjects } = await import("./services/projectsManager.js");
     const { stopAllTunnels } = await import("./services/tunnelManager.js");
-    const { Project } = await import("../database/models/Project.js");
+    const { clearAllProjectPids } = await import("./services/database.js");
 
     // Fast kill all running projects and tunnels
     await Promise.all([stopAllProjects(), stopAllTunnels()]);
-    // Fast clear all PIDs in DB
-    await Project.update({ pid: null }, { where: {} });
+    // Fast clear all PIDs in st.db
+    await clearAllProjectPids();
   } catch (err) {
     logger.error("Cleanup error during shutdown:", err);
   } finally {
