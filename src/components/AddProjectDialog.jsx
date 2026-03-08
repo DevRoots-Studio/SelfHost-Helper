@@ -225,6 +225,8 @@ export default function AddProjectDialog({ onProjectsChange }) {
                   type: value,
                   script: typeInfo ? typeInfo.script : prev.script,
                   icon: typeInfo?.icon || prev.icon,
+                  nodeVersionId: NODE_PROJECT_TYPES.includes(value) ? prev.nodeVersionId : null,
+                  pythonVersionId: value === "python" ? prev.pythonVersionId : null,
                 }));
               }}
             >
@@ -308,6 +310,10 @@ export default function AddProjectDialog({ onProjectsChange }) {
               {newProject.type === "python" && (
                 <div className="grid gap-2">
                   <Label>Python version</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Portable Python does not include pip; dependencies must be pre-installed or use
+                    system Python for pip.
+                  </p>
                   <Select
                     value={newProject.pythonVersionId ?? "__system__"}
                     onValueChange={(v) =>

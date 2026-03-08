@@ -78,17 +78,18 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
 
   useEffect(() => {
     if (project) {
+      const type = project.type || "node";
       setFormData({
         name: project.name || "",
         path: project.path || "",
         script: project.script || "npm start",
         autoStart: project.autoStart || false,
-        type: project.type || "node",
+        type,
         description: project.description || "",
         icon: project.icon || "",
         clearLogsBeforeStart: project.clearLogsBeforeStart || false,
-        nodeVersionId: project.nodeVersionId ?? null,
-        pythonVersionId: project.pythonVersionId ?? null,
+        nodeVersionId: NODE_PROJECT_TYPES.includes(type) ? (project.nodeVersionId ?? null) : null,
+        pythonVersionId: type === "python" ? (project.pythonVersionId ?? null) : null,
       });
     }
   }, [project]);
@@ -200,6 +201,7 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
   };
 
   const resetForm = () => {
+    const type = project?.type || "node";
     setFormData({
       name: project?.name || "",
       path: project?.path || "",
@@ -208,12 +210,12 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
         (project?.type && PROJECT_TYPES.find((t) => t.value === project.type)?.script) ||
         "npm start",
       autoStart: project?.autoStart || false,
-      type: project?.type || "node",
+      type,
       description: project?.description || "",
       icon: project?.icon || "",
       clearLogsBeforeStart: project?.clearLogsBeforeStart || false,
-      nodeVersionId: project?.nodeVersionId ?? null,
-      pythonVersionId: project?.pythonVersionId ?? null,
+      nodeVersionId: NODE_PROJECT_TYPES.includes(type) ? (project?.nodeVersionId ?? null) : null,
+      pythonVersionId: type === "python" ? (project?.pythonVersionId ?? null) : null,
     });
   };
 
@@ -266,6 +268,8 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
                       ...prev,
                       type: value,
                       script: value !== "other" && typeInfo ? typeInfo.script : prev.script,
+                      nodeVersionId: NODE_PROJECT_TYPES.includes(value) ? prev.nodeVersionId : null,
+                      pythonVersionId: value === "python" ? prev.pythonVersionId : null,
                     }));
                   }}
                 >
@@ -394,6 +398,10 @@ export default function ProjectSettingsDialog({ project, isOpen, onClose, onSave
                 {formData.type === "python" && (
                   <div className="space-y-2">
                     <Label>Python version</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Portable Python does not include pip; dependencies must be pre-installed or
+                      use system Python for pip.
+                    </p>
                     <Select
                       value={formData.pythonVersionId ?? "__system__"}
                       onValueChange={(v) =>
