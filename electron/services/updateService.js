@@ -1,3 +1,4 @@
+import { app } from "electron";
 import logger from "./logger.js";
 
 const GITHUB_OWNER = "DevRoots-Studio";
@@ -82,6 +83,25 @@ function formatUpdateError(rawMessage) {
   return rawMessage;
 }
 
+/** Normalize version string for comparison (strip "v" prefix). */
+function normalizeVersion(v) {
+  if (v == null || typeof v !== "string") return "";
+  return v.trim().replace(/^v/i, "");
+}
+
+/** True only if remote is a higher version than current (semver-style). Same version => false. */
+function isUpdateNewer(remoteVersion, currentVersion) {
+  const r = normalizeVersion(remoteVersion).split(".");
+  const c = normalizeVersion(currentVersion).split(".");
+  for (let i = 0; i < 3; i++) {
+    const rn = parseInt(r[i] || "0", 10);
+    const cn = parseInt(c[i] || "0", 10);
+    if (rn > cn) return true;
+    if (rn < cn) return false;
+  }
+  return false;
+}
+
 function getReleaseNotesFromUpdateInfo(updateInfo) {
   if (!updateInfo) return null;
   if (typeof updateInfo.releaseNotes === "string") return updateInfo.releaseNotes;
@@ -132,6 +152,18 @@ export async function initUpdateService() {
     autoUpdater.autoInstallOnAppQuit = false;
 
     autoUpdater.on("update-available", async (info) => {
+      const current = app.getVersion();
+      if (!isUpdateNewer(info.version, current)) {
+        updateStatus = "idle";
+        updateVersion = null;
+        releaseNotes = null;
+        updateError = null;
+        logger.info(
+          `[UpdateService] Remote ${info.version} is not newer than current ${current}; ignoring.`
+        );
+        sendStatus({ status: "idle" });
+        return;
+      }
       stopPeriodicUpdateCheck();
       updateStatus = "available";
       updateVersion = info.version;
@@ -208,6 +240,18 @@ export async function checkForUpdates() {
     const info = result?.updateInfo;
     if (!info) {
       updateStatus = "idle";
+      sendStatus({ status: "idle" });
+      return;
+    }
+    const current = app.getVersion();
+    if (!isUpdateNewer(info.version, current)) {
+      updateStatus = "idle";
+      updateVersion = null;
+      releaseNotes = null;
+      updateError = null;
+      logger.info(
+        `[UpdateService] Remote ${info.version} is not newer than current ${current}; up to date.`
+      );
       sendStatus({ status: "idle" });
       return;
     }
