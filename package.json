@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.19.3",
+  "version": "0.19.5",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -101,6 +101,7 @@
     "cross-env": "latest",
     "electron": "latest",
     "electron-builder": "latest",
+    "esbuild": "latest",
     "eslint": "^9.17.0",
     "eslint-plugin-react": "latest",
     "eslint-plugin-react-hooks": "latest",
@@ -114,6 +115,7 @@
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
     "@monaco-editor/react": "latest",
+    "monaco-editor": "latest",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",

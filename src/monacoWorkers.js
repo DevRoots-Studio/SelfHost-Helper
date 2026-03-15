@@ -3,9 +3,9 @@
  * Must run before Monaco is loaded (e.g. before first Editor mount).
  * Uses Vite's ?worker suffix so workers are bundled correctly.
  */
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker.js?worker";
-import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker.js?worker";
-import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker.js?worker";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
+import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 
 function setupMonacoWorkers() {
   if (typeof window === "undefined" || window.MonacoEnvironment?.getWorker) return;
