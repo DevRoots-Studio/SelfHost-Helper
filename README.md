@@ -36,10 +36,12 @@
 <img src="https://img.shields.io/badge/Jotai-333333.svg?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PC9zdmc+" alt="Jotai">
 <img src="https://img.shields.io/badge/Framer_Motion-0055FF.svg?style=flat&logo=framer&logoColor=white" alt="Framer Motion">
 <img src="https://img.shields.io/badge/Cloudflare_Tunnels-F38020.svg?style=flat&logo=cloudflare&logoColor=white" alt="Cloudflare Tunnels">
-
-</div>
 <br>
+<br>
+<a href="https://deepwiki.com/DevRoots-Studio/SelfHost-Helper"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+</div>
 
+<br>
 ---
 
 ## Table of Contents
