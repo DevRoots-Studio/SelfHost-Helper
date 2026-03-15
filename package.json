@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.19.0",
+  "version": "0.19.3",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -90,6 +90,9 @@
     "email": "abomeezo2@gmail.com"
   },
   "license": "ISC",
+  "overrides": {
+    "vite": "$vite"
+  },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@vitejs/plugin-react": "latest",

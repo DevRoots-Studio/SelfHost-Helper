@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const allowedListenerChannels = [
   "project:log",
@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("file:delete", { projectRoot, targetPath }),
   renamePath: (projectRoot, oldPath, newPath) =>
     ipcRenderer.invoke("file:rename", { projectRoot, oldPath, newPath }),
+  copyFilesInto: (projectRoot, destinationPath, sourcePaths) =>
+    ipcRenderer.invoke("files:copyInto", { projectRoot, destinationPath, sourcePaths }),
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   watchFolder: (folderPath) => ipcRenderer.invoke("watcher:watch", folderPath),
   stopWatchingFolder: (folderPath) => ipcRenderer.invoke("watcher:stop", folderPath),
 

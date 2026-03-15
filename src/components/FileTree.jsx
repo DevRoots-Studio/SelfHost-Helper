@@ -36,6 +36,19 @@ import { Button } from "@/components/ui/button";
 import { FILE_TAG_MODE } from "@/config/fileTagConfig";
 
 const API = window.api;
+
+/** Get filesystem paths from a DataTransfer (drag-and-drop). Uses webUtils.getPathForFile on Electron 32+. */
+function getDroppedFilePaths(dataTransfer) {
+  if (!dataTransfer?.files?.length) return [];
+  const paths = [];
+  for (let i = 0; i < dataTransfer.files.length; i++) {
+    const file = dataTransfer.files[i];
+    const path = typeof API.getPathForFile === "function" ? API.getPathForFile(file) : file.path;
+    if (path) paths.push(path);
+  }
+  return paths;
+}
+
 // Sort function: folders first, then files (alphabetically)
 const sortTree = (nodes) => {
   if (!nodes || !Array.isArray(nodes)) return [];
@@ -60,12 +73,23 @@ const sortTree = (nodes) => {
 };
 
 const dirname = (p) => p.replace(/[/\\][^/\\]+$/, "") || p;
+const basename = (p) => (p || "").replace(/^.*[/\\]([^/\\]+)$/, "$1") || p;
 // Normalize to forward slashes so paths are never mixed (backend accepts both)
 const joinPath = (parent, name) => {
   const p = (parent || "").replace(/\\/g, "/");
   return p.endsWith("/") ? p + name : p + "/" + name;
 };
 const normalizePath = (p) => (p || "").replace(/\\/g, "/");
+
+/** DataTransfer type for in-tree move (drag within same project). */
+const MOVE_DATA_TYPE = "application/x-selfhost-file-move";
+
+/** Returns true if dest is the same as src or a descendant of src (invalid move target). */
+function isDescendantOrSelf(normalizedDest, normalizedSrc) {
+  if (normalizedDest === normalizedSrc) return true;
+  const prefix = normalizedSrc.endsWith("/") ? normalizedSrc : normalizedSrc + "/";
+  return normalizedDest.startsWith(prefix);
+}
 
 // Build a map of directories that contain any changed files (directly or nested)
 const buildFolderChangeMap = (nodes, gitStatusByPath) => {
@@ -109,6 +133,7 @@ const FileTreeNode = ({
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
   const [iconError, setIconError] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const isDirectory = node.type === "directory";
   const isSelected = selectedPath === node.path;
   const hasChildren = isDirectory && node.children && node.children.length > 0;
@@ -204,6 +229,93 @@ const FileTreeNode = ({
 
   const iconUrl = getIconUrl(iconName);
 
+  const handleDragStart = useCallback(
+    (e) => {
+      e.dataTransfer.setData(MOVE_DATA_TYPE, node.path);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", node.name);
+    },
+    [node.path, node.name]
+  );
+  const handleDragOver = useCallback(
+    (e) => {
+      if (!isDirectory) return;
+      const hasFiles = e.dataTransfer.types.includes("Files");
+      const hasInternalMove = e.dataTransfer.types.includes(MOVE_DATA_TYPE);
+      if (!hasFiles && !hasInternalMove) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = hasInternalMove ? "move" : "copy";
+      setIsDragOver(true);
+    },
+    [isDirectory]
+  );
+  const handleDragLeave = useCallback((e) => {
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+  const handleDrop = useCallback(
+    async (e) => {
+      if (!isDirectory || !projectRoot) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      const projectNorm = normalizePath(projectRoot);
+      const destNorm = normalizePath(node.path);
+      const movePath = e.dataTransfer.getData(MOVE_DATA_TYPE);
+
+      if (movePath) {
+        const srcNorm = normalizePath(movePath);
+        if (isDescendantOrSelf(destNorm, srcNorm)) {
+          toast.error("Cannot move a folder into itself or into its own subfolder");
+          return;
+        }
+        const newPath = joinPath(node.path, basename(movePath));
+        const newNorm = normalizePath(newPath);
+        if (newNorm === srcNorm) {
+          toast.info("File is already in this folder");
+          return;
+        }
+        const relOld = srcNorm.startsWith(projectNorm)
+          ? srcNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+          : srcNorm;
+        const relNew = newNorm.startsWith(projectNorm)
+          ? newNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+          : newPath;
+        try {
+          await API.renamePath(projectRoot, relOld, relNew);
+          toast.success("Moved");
+          onRefresh?.();
+        } catch (err) {
+          toast.error(err?.message || "Failed to move");
+        }
+        return;
+      }
+
+      const sourcePaths = getDroppedFilePaths(e.dataTransfer);
+      if (!sourcePaths.length) {
+        toast.info("No files to copy");
+        return;
+      }
+      const relPath = destNorm.startsWith(projectNorm)
+        ? destNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+        : destNorm;
+      try {
+        const result = await API.copyFilesInto(projectRoot, relPath, sourcePaths);
+        onRefresh?.();
+        if (result?.copied) {
+          toast.success(`Copied ${result.copied} item(s)`);
+        }
+        if (result?.errors?.length) {
+          toast.error(result.errors.map((err) => err.message).join(", "));
+        }
+      } catch (err) {
+        toast.error(err?.message || "Failed to copy");
+      }
+    },
+    [isDirectory, projectRoot, node.path, onRefresh]
+  );
+
   return (
     <div className="select-none">
       <ContextMenu>
@@ -213,12 +325,18 @@ const FileTreeNode = ({
               "flex items-center py-1.5 px-2 hover:bg-white/5 cursor-pointer transition-colors text-sm group rounded-lg mx-1",
               isSelected
                 ? "bg-primary/10 text-primary font-medium"
-                : "text-foreground/70 hover:text-foreground"
+                : "text-foreground/70 hover:text-foreground",
+              isDirectory && isDragOver && "bg-primary/20 ring-1 ring-primary/50 ring-inset"
             )}
             style={{ paddingLeft: `${level * 12 + 8}px` }}
+            draggable
             onClick={handleSelect}
             whileHover={{ x: 2 }}
             transition={{ duration: 0.15 }}
+            onDragStart={handleDragStart}
+            onDragOver={isDirectory ? handleDragOver : undefined}
+            onDragLeave={isDirectory ? handleDragLeave : undefined}
+            onDrop={isDirectory ? handleDrop : undefined}
           >
             <span
               className="mr-1.5 flex items-center justify-center w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity"
@@ -388,6 +506,74 @@ export default function FileTree({
 
   const [pendingCreate, setPendingCreate] = useState(null);
   const [newItemName, setNewItemName] = useState("");
+  const [rootDragOver, setRootDragOver] = useState(false);
+
+  const handleRootDragOver = useCallback((e) => {
+    const hasFiles = e.dataTransfer.types.includes("Files");
+    const hasInternalMove = e.dataTransfer.types.includes(MOVE_DATA_TYPE);
+    if (!hasFiles && !hasInternalMove) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = hasInternalMove ? "move" : "copy";
+    setRootDragOver(true);
+  }, []);
+  const handleRootDragLeave = useCallback((e) => {
+    e.stopPropagation();
+    setRootDragOver(false);
+  }, []);
+  const handleRootDrop = useCallback(
+    async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setRootDragOver(false);
+      if (!projectRoot) return;
+      const projectNorm = normalizePath(projectRoot);
+      const movePath = e.dataTransfer.getData(MOVE_DATA_TYPE);
+
+      if (movePath) {
+        const srcNorm = normalizePath(movePath);
+        const newPath = joinPath(projectRoot.replace(/[/\\]+$/, ""), basename(movePath));
+        const newNorm = normalizePath(newPath);
+        if (newNorm === srcNorm) {
+          toast.info("File is already at project root");
+          return;
+        }
+        const relOld = srcNorm.startsWith(projectNorm)
+          ? srcNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+          : srcNorm;
+        const relNew = newNorm.startsWith(projectNorm)
+          ? newNorm.slice(projectNorm.length).replace(/^[/\\]/, "")
+          : basename(movePath);
+        try {
+          await API.renamePath(projectRoot, relOld, relNew);
+          toast.success("Moved");
+          onRefresh?.();
+        } catch (err) {
+          toast.error(err?.message || "Failed to move");
+        }
+        return;
+      }
+
+      const sourcePaths = getDroppedFilePaths(e.dataTransfer);
+      if (!sourcePaths.length) {
+        toast.info("No files to copy");
+        return;
+      }
+      try {
+        const result = await API.copyFilesInto(projectRoot, "", sourcePaths);
+        onRefresh?.();
+        if (result?.copied) {
+          toast.success(`Copied ${result.copied} item(s)`);
+        }
+        if (result?.errors?.length) {
+          toast.error(result.errors.map((err) => err.message).join(", "));
+        }
+      } catch (err) {
+        toast.error(err?.message || "Failed to copy");
+      }
+    },
+    [projectRoot, onRefresh]
+  );
 
   const openCreateDialog = useCallback(
     (type, parentPath) => {
@@ -447,7 +633,15 @@ export default function FileTree({
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="overflow-auto h-full pb-4 min-h-[120px]">
+          <div
+            className={cn(
+              "overflow-auto h-full pb-4 min-h-[120px] flex flex-col transition-colors",
+              projectRoot && rootDragOver && "bg-primary/10"
+            )}
+            onDragOver={projectRoot ? handleRootDragOver : undefined}
+            onDragLeave={projectRoot ? handleRootDragLeave : undefined}
+            onDrop={projectRoot ? handleRootDrop : undefined}
+          >
             {!files || files.length === 0 ? (
               <div className="p-4 text-xs text-muted-foreground italic text-center">
                 No files found
