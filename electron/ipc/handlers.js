@@ -412,10 +412,62 @@ export const registerHandlers = () => {
       if (!isUnderRoot(resolvedOld, projectRoot) || !isUnderRoot(resolvedNew, projectRoot)) {
         throw new Error("Paths must be inside project");
       }
-      await fs.rename(resolvedOld, resolvedNew);
-      return true;
+      try {
+        await fs.rename(resolvedOld, resolvedNew);
+        return true;
+      } catch (renameErr) {
+        const isDirMoveError = renameErr?.code === "EPERM" || renameErr?.code === "EXDEV";
+        const stat = await fs.stat(resolvedOld).catch(() => null);
+        if (isDirMoveError && stat?.isDirectory()) {
+          await fs.cp(resolvedOld, resolvedNew, { recursive: true, force: true });
+          await fs.rm(resolvedOld, { recursive: true, force: true });
+          return true;
+        }
+        throw renameErr;
+      }
     } catch (e) {
       logger.error(`Error renaming ${oldPath} to ${newPath}:`, e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle("files:copyInto", async (_, { projectRoot, destinationPath, sourcePaths }) => {
+    try {
+      if (!projectRoot || !Array.isArray(sourcePaths)) {
+        throw new Error("projectRoot and sourcePaths (array) are required");
+      }
+      const resolvedDest = path.resolve(projectRoot, destinationPath || ".");
+      if (!isUnderRoot(resolvedDest, projectRoot)) {
+        throw new Error("Destination must be inside project");
+      }
+      await fs.mkdir(resolvedDest, { recursive: true });
+      const stat = await fs.stat(resolvedDest).catch(() => null);
+      if (stat && !stat.isDirectory()) {
+        throw new Error("Destination is not a directory");
+      }
+      let copied = 0;
+      const errors = [];
+      for (const sourcePath of sourcePaths) {
+        if (!sourcePath || typeof sourcePath !== "string") continue;
+        const src = path.resolve(sourcePath);
+        try {
+          const srcStat = await fs.stat(src);
+          const destItem = path.join(resolvedDest, path.basename(src));
+          if (srcStat.isDirectory()) {
+            await fs.cp(src, destItem, { recursive: true, force: true });
+            copied++;
+          } else {
+            await fs.copyFile(src, destItem);
+            copied++;
+          }
+        } catch (e) {
+          logger.warn(`Failed to copy ${src}:`, e);
+          errors.push({ path: src, message: e?.message || String(e) });
+        }
+      }
+      return { copied, errors: errors.length ? errors : undefined };
+    } catch (e) {
+      logger.error("files:copyInto error:", e);
       throw e;
     }
   });
