@@ -516,6 +516,22 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     typeof window !== "undefined" && window.innerWidth <= 900
   );
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [isRtl, setIsRtl] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      (document.documentElement.getAttribute("dir") === "rtl" ||
+        getComputedStyle(document.documentElement).direction === "rtl")
+  );
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const updateRtl = () => {
+      setIsRtl(el.getAttribute("dir") === "rtl" || getComputedStyle(el).direction === "rtl");
+    };
+    const observer = new MutationObserver(updateRtl);
+    observer.observe(el, { attributes: true, attributeFilter: ["dir"] });
+    return () => observer.disconnect();
+  }, []);
   const [discordInfo, setDiscordInfo] = useState(null);
   const [updateStatus, setUpdateStatus] = useState("idle");
   const [updateVersion, setUpdateVersion] = useState("");
@@ -847,7 +863,8 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         <div
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
-            width < 120 ? "justify-center px-0" : "justify-between px-4"
+            width < 120 ? "justify-center px-0" : "justify-between px-4",
+            isRtl && "pl-[140px]"
           )}
         >
           <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
