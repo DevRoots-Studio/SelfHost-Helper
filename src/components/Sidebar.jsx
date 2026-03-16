@@ -868,6 +868,12 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           )}
         >
           <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+            <img
+              src="media://app/resources/icon.png"
+              alt="SelfHost Helper"
+              className="w-8 h-8 rounded-lg object-cover shrink-0"
+              draggable={false}
+            />
             <AnimatePresence>
               {width >= 120 && (
                 <motion.h1

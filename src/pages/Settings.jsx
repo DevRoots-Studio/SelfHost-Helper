@@ -1,21 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import {
-  ArrowLeft,
-  Terminal,
-  FolderOpen,
-  FileUp,
-  RotateCcw,
-  Download,
-  RefreshCw,
-  Loader2,
-  Trash2,
-} from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, SlidersHorizontal, Database, Box, Download, Info } from "lucide-react";
 
 const API = window.api;
 
@@ -26,29 +12,96 @@ const UPDATE_STATUS_DOWNLOADING = "downloading";
 const UPDATE_STATUS_DOWNLOADED = "downloaded";
 const UPDATE_STATUS_ERROR = "error";
 
-/**
- * Render the main application Settings page for managing general preferences, data & backups,
- * portable runtimes (Node & Python), and application updates.
- *
- * Provides UI and state handling for auto-launch, log clearing, restore from backups, listing and
- * installing/uninstalling portable runtimes, update checks/installation, and displays app info.
- * @returns {JSX.Element} The rendered Settings page component.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings nav sidebar
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { path: "general", label: "General", Icon: SlidersHorizontal },
+  { path: "data", label: "Data & Backup", Icon: Database },
+  { path: "runtimes", label: "Runtimes", Icon: Box },
+  { path: "updates", label: "Updates", Icon: Download },
+  { path: "about", label: "About", Icon: Info },
+];
+
+function SettingsNav() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <aside className="w-56 shrink-0 flex flex-col h-screen border-r border-white/5 bg-transparent backdrop-blur-xl overflow-hidden">
+      {/* Brand + back */}
+      <div className="px-4 pt-5 pb-4 drag">
+        <div className="flex items-center gap-2.5 mb-5 no-drag">
+          <img
+            src="media://app/resources/icon.png"
+            alt="SelfHost Helper"
+            className="w-8 h-8 rounded-lg object-cover shrink-0"
+            draggable={false}
+          />
+          <span className="font-bold text-sm tracking-tight">Settings</span>
+        </div>
+        <Link
+          to="/"
+          className="no-drag flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors group"
+        >
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back to app
+        </Link>
+      </div>
+
+      {/* Nav items */}
+      <nav className="flex-1 px-3 pb-6 space-y-0.5 overflow-y-auto">
+        {NAV_ITEMS.map(({ path, label, Icon }) => {
+          const isActive = location.pathname.includes(`/settings/${path}`);
+          return (
+            <button
+              key={path}
+              onClick={() => navigate(`/settings/${path}`)}
+              className={[
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer text-left",
+                isActive
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5",
+              ].join(" ")}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+              {isActive && (
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings layout (holds all state + handlers, passes via Outlet context)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Settings() {
+  // ── General ──────────────────────────────────────────────────────────────
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
   const [startMaximized, setStartMaximized] = useState(false);
+
+  // ── Data & Backup ─────────────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState("");
   const [userDataPath, setUserDataPath] = useState("");
   const [backupCandidates, setBackupCandidates] = useState([]);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
+  // ── Updates ───────────────────────────────────────────────────────────────
   const [updateStatus, setUpdateStatus] = useState(UPDATE_STATUS_IDLE);
   const [updateVersion, setUpdateVersion] = useState("");
   const [updateError, setUpdateError] = useState("");
   const [releaseNotes, setReleaseNotes] = useState("");
   const unsubUpdaterRef = useRef(null);
 
+  // ── Runtimes ─────────────────────────────────────────────────────────────
   const [installedNodeRuntimes, setInstalledNodeRuntimes] = useState([]);
   const [installedPythonRuntimes, setInstalledPythonRuntimes] = useState([]);
   const [availableNodeVersions, setAvailableNodeVersions] = useState([]);
@@ -58,9 +111,9 @@ export default function Settings() {
   const [runtimeInstallLoading, setRuntimeInstallLoading] = useState(false);
   const [runtimeInstallProgress, setRuntimeInstallProgress] = useState(null);
   const [runtimeInstallError, setRuntimeInstallError] = useState("");
-  /** { type: 'node'|'python', versionId: string } when an install is in progress */
   const [installingRuntime, setInstallingRuntime] = useState(null);
 
+  // ── Initialization ────────────────────────────────────────────────────────
   useEffect(() => {
     loadSettings();
     loadAutoLaunchStatus();
@@ -68,48 +121,6 @@ export default function Settings() {
     loadBackupInfo();
     loadRuntimesAndProjects();
   }, []);
-
-  const loadRuntimesAndProjects = async () => {
-    try {
-      if (API.runtimeListInstalled) {
-        const [nodeList, pythonList] = await Promise.all([
-          API.runtimeListInstalled("node"),
-          API.runtimeListInstalled("python"),
-        ]);
-        setInstalledNodeRuntimes(Array.isArray(nodeList) ? nodeList : []);
-        setInstalledPythonRuntimes(Array.isArray(pythonList) ? pythonList : []);
-      }
-      if (API.getProjects) {
-        const list = await API.getProjects();
-        setProjects(Array.isArray(list) ? list : []);
-      }
-      if (window.api?.runtimeListAvailable) {
-        const [nodeAvail, pythonAvail] = await Promise.allSettled([
-          window.api.runtimeListAvailable("node"),
-          window.api.runtimeListAvailable("python"),
-        ]);
-        const toArray = (v) => {
-          if (Array.isArray(v)) return v;
-          if (v && typeof v === "object" && typeof v.length === "number") return Array.from(v);
-          return [];
-        };
-        setAvailableNodeVersions(nodeAvail.status === "fulfilled" ? toArray(nodeAvail.value) : []);
-        setAvailablePythonVersions(
-          pythonAvail.status === "fulfilled" ? toArray(pythonAvail.value) : []
-        );
-        if (nodeAvail.status === "rejected")
-          console.error("Failed to load Node versions", nodeAvail.reason);
-        if (pythonAvail.status === "rejected")
-          console.error("Failed to load Python versions", pythonAvail.reason);
-      }
-    } catch (e) {
-      console.error("Failed to load runtimes/projects", e);
-      setAvailableNodeVersions([]);
-      setAvailablePythonVersions([]);
-    } finally {
-      setAvailableVersionsLoaded(true);
-    }
-  };
 
   useEffect(() => {
     const syncUpdateStatus = async () => {
@@ -162,6 +173,45 @@ export default function Settings() {
     };
   }, []);
 
+  // ── Loaders ───────────────────────────────────────────────────────────────
+  const loadRuntimesAndProjects = async () => {
+    try {
+      if (API.runtimeListInstalled) {
+        const [nodeList, pythonList] = await Promise.all([
+          API.runtimeListInstalled("node"),
+          API.runtimeListInstalled("python"),
+        ]);
+        setInstalledNodeRuntimes(Array.isArray(nodeList) ? nodeList : []);
+        setInstalledPythonRuntimes(Array.isArray(pythonList) ? pythonList : []);
+      }
+      if (API.getProjects) {
+        const list = await API.getProjects();
+        setProjects(Array.isArray(list) ? list : []);
+      }
+      if (window.api?.runtimeListAvailable) {
+        const [nodeAvail, pythonAvail] = await Promise.allSettled([
+          window.api.runtimeListAvailable("node"),
+          window.api.runtimeListAvailable("python"),
+        ]);
+        const toArray = (v) => {
+          if (Array.isArray(v)) return v;
+          if (v && typeof v === "object" && typeof v.length === "number") return Array.from(v);
+          return [];
+        };
+        setAvailableNodeVersions(nodeAvail.status === "fulfilled" ? toArray(nodeAvail.value) : []);
+        setAvailablePythonVersions(
+          pythonAvail.status === "fulfilled" ? toArray(pythonAvail.value) : []
+        );
+      }
+    } catch (e) {
+      console.error("Failed to load runtimes/projects", e);
+      setAvailableNodeVersions([]);
+      setAvailablePythonVersions([]);
+    } finally {
+      setAvailableVersionsLoaded(true);
+    }
+  };
+
   const loadBackupInfo = async () => {
     try {
       const path = await API.getUserDataPath();
@@ -201,6 +251,7 @@ export default function Settings() {
     }
   };
 
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleAutoLaunchToggle = async (enabled) => {
     try {
       if (enabled) {
@@ -212,7 +263,6 @@ export default function Settings() {
       }
       setAutoLaunchEnabled(enabled);
     } catch (e) {
-      console.error("Failed to toggle auto-launch", e);
       toast.error("Failed to change auto-launch setting");
     }
   };
@@ -223,7 +273,6 @@ export default function Settings() {
       setClearLogsBeforeStart(enabled);
       toast.success(`Clear Logs Before Start ${enabled ? "enabled" : "disabled"} globally`);
     } catch (e) {
-      console.error("Failed to toggle clear logs setting", e);
       toast.error("Failed to update setting");
     }
   };
@@ -234,7 +283,6 @@ export default function Settings() {
       setStartMaximized(enabled);
       toast.success(`Start maximized ${enabled ? "enabled" : "disabled"}`);
     } catch (e) {
-      console.error("Failed to toggle start maximized setting", e);
       toast.error("Failed to update setting");
     }
   };
@@ -244,7 +292,6 @@ export default function Settings() {
       if (userDataPath) await API.openPath(userDataPath);
       else toast.error("Data folder path not available");
     } catch (e) {
-      console.error("Failed to open data folder", e);
       toast.error("Failed to open folder");
     }
   };
@@ -258,13 +305,10 @@ export default function Settings() {
         toast.error(result.error);
         return;
       }
-      const { projects = 0, categories = 0 } = result?.restored ?? {};
-      toast.success(
-        `Restored ${projects} projects and ${categories} categories. The project list will refresh.`
-      );
+      const { projects: p = 0, categories: c = 0 } = result?.restored ?? {};
+      toast.success(`Restored ${p} projects and ${c} categories.`);
       loadBackupInfo();
     } catch (e) {
-      console.error("Restore failed", e);
       toast.error(e?.message || "Restore failed");
     } finally {
       setRestoreLoading(false);
@@ -316,13 +360,6 @@ export default function Settings() {
     }
   };
 
-  const isNodeVersionInstalled = (id) =>
-    installedNodeRuntimes.some((r) => r.id === id || r.version === id);
-  const isPythonVersionInstalled = (id) =>
-    installedPythonRuntimes.some((r) => r.id === id || r.version === id);
-  const isInstalling = (type, versionId) =>
-    installingRuntime?.type === type && installingRuntime?.versionId === versionId;
-
   const handleUninstallRuntime = async (type, id) => {
     const usedBy = projects.filter(
       (p) =>
@@ -336,9 +373,8 @@ export default function Settings() {
         !confirm(
           `This version is used by: ${names}. Remove anyway? Those projects will use system PATH until you pick another version.`
         )
-      ) {
+      )
         return;
-      }
     }
     try {
       await API.runtimeUninstall?.(type, id, force);
@@ -349,521 +385,63 @@ export default function Settings() {
     }
   };
 
-  const renderReleaseNotes = (notes) => {
-    if (!notes || !notes.trim()) return null;
-    return (
-      <div className="mt-3 p-4 rounded-lg bg-black/20 border border-white/5 text-sm text-muted-foreground overflow-y-auto max-h-64 prose prose-invert prose-sm max-w-none">
-        <ReactMarkdown
-          components={{
-            a: ({ href, children }) => (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline"
-              >
-                {children}
-              </a>
-            ),
-          }}
-        >
-          {notes}
-        </ReactMarkdown>
-      </div>
-    );
+  const isNodeVersionInstalled = (id) =>
+    installedNodeRuntimes.some((r) => r.id === id || r.version === id);
+  const isPythonVersionInstalled = (id) =>
+    installedPythonRuntimes.some((r) => r.id === id || r.version === id);
+  const isInstalling = (type, versionId) =>
+    installingRuntime?.type === type && installingRuntime?.versionId === versionId;
+
+  const outletContext = {
+    // General
+    autoLaunchEnabled,
+    handleAutoLaunchToggle,
+    clearLogsBeforeStart,
+    handleClearLogsToggle,
+    startMaximized,
+    handleStartMaximizedToggle,
+    // Data
+    userDataPath,
+    backupCandidates,
+    restoreLoading,
+    handleOpenDataFolder,
+    handleChooseBackupFile,
+    handleRestoreFromPath,
+    // Runtimes
+    installedNodeRuntimes,
+    installedPythonRuntimes,
+    availableNodeVersions,
+    availablePythonVersions,
+    availableVersionsLoaded,
+    runtimeInstallLoading,
+    runtimeInstallProgress,
+    runtimeInstallError,
+    installingRuntime,
+    handleInstallRuntime,
+    handleUninstallRuntime,
+    isNodeVersionInstalled,
+    isPythonVersionInstalled,
+    isInstalling,
+    projects,
+    loadRuntimesAndProjects,
+    // Updates
+    updateStatus,
+    updateVersion,
+    updateError,
+    releaseNotes,
+    handleCheckForUpdates,
+    handleStartInstall,
+    handleRestartToApply,
+    // Shared
+    appVersion,
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto h-screen overflow-y-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <Link to="/" className="p-2 rounded-full hover:bg-white/10 transition-colors">
-          <ArrowLeft size={24} />
-        </Link>
-        <h1 className="text-3xl font-bold">App Settings</h1>
-      </div>
-
-      <div className="space-y-8">
-        {/* General Settings */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">General</h2>
-
-          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="auto-launch" className="text-base font-semibold cursor-pointer">
-                  Launch on Startup
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically start SelfHost Helper when your computer boots up.
-                </p>
-              </div>
-              <Switch
-                id="auto-launch"
-                checked={autoLaunchEnabled}
-                onCheckedChange={handleAutoLaunchToggle}
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-6 border-t border-white/5">
-              <div className="space-y-1">
-                <Label htmlFor="clear-logs" className="text-base font-semibold cursor-pointer">
-                  Clear Terminal Logs Before Start (Global)
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically clear the logs of any project before it starts.
-                </p>
-              </div>
-              <Switch
-                id="clear-logs"
-                checked={clearLogsBeforeStart}
-                onCheckedChange={handleClearLogsToggle}
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-6 border-t border-white/5">
-              <div className="space-y-1">
-                <Label htmlFor="start-maximized" className="text-base font-semibold cursor-pointer">
-                  Start maximized
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Open the app window maximized (full screen) on startup.
-                </p>
-              </div>
-              <Switch
-                id="start-maximized"
-                checked={startMaximized}
-                onCheckedChange={handleStartMaximizedToggle}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Data & backup – restore from legacy/backup */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">Data &amp; backup</h2>
-
-          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-4">
-            <p className="text-sm text-muted-foreground">
-              If you lost your projects after updating (e.g. from an older version), you can restore
-              from a backup. Backups are created automatically when the app migrates an old
-              database. Put your backup file in the data folder, or choose it from anywhere.
-            </p>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleOpenDataFolder}
-                disabled={!userDataPath}
-                className="gap-2"
-              >
-                <FolderOpen className="h-4 w-4" />
-                Open data folder
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleChooseBackupFile}
-                disabled={restoreLoading}
-                className="gap-2"
-              >
-                <FileUp className="h-4 w-4" />
-                Choose backup file…
-              </Button>
-            </div>
-
-            {backupCandidates.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/5">
-                <p className="text-sm font-medium">Backup files in data folder:</p>
-                <ul className="space-y-1">
-                  {backupCandidates.map((c) => (
-                    <li key={c.path} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate text-muted-foreground" title={c.path}>
-                        {c.name}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRestoreFromPath(c.path, true)}
-                        disabled={restoreLoading}
-                        className="gap-1 shrink-0"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Restore
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Portable runtimes (Node & Python) */}
-        {API.runtimeListInstalled && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold border-b border-white/10 pb-2">
-              Portable runtimes (Node &amp; Python)
-            </h2>
-            <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-6">
-              <p className="text-sm text-muted-foreground">
-                Install portable Node.js or Python versions once and use them per project. Each
-                version is stored in your data folder and can be selected in project settings.
-              </p>
-
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">Installed</Label>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Node.js</p>
-                    {installedNodeRuntimes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No Node versions installed.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {installedNodeRuntimes.map((r) => {
-                          const usedBy = projects.filter(
-                            (p) => p.nodeVersionId === r.id || p.nodeVersionId === r.version
-                          );
-                          return (
-                            <li
-                              key={r.id}
-                              className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-black/20 border border-white/5"
-                            >
-                              <div className="min-w-0">
-                                <span className="font-medium">{r.version || r.id}</span>
-                                <p
-                                  className="text-xs text-muted-foreground truncate"
-                                  title={r.path}
-                                >
-                                  {r.path}
-                                </p>
-                                {usedBy.length > 0 && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    Used by: {usedBy.map((p) => p.name).join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUninstallRuntime("node", r.id)}
-                                className="gap-1 shrink-0 text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Remove
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Python</p>
-                    {installedPythonRuntimes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No Python versions installed.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {installedPythonRuntimes.map((r) => {
-                          const usedBy = projects.filter(
-                            (p) => p.pythonVersionId === r.id || p.pythonVersionId === r.version
-                          );
-                          return (
-                            <li
-                              key={r.id}
-                              className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-black/20 border border-white/5"
-                            >
-                              <div className="min-w-0">
-                                <span className="font-medium">{r.version || r.id}</span>
-                                <p
-                                  className="text-xs text-muted-foreground truncate"
-                                  title={r.path}
-                                >
-                                  {r.path}
-                                </p>
-                                {usedBy.length > 0 && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    Used by: {usedBy.map((p) => p.name).join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUninstallRuntime("python", r.id)}
-                                className="gap-1 shrink-0 text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Remove
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-base font-semibold">
-                    Available versions (from official APIs)
-                  </Label>
-                  {availableVersionsLoaded && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setAvailableVersionsLoaded(false);
-                        loadRuntimesAndProjects();
-                      }}
-                      className="gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Retry
-                    </Button>
-                  )}
-                </div>
-                {runtimeInstallError && (
-                  <p className="text-sm text-destructive">{runtimeInstallError}</p>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Node.js</p>
-                    <ul className="space-y-1 max-h-64 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
-                      {!availableVersionsLoaded ? (
-                        <li className="text-sm text-muted-foreground py-2">Loading…</li>
-                      ) : availableNodeVersions.length === 0 ? (
-                        <li className="text-sm text-muted-foreground py-2 flex items-center gap-2">
-                          No versions (check connection or retry)
-                        </li>
-                      ) : (
-                        availableNodeVersions.map((v) => {
-                          const id = v.id || v.version;
-                          const installed = isNodeVersionInstalled(id);
-                          const installing = isInstalling("node", id);
-                          return (
-                            <li
-                              key={id}
-                              className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-white/5"
-                            >
-                              <span className="font-mono text-sm truncate">{v.version || id}</span>
-                              {installed ? (
-                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
-                                  Installed
-                                </span>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 gap-1 shrink-0"
-                                  disabled={runtimeInstallLoading}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleInstallRuntime("node", id);
-                                  }}
-                                >
-                                  {installing ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      {runtimeInstallProgress?.percent != null
-                                        ? `${runtimeInstallProgress.percent}%`
-                                        : "…"}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Download className="h-3 w-3" />
-                                      Install
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Python</p>
-                    <ul className="space-y-1 max-h-64 overflow-y-auto rounded-lg border border-white/5 bg-black/20 p-2">
-                      {!availableVersionsLoaded ? (
-                        <li className="text-sm text-muted-foreground py-2">Loading…</li>
-                      ) : availablePythonVersions.length === 0 ? (
-                        <li className="text-sm text-muted-foreground py-2">
-                          No versions (check connection or retry)
-                        </li>
-                      ) : (
-                        availablePythonVersions.map((v) => {
-                          const id = v.id || v.version;
-                          const installed = isPythonVersionInstalled(id);
-                          const installing = isInstalling("python", id);
-                          return (
-                            <li
-                              key={id}
-                              className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-white/5"
-                            >
-                              <span className="font-mono text-sm truncate">{v.version || id}</span>
-                              {installed ? (
-                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
-                                  Installed
-                                </span>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 gap-1 shrink-0"
-                                  disabled={runtimeInstallLoading}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleInstallRuntime("python", id);
-                                  }}
-                                >
-                                  {installing ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      {runtimeInstallProgress?.percent != null
-                                        ? `${runtimeInstallProgress.percent}%`
-                                        : "…"}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Download className="h-3 w-3" />
-                                      Install
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Updates */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">Updates</h2>
-
-          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Current version:{" "}
-              <span className="font-medium text-foreground">{appVersion || "—"}</span>
-            </p>
-
-            {updateStatus === UPDATE_STATUS_IDLE && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCheckForUpdates}
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Check for updates
-              </Button>
-            )}
-
-            {updateStatus === UPDATE_STATUS_CHECKING && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Checking for updates…
-              </div>
-            )}
-
-            {updateStatus === UPDATE_STATUS_AVAILABLE && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">
-                  A new version <strong>v{updateVersion}</strong> is available.
-                </p>
-                {renderReleaseNotes(releaseNotes)}
-                <Button type="button" size="sm" onClick={handleStartInstall} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Install
-                </Button>
-              </div>
-            )}
-
-            {(updateStatus === UPDATE_STATUS_DOWNLOADING || updateStatus === "downloading") && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Downloading… Please wait.
-              </div>
-            )}
-
-            {updateStatus === UPDATE_STATUS_DOWNLOADED && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-green-500 dark:text-green-400">
-                  Installation complete. Please restart the app to use the new version.
-                </p>
-                {updateVersion && (
-                  <p className="text-sm text-muted-foreground">New version: v{updateVersion}</p>
-                )}
-                {renderReleaseNotes(releaseNotes)}
-                <Button type="button" size="sm" onClick={handleRestartToApply} className="gap-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Restart
-                </Button>
-              </div>
-            )}
-
-            {updateStatus === UPDATE_STATUS_ERROR && (
-              <div className="space-y-2">
-                <p className="text-sm text-destructive">{updateError || "An error occurred."}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCheckForUpdates}
-                  className="gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Check for updates again
-                </Button>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* About Section */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold border-b border-white/10 pb-2">About</h2>
-
-          <div className="p-6 bg-white/5 backdrop-blur-md rounded-xl border border-white/5 shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-32 bg-primary/20 blur-[100px] rounded-full pointer-events-none -mr-16 -mt-16 opacity-50 group-hover:opacity-70 transition-opacity" />
-
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 bg-linear-to-br from-primary to-violet-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
-                <Terminal className="text-white h-8 w-8" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl tracking-tight">SelfHost Helper</h3>
-                <p className="text-sm text-muted-foreground">
-                  Version {appVersion || "Loading..."}
-                </p>
-              </div>
-            </div>
-            <p className="text-muted-foreground relative z-10 max-w-lg leading-relaxed">
-              Manage and monitor your self-hosted Node.js applications with ease. Built with
-              Electron, React, and passion.
-            </p>
-          </div>
-        </section>
-      </div>
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
+      <SettingsNav />
+      <main className="flex-1 overflow-y-auto custom-scrollbar">
+        <Outlet context={outletContext} />
+      </main>
     </div>
   );
 }

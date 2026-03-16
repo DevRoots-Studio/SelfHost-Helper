@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
+import GeneralSection from "./pages/settings/GeneralSection";
+import DataSection from "./pages/settings/DataSection";
+import RuntimesSection from "./pages/settings/RuntimesSection";
+import UpdatesSection from "./pages/settings/UpdatesSection";
+import AboutSection from "./pages/settings/AboutSection";
 import ProjectLayout from "./components/ProjectLayout";
 import EmptyState from "./components/EmptyState";
 import LogViewer from "./components/LogViewer";
@@ -40,7 +45,14 @@ function App() {
               <Route path="resources" element={<ResourcesTab />} />
             </Route>
           </Route>
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<Settings />}>
+            <Route index element={<Navigate to="general" replace />} />
+            <Route path="general"  element={<GeneralSection />} />
+            <Route path="data"     element={<DataSection />} />
+            <Route path="runtimes" element={<RuntimesSection />} />
+            <Route path="updates"  element={<UpdatesSection />} />
+            <Route path="about"    element={<AboutSection />} />
+          </Route>
         </Routes>
         <ToastContainer
           position="bottom-right"
