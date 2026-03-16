@@ -22,13 +22,11 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAtom, useSetAtom } from "jotai";
 import {
   projectsAtom,
   categoriesAtom,
-  selectedProjectAtom,
-  selectedProjectIdAtom,
   isAddProjectModalOpenAtom,
   isProjectSettingsOpenAtom,
 } from "@/store/atoms";
@@ -44,9 +42,10 @@ import {
 const API = window.api;
 
 const Sidebar = React.memo(({ onProjectsChange }) => {
+  const navigate = useNavigate();
+  const { projectId } = useParams();
+  const activeProjectId = projectId != null ? Number(projectId) : null;
   const [projects, setProjects] = useAtom(projectsAtom);
-  const selectedProject = useAtomValue(selectedProjectAtom);
-  const setSelectedProjectId = useSetAtom(selectedProjectIdAtom);
 
   const [categories, setCategories] = useAtom(categoriesAtom);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -547,7 +546,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     );
   };
 
-  const navigate = useNavigate();
   const [width, setWidth] = useState(72);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -682,7 +680,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   };
 
   const renderProject = (p, index) => {
-    const isSelected = selectedProject?.id === p.id;
+    const isSelected = activeProjectId === p.id;
     return (
       <Draggable key={`project-${p.id}`} draggableId={`project-${p.id}`} index={index}>
         {(provided, snapshot) => {
@@ -702,7 +700,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
-                    onClick={() => setSelectedProjectId(p.id)}
+                    onClick={() => navigate(`/project/${p.id}/console`)}
                     className={cn(
                       "sidebar-item group relative transition-all duration-200 select-none",
                       width < 120 ? "collapsed" : "",
@@ -810,7 +808,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 <ContextMenuContent>
                   <ContextMenuItem
                     onClick={() => {
-                      setSelectedProjectId(p.id);
+                      navigate(`/project/${p.id}/console`);
                       setIsProjectSettingsOpen(true);
                     }}
                   >

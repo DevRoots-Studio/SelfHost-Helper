@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   FileCode,
   Save,
@@ -82,15 +83,21 @@ const getLanguageFromPath = (filePath) => {
   return languageMap[ext] || "plaintext";
 };
 
-export default function EditorView({
-  projectId,
-  projectPath,
-  fileTree,
-  isFileTreeLoading,
-  initialFile,
-  onFileSelect,
-  onRefreshFileTree,
-}) {
+export default function EditorView() {
+  const context = useOutletContext();
+  const project = context?.project ?? null;
+  const projectId = project?.id;
+  const projectPath = project?.path ?? "";
+  const fileTree = context?.fileTree ?? [];
+  const isFileTreeLoading = context?.isFileTreeLoading ?? false;
+  const projectEditorStates = context?.projectEditorStates ?? {};
+  const initialFile = project ? projectEditorStates[project.id] : null;
+  const onFileSelect = context?.handleEditorFileChange
+    ? (path) => context.handleEditorFileChange(project?.id, path)
+    : () => {};
+  const onRefreshFileTree = context?.loadFileTree
+    ? () => project?.path && context.loadFileTree(project.path)
+    : () => {};
   const [editorContent, setEditorContent] = useState("");
   const [currentFile, setCurrentFile] = useState(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
@@ -411,6 +418,8 @@ export default function EditorView({
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [handleSaveFile]);
+
+  if (!project) return null;
 
   return (
     <div className="h-full min-h-0 flex text-sm">

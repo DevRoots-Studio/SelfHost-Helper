@@ -134,6 +134,11 @@ function stopPeriodicUpdateCheck() {
 }
 
 export async function initUpdateService() {
+  if (!app.isPackaged) {
+    logger.info("[UpdateService] Skipping update checks in development (app not packaged).");
+    return;
+  }
+
   try {
     const mod = await import("electron-updater");
     const updater = mod.autoUpdater ?? mod.default?.autoUpdater;
