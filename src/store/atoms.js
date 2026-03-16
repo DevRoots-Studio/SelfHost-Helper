@@ -34,3 +34,6 @@ export const unsavedChangesAtom = atom({});
 
 // Cloudflare Tunnel State (projectId -> { status, url, logs })
 export const tunnelStateAtom = atom({});
+
+// Window control buttons position: "left" | "right" (used for RTL / dev testing)
+export const windowButtonsSideAtom = atom("right");

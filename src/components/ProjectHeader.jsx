@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
 import { useAtom } from "jotai";
-import { isProjectSettingsOpenAtom } from "@/store/atoms";
+import { isProjectSettingsOpenAtom, windowButtonsSideAtom } from "@/store/atoms";
 
 export default function ProjectHeader({
   selectedProject,
@@ -16,9 +16,15 @@ export default function ProjectHeader({
   onUpdate,
 }) {
   const [isSettingsOpen, setIsSettingsOpen] = useAtom(isProjectSettingsOpenAtom);
+  const [windowButtonsSide] = useAtom(windowButtonsSideAtom);
 
   return (
-    <header className="h-auto min-h-[64px] flex items-center px-4 md:px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag py-2 flex-wrap gap-2  md:pr-[140px]">
+    <header
+      className={cn(
+        "h-auto min-h-[64px] flex items-center px-4 md:px-6 justify-between bg-transparent backdrop-blur-md sticky top-0 z-10 shadow-sm drag py-2 flex-wrap gap-2",
+        windowButtonsSide === "right" && "md:pr-[140px]"
+      )}
+    >
       <div className="flex flex-col no-drag min-w-0">
         <h2 className="text-lg md:text-xl font-bold flex items-center gap-2 md:gap-3 flex-wrap">
           <span className="truncate">{selectedProject.name}</span>

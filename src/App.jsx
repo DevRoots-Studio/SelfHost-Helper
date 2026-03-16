@@ -12,6 +12,7 @@ import LogViewer from "./components/LogViewer";
 import EditorView from "./components/EditorView";
 import TunnelView from "./components/TunnelView";
 import ResourcesTab from "./components/ResourcesTab";
+import TitleBar from "./components/TitleBar";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 import ShutdownOverlay from "./components/ShutdownOverlay";
@@ -31,7 +32,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background">
+      <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background relative">
         <ShutdownOverlay isVisible={isShuttingDown} />
         <title>{import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}</title>
         <Routes>
@@ -47,13 +48,14 @@ function App() {
           </Route>
           <Route path="/settings" element={<Settings />}>
             <Route index element={<Navigate to="general" replace />} />
-            <Route path="general"  element={<GeneralSection />} />
-            <Route path="data"     element={<DataSection />} />
+            <Route path="general" element={<GeneralSection />} />
+            <Route path="data" element={<DataSection />} />
             <Route path="runtimes" element={<RuntimesSection />} />
-            <Route path="updates"  element={<UpdatesSection />} />
-            <Route path="about"    element={<AboutSection />} />
+            <Route path="updates" element={<UpdatesSection />} />
+            <Route path="about" element={<AboutSection />} />
           </Route>
         </Routes>
+        <TitleBar />
         <ToastContainer
           position="bottom-right"
           autoClose={3000}

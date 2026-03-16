@@ -1,35 +1,33 @@
 import React from "react";
 import { useOutletContext } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
-import {
-  RefreshCw,
-  Download,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Sparkles,
-} from "lucide-react";
+import { RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const STATUS = {
-  IDLE:        "idle",
-  CHECKING:    "checking",
-  AVAILABLE:   "available",
+  IDLE: "idle",
+  CHECKING: "checking",
+  AVAILABLE: "available",
   DOWNLOADING: "downloading",
-  DOWNLOADED:  "downloaded",
-  ERROR:       "error",
+  DOWNLOADED: "downloaded",
+  ERROR: "error",
 };
 
 function ReleaseNotes({ notes }) {
   if (!notes?.trim()) return null;
   return (
-      <div className="relative mt-4 rounded-xl border border-white/[0.07] bg-black/20 overflow-hidden [&_*]:[mask-image:none]">
+    <div className="relative mt-4 rounded-xl border border-white/[0.07] bg-black/20 overflow-hidden **:mask-none">
       <div className="max-h-52 overflow-y-auto custom-scrollbar p-4 text-sm text-muted-foreground prose prose-invert prose-sm max-w-none">
         <ReactMarkdown
           components={{
             a: ({ href, children }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline"
+              >
                 {children}
               </a>
             ),
@@ -47,17 +45,20 @@ function ReleaseNotes({ notes }) {
 export default function UpdatesSection() {
   const {
     appVersion,
-    updateStatus, updateVersion, updateError, releaseNotes,
-    handleCheckForUpdates, handleStartInstall, handleRestartToApply,
+    updateStatus,
+    updateVersion,
+    updateError,
+    releaseNotes,
+    handleCheckForUpdates,
+    handleStartInstall,
+    handleRestartToApply,
   } = useOutletContext();
 
   return (
     <div className="p-8 max-w-2xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Updates</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Keep SelfHost Helper up to date.
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Keep SelfHost Helper up to date.</p>
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] bg-white/2.5 shadow-[0_1px_4px_rgba(0,0,0,0.4)] overflow-hidden">
@@ -88,9 +89,7 @@ export default function UpdatesSection() {
         {/* Status area */}
         <div className="px-6 py-5">
           {updateStatus === STATUS.IDLE && (
-            <p className="text-sm text-muted-foreground/50">
-              You are running the latest version.
-            </p>
+            <p className="text-sm text-muted-foreground/50">You are running the latest version.</p>
           )}
 
           {updateStatus === STATUS.CHECKING && (
@@ -133,9 +132,7 @@ export default function UpdatesSection() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-sm text-emerald-400">
-                    Ready to install
-                  </p>
+                  <p className="font-semibold text-sm text-emerald-400">Ready to install</p>
                   {updateVersion && (
                     <p className="text-[13px] text-muted-foreground mt-0.5">
                       v{updateVersion} has been downloaded. Restart to apply.

@@ -29,6 +29,7 @@ import {
   categoriesAtom,
   isAddProjectModalOpenAtom,
   isProjectSettingsOpenAtom,
+  windowButtonsSideAtom,
 } from "@/store/atoms";
 import AddProjectDialog from "./AddProjectDialog";
 import {
@@ -46,7 +47,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   const { projectId } = useParams();
   const activeProjectId = projectId != null ? Number(projectId) : null;
   const [projects, setProjects] = useAtom(projectsAtom);
-
+  const [windowButtonsSide] = useAtom(windowButtonsSideAtom);
   const [categories, setCategories] = useAtom(categoriesAtom);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -860,6 +861,9 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
             setIsResizing(true);
           }}
         />
+        {windowButtonsSide === "left" && (
+          <div className="h-9 shrink-0 no-drag" aria-hidden="true" />
+        )}
         <div
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
