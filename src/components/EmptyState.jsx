@@ -1,8 +1,12 @@
 import React from "react";
 import { Plus, Terminal } from "lucide-react";
+import { useSetAtom } from "jotai";
+import { isAddProjectModalOpenAtom } from "@/store/atoms";
 import { Button } from "@/components/ui/button";
 
 export default function EmptyState({ onAddProject }) {
+  const setAddProjectModalOpen = useSetAtom(isAddProjectModalOpenAtom);
+  const handleAddProject = onAddProject ?? (() => setAddProjectModalOpen(true));
   return (
     <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col bg-transparent relative z-0">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
@@ -17,7 +21,7 @@ export default function EmptyState({ onAddProject }) {
       </p>
       <Button
         className="cursor-pointer btn-primary h-12 px-8 text-base shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
-        onClick={onAddProject}
+        onClick={handleAddProject}
       >
         <Plus className="mr-2 h-5 w-5" /> Create New Project
       </Button>

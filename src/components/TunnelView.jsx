@@ -31,36 +31,39 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "react-toastify";
 import { useAtom } from "jotai";
 import { tunnelStateAtom } from "@/store/atoms";
+import { useOutletContext } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-export default function TunnelView({ selectedProject, onUpdateProject }) {
+export default function TunnelView(props) {
+  const context = useOutletContext();
+  const selectedProject = context?.project ?? null;
+  const onUpdateProject = context?.handleUpdateProject ?? (() => {});
   const [tunnelState, setTunnelState] = useAtom(tunnelStateAtom);
-  const projectTunnelState = tunnelState[selectedProject.id] || {
-    status: "stopped",
-    url: null,
-    logs: [],
-  };
+  const projectTunnelState = selectedProject
+    ? tunnelState[selectedProject.id] || { status: "stopped", url: null, logs: [] }
+    : { status: "stopped", url: null, logs: [] };
 
-  const [mode, setMode] = useState(selectedProject.tunnelMode || "quick");
-  const [port, setPort] = useState(selectedProject.tunnelPort || 3000);
-  const [token, setToken] = useState(selectedProject.encryptedTunnelToken || "");
+  const [mode, setMode] = useState(selectedProject?.tunnelMode || "quick");
+  const [port, setPort] = useState(selectedProject?.tunnelPort ?? 3000);
+  const [token, setToken] = useState(selectedProject?.encryptedTunnelToken || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [autoStart, setAutoStart] = useState(selectedProject.autoStartTunnel || false);
+  const [autoStart, setAutoStart] = useState(selectedProject?.autoStartTunnel || false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [config, setConfig] = useState({
-    protocol: selectedProject.tunnelConfig?.protocol || "http2",
-    loglevel: selectedProject.tunnelConfig?.loglevel || "info",
-    noTLSVerify: selectedProject.tunnelConfig?.noTLSVerify || false,
-    connectTimeout: selectedProject.tunnelConfig?.connectTimeout || "30s",
-    httpHostHeader: selectedProject.tunnelConfig?.httpHostHeader || "",
+    protocol: selectedProject?.tunnelConfig?.protocol || "http2",
+    loglevel: selectedProject?.tunnelConfig?.loglevel || "info",
+    noTLSVerify: selectedProject?.tunnelConfig?.noTLSVerify || false,
+    connectTimeout: selectedProject?.tunnelConfig?.connectTimeout || "30s",
+    httpHostHeader: selectedProject?.tunnelConfig?.httpHostHeader || "",
   });
 
   const prevStatusRef = useRef(projectTunnelState.status);
 
   // Reset state on project change
   useEffect(() => {
+    if (!selectedProject) return;
     setMode(selectedProject.tunnelMode || "quick");
     setPort(selectedProject.tunnelPort || 3000);
     setToken(selectedProject.encryptedTunnelToken || "");
@@ -75,7 +78,7 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
       httpHostHeader: selectedProject.tunnelConfig?.httpHostHeader || "",
     });
     prevStatusRef.current = projectTunnelState.status;
-  }, [selectedProject.id]);
+  }, [selectedProject?.id]);
   useEffect(() => {
     if (prevStatusRef.current !== "running" && projectTunnelState.status === "running") {
       toast.success("Tunnel established successfully!");
@@ -84,6 +87,8 @@ export default function TunnelView({ selectedProject, onUpdateProject }) {
     }
     prevStatusRef.current = projectTunnelState.status;
   }, [projectTunnelState.status]);
+
+  if (!selectedProject) return null;
 
   const handleSave = async (silent = false) => {
     const updatedProject = {

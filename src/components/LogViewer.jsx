@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { Terminal as TerminalIcon, Send, BrushCleaning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,11 @@ import { toast } from "react-toastify";
 import { useAtomValue, useSetAtom } from "jotai";
 import { logsAtom } from "@/store/atoms";
 
-export default function LogViewer({ projectId, status, onSendInput }) {
+export default function LogViewer(props) {
+  const context = useOutletContext();
+  const projectId = context?.project?.id;
+  const status = context?.project?.status;
+  const onSendInput = context?.handleSendInput;
   const allLogs = useAtomValue(logsAtom);
   const logs = allLogs[projectId] || [];
   const [input, setInput] = useState("");
@@ -164,6 +169,8 @@ export default function LogViewer({ projectId, status, onSendInput }) {
     window.api.clearLogs(projectId);
     toast.success("Terminal cleared");
   };
+
+  if (!context?.project) return null;
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0c] text-white font-mono text-sm shadow-inner relative z-0">

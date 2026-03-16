@@ -24,6 +24,9 @@ class SettingsService {
       if (!(await this.db.has("clearLogsBeforeStart"))) {
         await this.db.set("clearLogsBeforeStart", false);
       }
+      if (!(await this.db.has("startMaximized"))) {
+        await this.db.set("startMaximized", false);
+      }
 
       logger.info("[SettingsService] Settings initialized with st.db.");
       this.initialized = true;

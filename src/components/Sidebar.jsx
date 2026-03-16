@@ -22,13 +22,11 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAtom, useSetAtom } from "jotai";
 import {
   projectsAtom,
   categoriesAtom,
-  selectedProjectAtom,
-  selectedProjectIdAtom,
   isAddProjectModalOpenAtom,
   isProjectSettingsOpenAtom,
 } from "@/store/atoms";
@@ -44,9 +42,10 @@ import {
 const API = window.api;
 
 const Sidebar = React.memo(({ onProjectsChange }) => {
+  const navigate = useNavigate();
+  const { projectId } = useParams();
+  const activeProjectId = projectId != null ? Number(projectId) : null;
   const [projects, setProjects] = useAtom(projectsAtom);
-  const selectedProject = useAtomValue(selectedProjectAtom);
-  const setSelectedProjectId = useSetAtom(selectedProjectIdAtom);
 
   const [categories, setCategories] = useAtom(categoriesAtom);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -493,61 +492,23 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     API.openPath(path);
   };
 
-  const renderFolderLogo = (categoryId, { compact = false, enlargeWhenEmpty = false } = {}) => {
-    const normalizedCategoryId = toNullableNumber(categoryId);
-    const categoryProjects = getSortedProjectsInCategory(normalizedCategoryId);
-    const isEmpty = categoryProjects.length === 0;
-
-    const wrapperClass = cn(
-      "rounded-lg border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center shrink-0",
-      compact ? "w-8 h-8" : "w-10 h-10",
-      isEmpty && enlargeWhenEmpty && (compact ? "w-10 h-10" : "w-12 h-12")
-    );
-
-    if (!isEmpty) {
-      return (
-        <div className={wrapperClass}>
-          <div className="grid grid-cols-2 gap-0.5 p-1 place-items-center w-full h-full">
-            {categoryProjects.slice(0, 4).map((p) => (
-              <div
-                key={p.id}
-                className={cn(
-                  "rounded-[2px] overflow-hidden bg-white/10",
-                  compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5"
-                )}
-              >
-                {p.icon ? (
-                  <img
-                    alt=""
-                    src={
-                      p.icon.match(/^(https?:\/\/|data:)/)
-                        ? p.icon
-                        : `media:///${p.icon.replace(/\\/g, "/")}?t=${new Date(
-                            p.updatedAt
-                          ).getTime()}`
-                    }
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[6px] font-bold">
-                    {p.name.charAt(0)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={wrapperClass}>
-        <FolderIcon className={cn("text-muted-foreground/40", compact ? "w-4 h-4" : "w-5 h-5")} />
-      </div>
-    );
+  const CATEGORY_COLOR_PALETTE = [
+    "bg-primary/25",
+    "bg-blue-500/25",
+    "bg-emerald-500/25",
+    "bg-amber-500/25",
+    "bg-violet-500/25",
+    "bg-rose-500/25",
+    "bg-cyan-500/25",
+    "bg-orange-500/25",
+  ];
+  const getCategoryColor = (categoryId) => {
+    const id = toNullableNumber(categoryId);
+    if (id == null) return CATEGORY_COLOR_PALETTE[0];
+    const index = Math.abs(id) % CATEGORY_COLOR_PALETTE.length;
+    return CATEGORY_COLOR_PALETTE[index];
   };
 
-  const navigate = useNavigate();
   const [width, setWidth] = useState(72);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -555,6 +516,22 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
     typeof window !== "undefined" && window.innerWidth <= 900
   );
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [isRtl, setIsRtl] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      (document.documentElement.getAttribute("dir") === "rtl" ||
+        getComputedStyle(document.documentElement).direction === "rtl")
+  );
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const updateRtl = () => {
+      setIsRtl(el.getAttribute("dir") === "rtl" || getComputedStyle(el).direction === "rtl");
+    };
+    const observer = new MutationObserver(updateRtl);
+    observer.observe(el, { attributes: true, attributeFilter: ["dir"] });
+    return () => observer.disconnect();
+  }, []);
   const [discordInfo, setDiscordInfo] = useState(null);
   const [updateStatus, setUpdateStatus] = useState("idle");
   const [updateVersion, setUpdateVersion] = useState("");
@@ -682,7 +659,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
   };
 
   const renderProject = (p, index) => {
-    const isSelected = selectedProject?.id === p.id;
+    const isSelected = activeProjectId === p.id;
     return (
       <Draggable key={`project-${p.id}`} draggableId={`project-${p.id}`} index={index}>
         {(provided, snapshot) => {
@@ -702,7 +679,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
-                    onClick={() => setSelectedProjectId(p.id)}
+                    onClick={() => navigate(`/project/${p.id}/console`)}
                     className={cn(
                       "sidebar-item group relative transition-all duration-200 select-none",
                       width < 120 ? "collapsed" : "",
@@ -810,7 +787,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 <ContextMenuContent>
                   <ContextMenuItem
                     onClick={() => {
-                      setSelectedProjectId(p.id);
+                      navigate(`/project/${p.id}/console`);
                       setIsProjectSettingsOpen(true);
                     }}
                   >
@@ -886,10 +863,17 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
         <div
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
-            width < 120 ? "justify-center px-0" : "justify-between px-4"
+            width < 120 ? "justify-center px-0" : "justify-between px-4",
+            isRtl && "pl-[140px]"
           )}
         >
           <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+            <img
+              src="media://app/resources/icon.png"
+              alt="SelfHost Helper"
+              className="w-8 h-8 rounded-lg object-cover shrink-0"
+              draggable={false}
+            />
             <AnimatePresence>
               {width >= 120 && (
                 <motion.h1
@@ -1049,9 +1033,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                               : {})}
                                           >
                                             {isCollapsed ? (
-                                              renderFolderLogo(categoryId, {
-                                                enlargeWhenEmpty: true,
-                                              })
+                                              <div
+                                                className={cn(
+                                                  "rounded-lg border border-white/10 overflow-hidden flex items-center justify-center shrink-0 w-10 h-10",
+                                                  getCategoryColor(categoryId)
+                                                )}
+                                              >
+                                                <FolderIcon className="w-5 h-5 text-muted-foreground/40" />
+                                              </div>
                                             ) : (
                                               <>
                                                 <div className="opacity-0 group-hover/cat:opacity-30 transition-opacity p-1 -ml-1">
@@ -1063,14 +1052,6 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                     isCategoryCollapsed && "-rotate-90"
                                                   )}
                                                 />
-                                                {isCategoryCollapsed && (
-                                                  <div className="mr-1">
-                                                    {renderFolderLogo(categoryId, {
-                                                      compact: true,
-                                                      enlargeWhenEmpty: true,
-                                                    })}
-                                                  </div>
-                                                )}
                                                 {editingCategoryId === categoryId ? (
                                                   <input
                                                     autoFocus
@@ -1142,7 +1123,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                                                       "space-y-1 min-h-8 transition-all duration-300 rounded-lg",
                                                       snapshotProj.isDraggingOver &&
                                                         "bg-primary/10",
-                                                      isCollapsed ? "pb-2" : "mt-1.5 mb-1"
+                                                      isCollapsed ? "pt-0.5" : "mt-1.5 mb-1"
                                                     )}
                                                   >
                                                     {snapshotProj.isDraggingOver &&

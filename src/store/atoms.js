@@ -6,24 +6,17 @@ export const projectsAtom = atom([]);
 // List of all categories
 export const categoriesAtom = atom([]);
 
-// The ID of the currently selected project
-export const selectedProjectIdAtom = atom(null);
-
-// Derived atom to get the full project object
-export const selectedProjectAtom = atom((get) => {
-  const projects = get(projectsAtom);
-  const selectedId = get(selectedProjectIdAtom);
-  return projects.find((p) => p.id === selectedId) || null;
-});
-
 // Logs stored by project ID
 export const logsAtom = atom({});
 
-// Performance stats for the current project
+// Performance stats for the current project (pushed from native monitor)
+// Shape: { projectId, cpu, memory, uptime, mainPid, pids, processCount,
+//          activeProcesses, timestamp, startTime?, supervisorType? } | null
 export const statsAtom = atom(null);
 
-// View mode (logs or editor)
-export const viewModeAtom = atom("logs");
+// Per-project bounded history for timeline charts
+// Shape: { [projectId: number]: { samples: Array<{ t, cpu, memory, processCount }> } }
+export const resourceHistoryAtom = atom({});
 
 // File tree and its loading state
 export const fileTreeAtom = atom([]);

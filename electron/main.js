@@ -174,6 +174,12 @@ async function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
+
+  const startMaximized = await settingsService.get("startMaximized");
+  if (startMaximized && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.maximize();
+  }
+
   return mainWindow;
 }
 
