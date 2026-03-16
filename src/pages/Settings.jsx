@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { ArrowLeft, SlidersHorizontal, Database, Box, Download, Info } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Database, Shield, Box, Download, Info } from "lucide-react";
 
 const API = window.api;
 
@@ -19,6 +19,7 @@ const UPDATE_STATUS_ERROR = "error";
 const NAV_ITEMS = [
   { path: "general", label: "General", Icon: SlidersHorizontal },
   { path: "data", label: "Data & Backup", Icon: Database },
+  { path: "backup", label: "Backup & Restore", Icon: Shield },
   { path: "runtimes", label: "Runtimes", Icon: Box },
   { path: "updates", label: "Updates", Icon: Download },
   { path: "about", label: "About", Icon: Info },
@@ -112,6 +113,8 @@ export default function Settings() {
   const [runtimeInstallProgress, setRuntimeInstallProgress] = useState(null);
   const [runtimeInstallError, setRuntimeInstallError] = useState("");
   const [installingRuntime, setInstallingRuntime] = useState(null);
+  const [exportConfigLoading, setExportConfigLoading] = useState(false);
+  const [importConfigLoading, setImportConfigLoading] = useState(false);
 
   // ── Initialization ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -385,6 +388,50 @@ export default function Settings() {
     }
   };
 
+  const handleExportConfig = async (passphrase) => {
+    if (!API.exportConfig) return;
+    setExportConfigLoading(true);
+    try {
+      const result = await API.exportConfig(passphrase);
+      if (result?.canceled) return;
+      if (result?.success && result?.path) {
+        toast.success("Backup exported successfully");
+      } else {
+        toast.success("Backup export completed");
+      }
+    } catch (e) {
+      toast.error(e?.message || "Failed to export backup");
+    } finally {
+      setExportConfigLoading(false);
+    }
+  };
+
+  const handleImportConfig = async (passphrase) => {
+    if (!API.importConfig) return;
+    setImportConfigLoading(true);
+    try {
+      const result = await API.importConfig(passphrase, true);
+      if (result?.canceled) return;
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      const restored = result?.restored || {};
+      const projectsCount = restored.projects ?? 0;
+      const categoriesCount = restored.categories ?? 0;
+      toast.success(
+        `Imported backup: ${projectsCount} servers and ${categoriesCount} categories restored.`
+      );
+      // Refresh projects and related views after restore
+      await loadRuntimesAndProjects();
+      await loadBackupInfo();
+    } catch (e) {
+      toast.error(e?.message || "Failed to import backup");
+    } finally {
+      setImportConfigLoading(false);
+    }
+  };
+
   const isNodeVersionInstalled = (id) =>
     installedNodeRuntimes.some((r) => r.id === id || r.version === id);
   const isPythonVersionInstalled = (id) =>
@@ -434,6 +481,11 @@ export default function Settings() {
     handleRestartToApply,
     // Shared
     appVersion,
+    // Encrypted config backup
+    handleExportConfig,
+    handleImportConfig,
+    exportConfigLoading,
+    importConfigLoading,
   };
 
   return (

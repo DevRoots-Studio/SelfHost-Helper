@@ -567,3 +567,140 @@ export const restoreFromLegacyBackup = async (filePath, replaceExisting = true) 
     return { restored: { projects: 0, categories: 0 }, error: message };
   }
 };
+
+/**
+ * Replace all projects and categories in the JSON database with the provided arrays.
+ * This is used by the encrypted JSON backup/restore flow.
+ *
+ * - Categories are restored first in order (sorted by order, then id); a map from old
+ *   category id to new category id is built so project categoryId references stay valid.
+ * - Projects are restored in order (sorted by order, then id) with full configuration;
+ *   each project's categoryId is remapped to the new category id.
+ *
+ * @param {Array<object>} projects - Project objects from backup payload (must include order, categoryId, and all config)
+ * @param {Array<object>} categories - Category objects from backup payload (must include id, name, order)
+ * @param {{ replaceExisting?: boolean }} options
+ * @returns {{ restored: { projects: number, categories: number } }}
+ */
+export const replaceAllProjectsAndCategoriesFromBackup = async (
+  projects,
+  categories,
+  options = {}
+) => {
+  if (!projectTable || !categoryTable) {
+    return { restored: { projects: 0, categories: 0 }, error: "Database not initialized." };
+  }
+
+  const { replaceExisting = true } = options;
+
+  try {
+    if (replaceExisting) {
+      const projectEntries = await projectTable.all();
+      for (const e of projectEntries) {
+        const key = e.ID ?? e.id ?? e.key ?? (e.data && String(e.data.id));
+        if (key != null) await projectTable.delete(String(key));
+      }
+      const categoryEntries = await categoryTable.all();
+      for (const e of categoryEntries) {
+        const key = e.ID ?? e.id ?? e.key ?? (e.data && String(e.data.id));
+        if (key != null) await categoryTable.delete(String(key));
+      }
+    }
+
+    let createdCategories = 0;
+    let createdProjects = 0;
+
+    // Build old category id -> new category id so projects can reference the new categories
+    const oldToNewCategoryId = new Map();
+    const sortedCategories = Array.isArray(categories)
+      ? [...categories].sort((a, b) => {
+          const oA = typeof a?.order === "number" ? a.order : 0;
+          const oB = typeof b?.order === "number" ? b.order : 0;
+          if (oA !== oB) return oA - oB;
+          const idA = Number(a?.id);
+          const idB = Number(b?.id);
+          return (Number.isFinite(idA) ? idA : 0) - (Number.isFinite(idB) ? idB : 0);
+        })
+      : [];
+
+    for (const raw of sortedCategories) {
+      const { name, order } = raw || {};
+      const added = await addCategory({
+        name: name ?? "",
+        order: typeof order === "number" ? order : 0,
+      });
+      if (added && added.id != null) {
+        const oldId = raw?.id;
+        if (oldId !== undefined && oldId !== null) oldToNewCategoryId.set(Number(oldId), added.id);
+      }
+      createdCategories += 1;
+    }
+
+    const sortedProjects = Array.isArray(projects)
+      ? [...projects].sort((a, b) => {
+          const oA = typeof a?.order === "number" ? a.order : 0;
+          const oB = typeof b?.order === "number" ? b.order : 0;
+          if (oA !== oB) return oA - oB;
+          const idA = Number(a?.id);
+          const idB = Number(b?.id);
+          return (Number.isFinite(idA) ? idA : 0) - (Number.isFinite(idB) ? idB : 0);
+        })
+      : [];
+
+    for (const raw of sortedProjects) {
+      const oldCategoryId = raw?.categoryId;
+      const newCategoryId =
+        oldCategoryId == null || oldCategoryId === ""
+          ? null
+          : (oldToNewCategoryId.get(Number(oldCategoryId)) ?? null);
+
+      const {
+        name,
+        path: projectPath,
+        script,
+        autoStart,
+        env,
+        type,
+        description,
+        icon,
+        order,
+        tunnelMode,
+        tunnelPort,
+        encryptedTunnelToken,
+        tunnelConfig,
+        autoStartTunnel,
+        clearLogsBeforeStart,
+        nodeVersionId,
+        pythonVersionId,
+      } = raw || {};
+
+      await addProject({
+        name: name ?? "",
+        path: projectPath ?? "",
+        script: script ?? "npm start",
+        autoStart: Boolean(autoStart),
+        env: env && typeof env === "object" && !Array.isArray(env) ? env : {},
+        type: type ?? "node",
+        description: description ?? null,
+        icon: icon ?? null,
+        order: typeof order === "number" ? order : 0,
+        categoryId: newCategoryId,
+        tunnelMode: tunnelMode ?? "quick",
+        tunnelPort: typeof tunnelPort === "number" ? tunnelPort : 3000,
+        encryptedTunnelToken: encryptedTunnelToken ?? "",
+        tunnelConfig: tunnelConfig && typeof tunnelConfig === "object" ? tunnelConfig : {},
+        autoStartTunnel: Boolean(autoStartTunnel),
+        clearLogsBeforeStart: Boolean(clearLogsBeforeStart),
+        nodeVersionId: nodeVersionId ?? null,
+        pythonVersionId: pythonVersionId ?? null,
+      });
+      createdProjects += 1;
+    }
+
+    return { restored: { projects: createdProjects, categories: createdCategories } };
+  } catch (err) {
+    const message = err?.message ?? String(err);
+    logger.error("[Database] replaceAllProjectsAndCategoriesFromBackup failed:", err);
+    return { restored: { projects: 0, categories: 0 }, error: message };
+  }
+};

@@ -58,6 +58,7 @@ import {
   validateRuntimeType,
 } from "../services/runtimeService.js";
 import logger from "../services/logger.js";
+import { exportConfigToFile, importConfigFromFile } from "../services/configBackupService.js";
 
 const appLauncher = new AutoLaunch({
   name: "SelfHost Helper",
@@ -746,6 +747,19 @@ export const registerHandlers = () => {
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
+  });
+
+  // Encrypted JSON configuration backup (projects, categories, app settings)
+  ipcMain.handle("backup:exportConfig", async (_, passphrase) => {
+    return exportConfigToFile(passphrase);
+  });
+
+  ipcMain.handle("backup:importConfig", async (_, passphrase, replaceExisting = true) => {
+    const result = await importConfigFromFile(passphrase, { replaceExisting });
+    if (!result?.canceled) {
+      notifyProjectListChanged();
+    }
+    return result;
   });
 
   ipcMain.handle("updater:check", () => checkForUpdates());

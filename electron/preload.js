@@ -204,4 +204,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("runtime:progress", subscription);
     return () => ipcRenderer.removeListener("runtime:progress", subscription);
   },
+
+  // Encrypted configuration backup (projects, categories, app settings)
+  exportConfig: (passphrase) => ipcRenderer.invoke("backup:exportConfig", passphrase),
+  importConfig: (passphrase, replaceExisting = true) =>
+    ipcRenderer.invoke("backup:importConfig", passphrase, replaceExisting),
 });
