@@ -84,6 +84,8 @@ function SettingsNav() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
+  const location = useLocation();
+
   // ── General ──────────────────────────────────────────────────────────────
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
@@ -124,6 +126,14 @@ export default function Settings() {
     loadBackupInfo();
     loadRuntimesAndProjects();
   }, []);
+
+  // Reset backup loading state when leaving Backup & Restore so it never appears stuck
+  useEffect(() => {
+    if (!location.pathname.includes("/settings/backup")) {
+      setExportConfigLoading(false);
+      setImportConfigLoading(false);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const syncUpdateStatus = async () => {
@@ -388,9 +398,15 @@ export default function Settings() {
     }
   };
 
+  const BACKUP_OPERATION_TIMEOUT_MS = 90 * 1000;
+
   const handleExportConfig = async (passphrase) => {
     if (!API.exportConfig) return;
     setExportConfigLoading(true);
+    const timeoutId = setTimeout(() => {
+      setExportConfigLoading(false);
+      toast.error("Export took too long. If the dialog is still open, cancel it and try again.");
+    }, BACKUP_OPERATION_TIMEOUT_MS);
     try {
       const result = await API.exportConfig(passphrase);
       if (result?.canceled) return;
@@ -402,6 +418,7 @@ export default function Settings() {
     } catch (e) {
       toast.error(e?.message || "Failed to export backup");
     } finally {
+      clearTimeout(timeoutId);
       setExportConfigLoading(false);
     }
   };
@@ -409,6 +426,10 @@ export default function Settings() {
   const handleImportConfig = async (passphrase) => {
     if (!API.importConfig) return;
     setImportConfigLoading(true);
+    const timeoutId = setTimeout(() => {
+      setImportConfigLoading(false);
+      toast.error("Import took too long. If the dialog is still open, cancel it and try again.");
+    }, BACKUP_OPERATION_TIMEOUT_MS);
     try {
       const result = await API.importConfig(passphrase, true);
       if (result?.canceled) return;
@@ -428,6 +449,7 @@ export default function Settings() {
     } catch (e) {
       toast.error(e?.message || "Failed to import backup");
     } finally {
+      clearTimeout(timeoutId);
       setImportConfigLoading(false);
     }
   };

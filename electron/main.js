@@ -354,15 +354,16 @@ app
       onStatusChange,
       onProjectListChange,
     } = await import("./services/projectsManager.js");
-    const { getProjects } = await import("./services/database.js");
+    const { getProjects, getCategories } = await import("./services/database.js");
     const { updateTrayMenu } = await import("./tray/tray.js");
 
     const refreshTray = async () => {
       logger.debug("[Tray] Refreshing menu state.");
-      const projects = await getProjects();
+      const [projects, categories] = await Promise.all([getProjects(), getCategories()]);
       const runningIds = getRunningProjects();
       updateTrayMenu(
         projects,
+        categories,
         runningIds,
         startProject,
         stopProject,

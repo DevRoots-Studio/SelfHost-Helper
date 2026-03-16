@@ -871,41 +871,54 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
             isRtl && "pl-[140px]"
           )}
         >
-          <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-            <img
-              src="media://app/resources/icon.png"
-              alt="SelfHost Helper"
-              className="w-8 h-8 rounded-lg object-cover shrink-0"
-              draggable={false}
-            />
-            <AnimatePresence>
-              {width >= 120 && (
-                <motion.h1
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="font-bold text-lg tracking-tight"
-                >
-                  SelfHost
-                </motion.h1>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0 no-drag">
-            <Button
-              size="icon"
-              variant="ghost"
+          {width < 120 ? (
+            <button
+              type="button"
               onClick={() => toggleSidebar()}
-              className="w-8 h-8 p-0 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+              className="no-drag w-8 h-8 rounded-lg flex items-center justify-center shrink-0 hover:bg-primary/20 transition-colors cursor-pointer"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
             >
-              {width < 120 ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronLeft className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+              <img
+                src="media://app/resources/icon.png"
+                alt="SelfHost Helper"
+                className="w-8 h-8 rounded-lg object-cover"
+                draggable={false}
+              />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                <img
+                  src="media://app/resources/icon.png"
+                  alt="SelfHost Helper"
+                  className="w-8 h-8 rounded-lg object-cover shrink-0"
+                  draggable={false}
+                />
+                <AnimatePresence>
+                  <motion.h1
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="font-bold text-lg tracking-tight"
+                  >
+                    SelfHost
+                  </motion.h1>
+                </AnimatePresence>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0 no-drag">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => toggleSidebar()}
+                  className="w-8 h-8 p-0 hover:bg-primary/20 hover:text-primary cursor-pointer flex items-center justify-center"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
 
           <AddProjectDialog onProjectsChange={onProjectsChange} />
         </div>
@@ -1204,7 +1217,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  onClick={() => navigate("/settings")}
+                  onClick={() => navigate("/settings/updates")}
                   title={
                     updateStatus === "downloaded"
                       ? "Update ready — open Settings to restart"
@@ -1230,7 +1243,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                  onClick={() => navigate("/settings")}
+                  onClick={() => navigate("/settings/updates")}
                   className={cn(
                     "rounded-xl border overflow-hidden cursor-pointer transition-all duration-200",
                     "hover:border-white/20 hover:shadow-lg hover:shadow-primary/5",

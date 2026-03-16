@@ -72,18 +72,35 @@ export default function UpdatesSection() {
               v{appVersion || "—"}
             </span>
           </div>
-          {updateStatus === STATUS.IDLE && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCheckForUpdates}
-              className="gap-2 border-white/10 hover:bg-white/10"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Check for updates
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {updateStatus === STATUS.IDLE && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCheckForUpdates}
+                className="gap-2 border-white/10 hover:bg-white/10"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Check for updates
+              </Button>
+            )}
+            {(updateStatus === STATUS.IDLE ||
+              updateStatus === STATUS.AVAILABLE ||
+              updateStatus === STATUS.DOWNLOADED ||
+              updateStatus === STATUS.ERROR) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCheckForUpdates}
+                className="gap-2 border-white/10 hover:bg-white/10"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Recheck for updates
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Status area */}
