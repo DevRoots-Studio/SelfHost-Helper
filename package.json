@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.26.2",
+  "version": "0.26.3",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -10,7 +10,7 @@
     "dev:electron": "cross-env NODE_ENV=development electron .",
     "build": "vite build && electron-builder",
     "build:dev": "vite build && cross-env NODE_ENV=development electron-builder --config.extraMetadata.appId=com.selfhosthelper.dev --config.directories.output=release-dev --config.productName=\"SelfHost Helper Dev\"",
-    "build:prod": "vite build && cross-env NODE_ENV=production electron-builder",
+    "build:prod": "vite build && cross-env NODE_ENV=production electron-builder --publish always",
     "build:web": "vite build",
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint .",
