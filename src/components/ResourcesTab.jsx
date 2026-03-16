@@ -265,8 +265,10 @@ export default function ResourcesTab() {
   if (!project) return null;
 
   const isRunning = project.status === "running";
+  const hasLiveStats = !!stats;
+  const isEffectivelyRunning = isRunning || hasLiveStats;
 
-  if (!isRunning || !stats) {
+  if (!isEffectivelyRunning || !stats) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground">
         <Activity className="h-12 w-12 opacity-20" />

@@ -3,7 +3,11 @@ import { useNavigate, Outlet } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
 import { toast } from "react-toastify";
 import * as atoms from "@/store/atoms";
-import { normalizeProject, normalizeProjectList, normalizeCategoryList } from "@/lib/normalizeProject";
+import {
+  normalizeProject,
+  normalizeProjectList,
+  normalizeCategoryList,
+} from "@/lib/normalizeProject";
 import { useSelectedProject } from "@/hooks/useSelectedProject";
 import ProjectHeader from "@/components/ProjectHeader";
 import ViewTabs from "@/components/ViewTabs";
@@ -33,10 +37,7 @@ export default function ProjectLayout() {
   }, [projects.length, project, navigate]);
 
   const loadData = async () => {
-    const [projectList, categoryList] = await Promise.all([
-      API.getProjects(),
-      API.getCategories(),
-    ]);
+    const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
     setProjects(normalizeProjectList(projectList));
     setCategories(normalizeCategoryList(categoryList));
   };
@@ -159,6 +160,19 @@ export default function ProjectLayout() {
       setStats(null);
     };
   }, [project?.id, setStats, setResourceHistory]);
+
+  // Clear stats when the current project transitions to a non-running state
+  useEffect(() => {
+    if (!project?.id) return;
+    if (project.status !== "running") {
+      setStats(null);
+      setResourceHistory((prev) => {
+        const next = { ...prev };
+        delete next[project.id];
+        return next;
+      });
+    }
+  }, [project?.id, project?.status, setStats, setResourceHistory]);
 
   const handleStart = async (id) => {
     const res = await API.startProject(id);

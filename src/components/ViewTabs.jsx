@@ -6,6 +6,7 @@ import { useAtomValue } from "jotai";
 import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
 import { useParams } from "react-router-dom";
 import { formatMemory } from "@/lib/formatMemory";
+import { useSelectedProject } from "@/hooks/useSelectedProject";
 
 const TAB_PATHS = ["console", "editor", "tunnel", "resources"];
 
@@ -116,7 +117,10 @@ const ViewTabs = React.memo(() => {
   const stats = useAtomValue(statsAtom);
   const allHistory = useAtomValue(resourceHistoryAtom);
   const { projectId } = useParams();
+  const project = useSelectedProject();
   const history = projectId ? (allHistory[Number(projectId)]?.samples ?? []) : [];
+  const shouldShowStats =
+    !!stats && !!project && project.status === "running";
 
   const pathname = location.pathname || "";
   const segments = pathname.split("/").filter(Boolean);
@@ -157,7 +161,7 @@ const ViewTabs = React.memo(() => {
       </button>
 
       <div className="ml-auto flex items-center gap-3 pb-2">
-        <StatsPill stats={stats} history={history} />
+        {shouldShowStats && <StatsPill stats={stats} history={history} />}
       </div>
     </div>
   );

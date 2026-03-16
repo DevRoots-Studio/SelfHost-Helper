@@ -340,13 +340,8 @@ app
       );
     }
 
-    // Auto-start projects and check for zombies
-    const { startAutoStartProjects, checkZombieProcesses, relaunchProjectsAfterUpdate } =
-      await import("./services/projectsManager.js");
-    await checkZombieProcesses();
-    await startAutoStartProjects();
-    await relaunchProjectsAfterUpdate();
-
+    // Create the main window *before* starting or recovering projects so that
+    // status and stats events can be delivered to the renderer.
     const window = await createWindow();
     if (!window) {
       logger.error("[Window] createWindow returned null during startup. Aborting tray setup.");
@@ -399,6 +394,14 @@ app
 
     // Initial tray setup
     refreshTray();
+
+    // Auto-start projects and check for zombies *after* window + tray exist so
+    // that sendStatus / stats events have an attached BrowserWindow.
+    const { startAutoStartProjects, checkZombieProcesses, relaunchProjectsAfterUpdate } =
+      await import("./services/projectsManager.js");
+    await checkZombieProcesses();
+    await startAutoStartProjects();
+    await relaunchProjectsAfterUpdate();
 
     app.on("activate", async () => {
       if (BrowserWindow.getAllWindows().length === 0) {
