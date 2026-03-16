@@ -37,6 +37,7 @@ const UPDATE_STATUS_ERROR = "error";
 export default function Settings() {
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false);
   const [clearLogsBeforeStart, setClearLogsBeforeStart] = useState(false);
+  const [startMaximized, setStartMaximized] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [userDataPath, setUserDataPath] = useState("");
   const [backupCandidates, setBackupCandidates] = useState([]);
@@ -176,6 +177,7 @@ export default function Settings() {
     try {
       const settings = await API.getSettings();
       setClearLogsBeforeStart(settings.clearLogsBeforeStart);
+      setStartMaximized(settings.startMaximized ?? false);
     } catch (e) {
       console.error("Failed to load settings", e);
     }
@@ -222,6 +224,17 @@ export default function Settings() {
       toast.success(`Clear Logs Before Start ${enabled ? "enabled" : "disabled"} globally`);
     } catch (e) {
       console.error("Failed to toggle clear logs setting", e);
+      toast.error("Failed to update setting");
+    }
+  };
+
+  const handleStartMaximizedToggle = async (enabled) => {
+    try {
+      await API.updateSettings({ startMaximized: enabled });
+      setStartMaximized(enabled);
+      toast.success(`Start maximized ${enabled ? "enabled" : "disabled"}`);
+    } catch (e) {
+      console.error("Failed to toggle start maximized setting", e);
       toast.error("Failed to update setting");
     }
   };
@@ -404,6 +417,22 @@ export default function Settings() {
                 id="clear-logs"
                 checked={clearLogsBeforeStart}
                 onCheckedChange={handleClearLogsToggle}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-6 border-t border-white/5">
+              <div className="space-y-1">
+                <Label htmlFor="start-maximized" className="text-base font-semibold cursor-pointer">
+                  Start maximized
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Open the app window maximized (full screen) on startup.
+                </p>
+              </div>
+              <Switch
+                id="start-maximized"
+                checked={startMaximized}
+                onCheckedChange={handleStartMaximizedToggle}
               />
             </div>
           </div>
