@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.26.3",
+  "version": "0.26.4",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -11,7 +11,7 @@
     "build": "vite build && electron-builder",
     "build:dev": "vite build && cross-env NODE_ENV=development electron-builder --config.extraMetadata.appId=com.selfhosthelper.dev --config.directories.output=release-dev --config.productName=\"SelfHost Helper Dev\"",
     "build:prod": "vite build && cross-env NODE_ENV=production electron-builder",
-    "publish:prod": "cross-env NODE_ENV=production electron-builder --publish always",
+    "publish:prod": "dotenv -e .env -- cross-env NODE_ENV=production electron-builder --publish always",
     "build:web": "vite build",
     "postinstall": "electron-builder install-app-deps",
     "lint": "eslint .",
@@ -65,9 +65,9 @@
       "icon": "resources/icon.ico"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "installerIcon": "resources/icon.ico",
       "installerHeaderIcon": "resources/icon.ico"
     },
@@ -100,6 +100,7 @@
     "autoprefixer": "latest",
     "concurrently": "latest",
     "cross-env": "latest",
+    "dotenv-cli": "latest",
     "electron": "latest",
     "electron-builder": "latest",
     "esbuild": "latest",
