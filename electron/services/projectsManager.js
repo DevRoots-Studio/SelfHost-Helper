@@ -134,9 +134,11 @@ export const checkZombieProcesses = async () => {
 
             // Re-establish runtime without a child object (since we don't have the handle)
             // But we have the job, which is enough for stats and killing.
+            const recoveredStartTime =
+              project.updatedAt ? new Date(project.updatedAt) : new Date();
             runningRuntimes[project.id] = {
               job: existingJob,
-              startTime: project.updatedAt || new Date(),
+              startTime: recoveredStartTime,
               platform: process.platform,
               isRecovered: true,
               child: {
@@ -151,14 +153,14 @@ export const checkZombieProcesses = async () => {
             };
 
             sendStatus(project.id, "running", {
-              startTime: runningRuntimes[project.id].startTime,
+              startTime: recoveredStartTime,
               isRecovered: true,
             });
             // Start native stats stream for recovered project
             startStatsStream(
               project.id,
               existingJob,
-              runningRuntimes[project.id].startTime,
+              recoveredStartTime,
               project.pid || null
             );
             continue;

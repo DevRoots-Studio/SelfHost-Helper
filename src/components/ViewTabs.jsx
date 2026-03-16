@@ -5,14 +5,9 @@ import { cn } from "@/lib/utils";
 import { useAtomValue } from "jotai";
 import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
 import { useParams } from "react-router-dom";
+import { formatMemory } from "@/lib/formatMemory";
 
 const TAB_PATHS = ["console", "editor", "tunnel", "resources"];
-
-function formatMemory(bytes) {
-  if (!bytes || bytes === 0) return "0 MB";
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-  return (bytes / (1024 * 1024)).toFixed(0) + " MB";
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tiny inline sparkline (8 points, 36×14 px)

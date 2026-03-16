@@ -1,20 +1,15 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { useOutletContext } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { Activity } from "lucide-react";
 import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
+import { formatMemory } from "@/lib/formatMemory";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-function formatMemory(bytes) {
-  if (!bytes || bytes === 0) return "0 MB";
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
 
 function formatUptime(ms) {
   if (!ms || ms <= 0) return "—";

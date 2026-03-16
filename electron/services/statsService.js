@@ -17,7 +17,10 @@ export function startStatsStream(projectId, job, startTime, mainPid = null) {
     stopStatsStream(projectId);
   }
 
-  const state = { job, startTime, mainPid, lastPayload: null };
+  const normalizedStartTime =
+    startTime instanceof Date ? startTime : startTime ? new Date(startTime) : new Date();
+
+  const state = { job, startTime: normalizedStartTime, mainPid, lastPayload: null };
   monitors.set(projectId, state);
 
   try {
@@ -25,18 +28,18 @@ export function startStatsStream(projectId, job, startTime, mainPid = null) {
       if (!global.mainWindow || global.mainWindow.isDestroyed()) return;
 
       const now = Date.now();
-      const uptime = now - startTime.getTime();
+      const uptime = now - state.startTime.getTime();
 
       const payload = {
         projectId,
-        cpu:             rawStats.cpu ?? 0,
-        memory:          rawStats.memory ?? 0,
+        cpu: rawStats.cpu ?? 0,
+        memory: rawStats.memory ?? 0,
         uptime,
-        mainPid:         state.mainPid,
-        pids:            Array.isArray(rawStats.pids) ? rawStats.pids : [],
-        processCount:    Array.isArray(rawStats.pids) ? rawStats.pids.length : 0,
+        mainPid: state.mainPid,
+        pids: Array.isArray(rawStats.pids) ? rawStats.pids : [],
+        processCount: Array.isArray(rawStats.pids) ? rawStats.pids.length : 0,
         activeProcesses: rawStats.activeProcesses ?? 0,
-        timestamp:       now,
+        timestamp: now,
       };
 
       state.lastPayload = payload;
@@ -77,7 +80,7 @@ export function stopStatsStream(projectId) {
  * Stop all running native monitors (called on app shutdown).
  */
 export function stopAllStatsStreams() {
-  for (const [projectId] of monitors) {
+  for (const projectId of [...monitors.keys()]) {
     stopStatsStream(projectId);
   }
 }
