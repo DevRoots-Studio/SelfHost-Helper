@@ -6,6 +6,7 @@ import EmptyState from "./components/EmptyState";
 import LogViewer from "./components/LogViewer";
 import EditorView from "./components/EditorView";
 import TunnelView from "./components/TunnelView";
+import ResourcesTab from "./components/ResourcesTab";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 import ShutdownOverlay from "./components/ShutdownOverlay";
@@ -36,6 +37,7 @@ function App() {
               <Route path="console" element={<LogViewer />} />
               <Route path="editor" element={<EditorView />} />
               <Route path="tunnel" element={<TunnelView />} />
+              <Route path="resources" element={<ResourcesTab />} />
             </Route>
           </Route>
           <Route path="/settings" element={<Settings />} />

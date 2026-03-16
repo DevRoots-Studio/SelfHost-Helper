@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
-import { useAtom, useSetAtom, useAtomValue } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { toast } from "react-toastify";
 import * as atoms from "@/store/atoms";
 import { normalizeProject, normalizeProjectList, normalizeCategoryList } from "@/lib/normalizeProject";
@@ -19,6 +19,7 @@ export default function ProjectLayout() {
   const [fileTree, setFileTree] = useAtom(atoms.fileTreeAtom);
   const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(atoms.isFileTreeLoadingAtom);
   const setStats = useSetAtom(atoms.statsAtom);
+  const setResourceHistory = useSetAtom(atoms.resourceHistoryAtom);
   const [projectEditorStates, setProjectEditorStates] = useAtom(atoms.projectEditorStatesAtom);
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
   const projectPathRef = useRef(null);
@@ -128,25 +129,36 @@ export default function ProjectLayout() {
     };
   }, [project?.path]);
 
-  // Stats polling when project is running
+  // Subscribe to native push-based stats events (no polling)
   useEffect(() => {
-    let interval;
-    let isCancelled = false;
-    if (project?.status === "running") {
-      const fetchStats = async () => {
-        const data = await API.getProjectStats(project.id);
-        if (!isCancelled) setStats(data);
-      };
-      fetchStats();
-      interval = setInterval(fetchStats, 1000);
-    } else {
-      setStats(null);
-    }
+    if (!project?.id) return;
+    // Clear stale stats when switching projects
+    setStats(null);
+
+    const unsub = API.onProjectStats((payload) => {
+      if (payload.projectId !== project.id) return;
+      setStats(payload);
+      setResourceHistory((prev) => {
+        const existing = prev[project.id]?.samples ?? [];
+        const next = [
+          ...existing,
+          {
+            t: payload.timestamp,
+            cpu: payload.cpu ?? 0,
+            memory: payload.memory ?? 0,
+            processCount: payload.processCount ?? 0,
+          },
+        ].slice(-120);
+        return { ...prev, [project.id]: { samples: next } };
+      });
+    });
+
     return () => {
-      isCancelled = true;
-      clearInterval(interval);
+      unsub?.();
+      // Clear stats display when unmounting / switching away
+      setStats(null);
     };
-  }, [project?.id, project?.status, setStats]);
+  }, [project?.id, setStats, setResourceHistory]);
 
   const handleStart = async (id) => {
     const res = await API.startProject(id);

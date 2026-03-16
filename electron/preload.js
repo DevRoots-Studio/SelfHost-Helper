@@ -4,6 +4,7 @@ const allowedListenerChannels = [
   "project:log",
   "project:logs-batch",
   "project:status",
+  "project:stats",
   "projects:list-changed",
   "project:logs-cleared",
   "file:change",
@@ -135,6 +136,11 @@ contextBridge.exposeInMainWorld("api", {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("tunnel:log", subscription);
     return () => ipcRenderer.removeListener("tunnel:log", subscription);
+  },
+  onProjectStats: (callback) => {
+    const subscription = (_, data) => callback(data);
+    ipcRenderer.on("project:stats", subscription);
+    return () => ipcRenderer.removeListener("project:stats", subscription);
   },
 
   removeAllListeners,

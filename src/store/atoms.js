@@ -9,8 +9,14 @@ export const categoriesAtom = atom([]);
 // Logs stored by project ID
 export const logsAtom = atom({});
 
-// Performance stats for the current project
+// Performance stats for the current project (pushed from native monitor)
+// Shape: { projectId, cpu, memory, uptime, mainPid, pids, processCount,
+//          activeProcesses, timestamp, startTime?, supervisorType? } | null
 export const statsAtom = atom(null);
+
+// Per-project bounded history for timeline charts
+// Shape: { [projectId: number]: { samples: Array<{ t, cpu, memory, processCount }> } }
+export const resourceHistoryAtom = atom({});
 
 // File tree and its loading state
 export const fileTreeAtom = atom([]);

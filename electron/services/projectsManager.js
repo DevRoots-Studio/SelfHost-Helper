@@ -22,6 +22,7 @@ const logHistory = {};
 const statusListeners = new Set();
 const listListeners = new Set();
 import { startTunnel } from "./tunnelManager.js";
+import { startStatsStream, stopStatsStream, stopAllStatsStreams, getLastStats } from "./statsService.js";
 
 export const onStatusChange = (callback) => {
   statusListeners.add(callback);
@@ -153,6 +154,13 @@ export const checkZombieProcesses = async () => {
               startTime: runningRuntimes[project.id].startTime,
               isRecovered: true,
             });
+            // Start native stats stream for recovered project
+            startStatsStream(
+              project.id,
+              existingJob,
+              runningRuntimes[project.id].startTime,
+              project.pid || null
+            );
             continue;
           } else {
             existingJob.close();
@@ -346,6 +354,11 @@ export const startProject = async (id) => {
 
     sendStatus(id, "running", { startTime });
 
+    // Start native stats stream (Windows Job Object push monitor)
+    if (process.platform === "win32" && runningRuntimes[id]?.job) {
+      startStatsStream(id, runningRuntimes[id].job, startTime, child.pid);
+    }
+
     child.stdout.on("data", (data) => {
       const text = data.toString();
       if (runningRuntimes[id] && !runningRuntimes[id].supervisorType) {
@@ -462,6 +475,9 @@ export const stopProject = async (id) => {
   const runtime = runningRuntimes[id];
   if (!runtime) return { success: false, message: "Not running" };
 
+  // Stop the native stats stream before closing the job handle
+  stopStatsStream(id);
+
   const code = await killProjectGroup(runtime.child, runtime.platform);
 
   if (runtime.job) {
@@ -515,6 +531,7 @@ export const startAllProjects = async () => {
 export const stopAllProjects = async () => {
   const ids = Object.keys(runningRuntimes);
   logger.info(`Stopping all ${ids.length} running projects...`);
+  stopAllStatsStreams();
   const promises = ids.map((id) => stopProject(id));
   await Promise.all(promises);
 };
@@ -526,39 +543,32 @@ export const getProjectStats = async (id) => {
   if (!runtime) return null;
 
   try {
-    // On Windows, use the highly efficient Job Object statistics
+    // Primary path: return the last sample from the native push-based monitor
+    const cached = getLastStats(id);
+    if (cached) {
+      return {
+        ...cached,
+        startTime: runtime.startTime,
+        supervisorType: runtime.supervisorType,
+      };
+    }
+
+    // On Windows, if the monitor hasn't emitted yet, do a one-off synchronous read
     if (runtime.platform === "win32" && runtime.job) {
       const stats = runtime.job.getStats();
       const now = Date.now();
-      let cpuPercent = 0;
-
-      if (runtime.lastStats) {
-        const deltaUser = stats.totalUserTime - runtime.lastStats.totalUserTime;
-        const deltaKernel = stats.totalKernelTime - runtime.lastStats.totalKernelTime;
-        const deltaTime = now - runtime.lastStats.timestamp;
-
-        if (deltaTime > 0) {
-          // Convert deltaTime (ms) to 100ns units (multiply by 10,000)
-          const deltaTimeUnits = deltaTime * 10000;
-          cpuPercent = (deltaUser + deltaKernel) / deltaTimeUnits / numCPUs;
-          cpuPercent = Math.max(0, cpuPercent * 100);
-        }
-      }
-
-      runtime.lastStats = {
-        totalUserTime: stats.totalUserTime,
-        totalKernelTime: stats.totalKernelTime,
-        timestamp: now,
-      };
 
       return {
         id,
         startTime: runtime.startTime,
         uptime: now - runtime.startTime.getTime(),
-        cpu: cpuPercent,
+        cpu: 0,
         memory: stats.memory,
+        pids: Array.isArray(stats.pids) ? stats.pids : [],
+        processCount: Array.isArray(stats.pids) ? stats.pids.length : 0,
+        activeProcesses: stats.activeProcesses,
+        mainPid: runtime.child?.pid ?? null,
         timestamp: now,
-        pidsCount: stats.activeProcesses,
         supervisorType: runtime.supervisorType,
       };
     }
@@ -668,6 +678,7 @@ export const relaunchProjectsAfterUpdate = async () => {
 //============================{Background Health Monitoring}=============================
 
 const cleanupProjectRuntime = async (id) => {
+  stopStatsStream(id);
   const runtime = runningRuntimes[id];
   if (runtime && runtime.job) {
     try {
