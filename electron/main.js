@@ -7,6 +7,7 @@ import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
 import { stopAllProjects } from "./services/projectsManager.js";
 import logger from "./services/logger.js";
+import settingsService from "./services/settingsService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -188,8 +189,6 @@ if (process.env.NODE_ENV === "development") {
   app.setAppUserModelId("com.selfhosthelper.dev");
   app.setPath("userData", app.getPath("userData") + "-dev");
 }
-
-import settingsService from "./services/settingsService.js";
 
 // Initialize settings early
 await settingsService.init();
