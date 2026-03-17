@@ -16,10 +16,7 @@ export default function Dashboard() {
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
 
   const loadData = async () => {
-    const [projectList, categoryList] = await Promise.all([
-      API.getProjects(),
-      API.getCategories(),
-    ]);
+    const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
     setProjects(normalizeProjectList(projectList));
     setCategories(normalizeCategoryList(categoryList));
   };
@@ -36,10 +33,27 @@ export default function Dashboard() {
           else if (status === "stopped") toast.info(`${project.name} has stopped`);
           else if (status === "error") toast.error(`${project.name} encountered an error`);
         }
-        return prev.map((p) =>
-          p.id === normalizedProjectId ? { ...p, status, startTime } : p
-        );
+        return prev.map((p) => (p.id === normalizedProjectId ? { ...p, status, startTime } : p));
       });
+    });
+    const cleanupStatusSync = API.onProjectStatusSync(({ running }) => {
+      if (!Array.isArray(running) || running.length === 0) return;
+      const runningById = new Map(
+        running
+          .map((r) => {
+            const id = toNullableNumber(r.id);
+            return id != null ? [id, r] : null;
+          })
+          .filter(Boolean)
+      );
+      setProjects((prev) =>
+        prev.map((p) => {
+          const r = runningById.get(p.id);
+          if (!r) return p;
+          const startTime = r.startTime != null ? new Date(r.startTime) : null;
+          return { ...p, status: "running", startTime };
+        })
+      );
     });
     const cleanupList = API.onProjectsChange(() => loadData());
     const appendLogs = (projectId, logEntries) => {
@@ -80,6 +94,7 @@ export default function Dashboard() {
     });
     return () => {
       cleanupStatus();
+      cleanupStatusSync();
       cleanupList();
       cleanupLogs();
       cleanupLogsBatch();

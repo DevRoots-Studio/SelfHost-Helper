@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { Activity } from "lucide-react";
-import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
+import { statsAtom, resourceHistoryAtom, projectsAtom } from "@/store/atoms";
+import { normalizeProjectList } from "@/lib/normalizeProject";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { formatMemory } from "@/lib/formatMemory";
@@ -255,12 +256,43 @@ function PidTable({ stats }) {
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
+const API = window.api;
+
 export default function ResourcesTab() {
   const context = useOutletContext();
   const project = context?.project ?? null;
   const stats = useAtomValue(statsAtom);
   const allHistory = useAtomValue(resourceHistoryAtom);
+  const setProjects = useSetAtom(projectsAtom);
   const history = project ? (allHistory[project.id]?.samples ?? []) : [];
+  const verifiedForProjectIdRef = useRef(null);
+
+  useEffect(() => {
+    verifiedForProjectIdRef.current = null;
+  }, [project?.id]);
+
+  // One-time backend verification when we would show "Project is not running"
+  // (fixes stale status for auto-started projects where status event was missed)
+  useEffect(() => {
+    if (!project?.id || project.status === "running" || stats) return;
+    if (verifiedForProjectIdRef.current === project.id) return;
+    verifiedForProjectIdRef.current = project.id;
+
+    let cancelled = false;
+    API.getProjects().then((list) => {
+      if (cancelled) return;
+      const normalized = normalizeProjectList(list);
+      const fresh = normalized.find((p) => p.id === project.id);
+      if (fresh?.status === "running") {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === project.id ? { ...p, status: "running", startTime: fresh.startTime } : p))
+        );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, project?.status, stats, setProjects]);
 
   if (!project) return null;
 

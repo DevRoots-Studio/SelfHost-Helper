@@ -393,11 +393,34 @@ app
 
     // Auto-start projects and check for zombies *after* window + tray exist so
     // that sendStatus / stats events have an attached BrowserWindow.
-    const { startAutoStartProjects, checkZombieProcesses, relaunchProjectsAfterUpdate } =
-      await import("./services/projectsManager.js");
+    const {
+      startAutoStartProjects,
+      checkZombieProcesses,
+      relaunchProjectsAfterUpdate,
+      getProjectStartTime,
+    } = await import("./services/projectsManager.js");
     await checkZombieProcesses();
     await startAutoStartProjects();
     await relaunchProjectsAfterUpdate();
+
+    // Sync running status to renderer so it doesn't show stale "stopped" for auto-started projects
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const runningIds = getRunningProjects();
+        const running = runningIds.map((id) => {
+          const startTime = getProjectStartTime(id);
+          return {
+            id,
+            startTime: startTime instanceof Date ? startTime.getTime() : (startTime ?? null),
+          };
+        });
+        if (running.length > 0) {
+          mainWindow.webContents.send("project:status-sync", { running });
+        }
+      } catch (err) {
+        logger.warn("[Window] Failed to send project:status-sync:", err);
+      }
+    }
 
     app.on("activate", async () => {
       if (BrowserWindow.getAllWindows().length === 0) {

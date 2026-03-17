@@ -5,6 +5,7 @@ const allowedListenerChannels = [
   "project:logs-batch",
   "project:status",
   "project:stats",
+  "project:status-sync",
   "projects:list-changed",
   "project:logs-cleared",
   "file:change",
@@ -111,6 +112,11 @@ contextBridge.exposeInMainWorld("api", {
     const subscription = (_, data) => callback(data);
     ipcRenderer.on("project:status", subscription);
     return () => ipcRenderer.removeListener("project:status", subscription);
+  },
+  onProjectStatusSync: (callback) => {
+    const subscription = (_, data) => callback(data);
+    ipcRenderer.on("project:status-sync", subscription);
+    return () => ipcRenderer.removeListener("project:status-sync", subscription);
   },
   onProjectsChange: (callback) => {
     const subscription = () => callback();

@@ -161,10 +161,11 @@ export default function ProjectLayout() {
     };
   }, [project?.id, setStats, setResourceHistory]);
 
-  // Clear stats when the current project transitions to a non-running state
+  // Clear stats only when the current project is explicitly stopped or error
+  // (avoids clearing on stale "stopped" before ResourcesTab verification or status-sync corrects it)
   useEffect(() => {
     if (!project?.id) return;
-    if (project.status !== "running") {
+    if (project.status === "stopped" || project.status === "error") {
       setStats(null);
       setResourceHistory((prev) => {
         const next = { ...prev };
