@@ -33,6 +33,7 @@ import { useAtom } from "jotai";
 import { tunnelStateAtom } from "@/store/atoms";
 import { useOutletContext } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { normalizeDigitsToEnglish } from "@/lib/numberUtils";
 
 export default function TunnelView(props) {
   const context = useOutletContext();
@@ -44,7 +45,9 @@ export default function TunnelView(props) {
     : { status: "stopped", url: null, logs: [] };
 
   const [mode, setMode] = useState(selectedProject?.tunnelMode || "quick");
-  const [port, setPort] = useState(selectedProject?.tunnelPort ?? 3000);
+  const [port, setPort] = useState(
+    selectedProject?.tunnelPort != null ? String(selectedProject.tunnelPort) : "3000"
+  );
   const [token, setToken] = useState(selectedProject?.encryptedTunnelToken || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -65,7 +68,7 @@ export default function TunnelView(props) {
   useEffect(() => {
     if (!selectedProject) return;
     setMode(selectedProject.tunnelMode || "quick");
-    setPort(selectedProject.tunnelPort || 3000);
+    setPort(selectedProject?.tunnelPort != null ? String(selectedProject.tunnelPort) : "3000");
     setToken(selectedProject.encryptedTunnelToken || "");
     setShowAdvanced(false);
     setShowHelp(false);
@@ -94,7 +97,7 @@ export default function TunnelView(props) {
     const updatedProject = {
       ...selectedProject,
       tunnelMode: mode,
-      tunnelPort: port === "" ? 3000 : port,
+      tunnelPort: port === "" ? 3000 : parseInt(port, 10),
       encryptedTunnelToken: token,
       tunnelConfig: config,
       autoStartTunnel: autoStart,
@@ -104,8 +107,8 @@ export default function TunnelView(props) {
 
   const handleStart = async () => {
     // Port validation
-    const portToCheck = port === "" ? 3000 : port;
-    const portNum = parseInt(portToCheck);
+    const portToCheck = port === "" ? "3000" : port;
+    const portNum = parseInt(portToCheck, 10);
 
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
       toast.error("Please enter a valid port number (1-65535)");
@@ -252,18 +255,14 @@ export default function TunnelView(props) {
                 </div>
               </Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={port}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "") {
-                    setPort("");
-                  } else {
-                    const parsed = parseInt(val);
-                    if (!isNaN(parsed)) {
-                      setPort(parsed);
-                    }
-                  }
+                  // Normalize any Unicode digits to ASCII so the input stays English-only.
+                  const ascii = normalizeDigitsToEnglish(e.target.value);
+                  const digitsOnly = ascii.replace(/[^\d]/g, "");
+                  setPort(digitsOnly);
                 }}
                 className="bg-black/20 border-white/5 h-11"
                 placeholder="3000"
