@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Terminal as TerminalIcon, Send, BrushCleaning } from "lucide-react";
+import {
+  Terminal as TerminalIcon,
+  Send,
+  BrushCleaning,
+  Copy,
+  Download,
+  MoreVertical,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Terminal } from "@xterm/xterm";
@@ -12,6 +19,13 @@ import { toast } from "react-toastify";
 
 import { useAtomValue, useSetAtom } from "jotai";
 import { logsAtom } from "@/store/atoms";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 
 export default function LogViewer(props) {
   const context = useOutletContext();
@@ -27,6 +41,8 @@ export default function LogViewer(props) {
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
   const lastLogIndexRef = useRef(0);
+  const [isCopying, setIsCopying] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     lastLogIndexRef.current = 0;
@@ -159,6 +175,91 @@ export default function LogViewer(props) {
   };
   const setAllLogs = useSetAtom(logsAtom);
 
+  const copyTextToClipboard = async (text) => {
+    await navigator.clipboard.writeText(text);
+  };
+
+  const handleCopyCurrentLogs = async () => {
+    if (!logs || logs.length === 0) {
+      toast.info("No console logs to copy");
+      return;
+    }
+    setIsCopying(true);
+    try {
+      const text = logs.map((l) => l?.data ?? "").join("");
+      await copyTextToClipboard(text);
+      toast.success("Console logs copied");
+    } catch (err) {
+      console.error("Failed to copy console logs:", err);
+      toast.error("Failed to copy console logs");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  const handleExportCurrentLogs = async () => {
+    setIsExporting(true);
+    try {
+      const res = await window.api.exportConsoleLogsProject(projectId);
+      if (res?.canceled) {
+        toast.info("Export canceled");
+        return;
+      }
+      toast.success("Console logs exported");
+    } catch (err) {
+      console.error("Failed to export console logs:", err);
+      toast.error("Failed to export console logs");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleCopyAllLogs = async () => {
+    setIsCopying(true);
+    try {
+      const [projects, allLogs] = await Promise.all([
+        window.api.getProjects(),
+        window.api.getAllLogs(),
+      ]);
+      const parts = projects.map((p) => {
+        const id = p?.id;
+        const key = String(id);
+        const projectLogs = allLogs?.[key] || [];
+        const projectName = p?.name || `Project ${id}`;
+        const header = `===== Console Logs: ${projectName} (ID: ${id}) =====\n`;
+        const body = Array.isArray(projectLogs)
+          ? projectLogs.map((l) => l?.data ?? "").join("")
+          : "";
+        return `${header}${body}`;
+      });
+      const text = parts.join("\n");
+      await copyTextToClipboard(text);
+      toast.success("All console logs copied");
+    } catch (err) {
+      console.error("Failed to copy all console logs:", err);
+      toast.error("Failed to copy all console logs");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  const handleExportAllLogs = async () => {
+    setIsExporting(true);
+    try {
+      const res = await window.api.exportConsoleLogsAll();
+      if (res?.canceled) {
+        toast.info("Export canceled");
+        return;
+      }
+      toast.success("Console logs exported (.zip)");
+    } catch (err) {
+      console.error("Failed to export all console logs:", err);
+      toast.error("Failed to export all console logs");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleClear = () => {
     lastLogIndexRef.current = 0;
     xtermRef.current.clear();
@@ -213,11 +314,61 @@ export default function LogViewer(props) {
           <Send className="h-4 w-4" />
         </Button>
       </div>
-      <div className=" absolute top-4 right-4 cursor-pointer">
-        <Button variant="ghost" size="icon" onClick={handleClear} className="cursor-pointer">
-          <BrushCleaning className="h-4 w-4" />
-        </Button>
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Logs actions"
+            className="absolute top-4 right-4 cursor-pointer h-8 w-8"
+            onClick={(e) => {
+              // Radix ContextMenu opens on right-click; for left-click we synthesize a `contextmenu` event.
+              e.preventDefault();
+              e.stopPropagation();
+              const ev = new MouseEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                clientX: e.clientX,
+                clientY: e.clientY,
+              });
+              e.currentTarget.dispatchEvent(ev);
+            }}
+            onContextMenu={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleCopyCurrentLogs} disabled={isCopying || isExporting}>
+            <Copy className="w-4 h-4 mr-2" />
+            Copy this project's console logs
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleExportCurrentLogs} disabled={isCopying || isExporting}>
+            <Download className="w-4 h-4 mr-2" />
+            Export this project's console logs (.log)
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={handleCopyAllLogs} disabled={isCopying || isExporting}>
+            <Copy className="w-4 h-4 mr-2" />
+            Copy all projects' console logs
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleExportAllLogs} disabled={isCopying || isExporting}>
+            <Download className="w-4 h-4 mr-2" />
+            Export all projects' console logs (.zip)
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={handleClear}
+            disabled={isCopying || isExporting}
+            className="text-destructive focus:text-destructive"
+          >
+            <BrushCleaning className="w-4 h-4 mr-2" />
+            Clear this project's console logs
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </div>
   );
 }
