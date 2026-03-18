@@ -156,6 +156,7 @@ async function createWindow() {
       mainWindow.hide();
       return false;
     }
+
     logger.info("[Window] Closing for real (isQuitting=true).");
   });
 
@@ -191,256 +192,270 @@ await settingsService.init();
 // Initialize logger early to catch startup issues
 logger.init();
 
-app
-  .whenReady()
-  .then(async () => {
-    try {
-      logger.info("Application starting up (Ready)...");
-    } catch (e) {
-      try {
-        const logPath = path.join(app.getPath("userData"), "main.log");
-        fs.appendFileSync(logPath, `[FATAL] Logger failed: ${String(e?.message || e)}\n`);
-      } catch (_) {}
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
     }
-    protocol.handle("media", async (request) => {
+  });
+
+  app
+    .whenReady()
+    .then(async () => {
       try {
-        const url = new URL(request.url);
-        let filePath;
-        let allowedBases = [];
+        logger.info("Application starting up (Ready)...");
+      } catch (e) {
+        try {
+          const logPath = path.join(app.getPath("userData"), "main.log");
+          fs.appendFileSync(logPath, `[FATAL] Logger failed: ${String(e?.message || e)}\n`);
+        } catch (_) {}
+      }
+      protocol.handle("media", async (request) => {
+        try {
+          const url = new URL(request.url);
+          let filePath;
+          let allowedBases = [];
 
-        if (url.hostname === "app") {
-          const relativePath = decodeURIComponent(url.pathname).replace(/^[/\\]+/, "");
-          const appBase = path.resolve(app.getAppPath());
-          const cwdBase = path.resolve(process.cwd());
-          const appCandidate = path.resolve(appBase, relativePath);
-          const cwdCandidate = path.resolve(cwdBase, relativePath);
+          if (url.hostname === "app") {
+            const relativePath = decodeURIComponent(url.pathname).replace(/^[/\\]+/, "");
+            const appBase = path.resolve(app.getAppPath());
+            const cwdBase = path.resolve(process.cwd());
+            const appCandidate = path.resolve(appBase, relativePath);
+            const cwdCandidate = path.resolve(cwdBase, relativePath);
 
-          if (isPathWithinBase(appCandidate, appBase) && fs.existsSync(appCandidate)) {
-            filePath = appCandidate;
-          } else if (isPathWithinBase(cwdCandidate, cwdBase) && fs.existsSync(cwdCandidate)) {
-            filePath = cwdCandidate;
+            if (isPathWithinBase(appCandidate, appBase) && fs.existsSync(appCandidate)) {
+              filePath = appCandidate;
+            } else if (isPathWithinBase(cwdCandidate, cwdBase) && fs.existsSync(cwdCandidate)) {
+              filePath = cwdCandidate;
+            } else {
+              // Keep deterministic lookup and validate against both app-local bases below.
+              filePath = appCandidate;
+            }
+            allowedBases = [appBase, cwdBase];
           } else {
-            // Keep deterministic lookup and validate against both app-local bases below.
-            filePath = appCandidate;
-          }
-          allowedBases = [appBase, cwdBase];
-        } else {
-          // Handle media://G/path, media:///G:/path, media:///G/path
-          let rawPath = decodeURIComponent(url.pathname);
-          let hostname = url.hostname;
+            // Handle media://G/path, media:///G:/path, media:///G/path
+            let rawPath = decodeURIComponent(url.pathname);
+            let hostname = url.hostname;
 
-          if (hostname && hostname.length === 1 && /^[a-zA-Z]$/.test(hostname)) {
-            // If hostname is "G", and rawPath is "/Minecraft server/image.png"
-            filePath = path.join(`${hostname}:`, rawPath);
-          } else if (process.platform === "win32") {
-            // If rawPath is "/G:/Minecraft server image.png"
-            if (/^\/[a-zA-Z]:/.test(rawPath)) {
-              filePath = rawPath.slice(1);
-            } else if (/^\/[a-zA-Z]\//.test(rawPath)) {
-              // Case: /G/path
-              filePath = rawPath.charAt(1) + ":" + rawPath.slice(2);
+            if (hostname && hostname.length === 1 && /^[a-zA-Z]$/.test(hostname)) {
+              // If hostname is "G", and rawPath is "/Minecraft server/image.png"
+              filePath = path.join(`${hostname}:`, rawPath);
+            } else if (process.platform === "win32") {
+              // If rawPath is "/G:/Minecraft server image.png"
+              if (/^\/[a-zA-Z]:/.test(rawPath)) {
+                filePath = rawPath.slice(1);
+              } else if (/^\/[a-zA-Z]\//.test(rawPath)) {
+                // Case: /G/path
+                filePath = rawPath.charAt(1) + ":" + rawPath.slice(2);
+              } else {
+                filePath = rawPath;
+              }
             } else {
               filePath = rawPath;
             }
-          } else {
-            filePath = rawPath;
+
+            if (!path.isAbsolute(filePath)) {
+              logger.warn(`[Media Protocol] Rejected non-absolute path: ${filePath}`);
+              return new Response("Forbidden", { status: 403 });
+            }
+
+            if (configuredExternalMediaBases.length > 0) {
+              allowedBases.push(...configuredExternalMediaBases);
+            } else {
+              // Backward-compatible permissive mode: allow readable files on the resolved drive root.
+              const driveRoot = path.parse(path.resolve(filePath)).root;
+              if (driveRoot) {
+                allowedBases.push(driveRoot);
+              }
+              if (
+                process.platform === "win32" &&
+                hostname &&
+                hostname.length === 1 &&
+                /^[a-zA-Z]$/.test(hostname)
+              ) {
+                allowedBases.push(path.resolve(`${hostname}:\\`));
+              }
+
+              if (!hasLoggedPermissiveExternalMediaMode) {
+                logger.warn(
+                  `[Media Protocol] External media requests are using permissive drive-root mode. Set ${EXTERNAL_MEDIA_DIRS_ENV_KEY} to a ${path.delimiter}-separated list of allowed directories to restrict access.`
+                );
+                hasLoggedPermissiveExternalMediaMode = true;
+              }
+            }
           }
 
-          if (!path.isAbsolute(filePath)) {
-            logger.warn(`[Media Protocol] Rejected non-absolute path: ${filePath}`);
+          // Remove any surrounding quotes that might have been pasted
+          filePath = filePath.replace(/^["']|["']$/g, "").trim();
+          filePath = path.normalize(filePath);
+
+          const resolvedFilePath = resolveAndValidatePath(filePath, allowedBases);
+          if (!resolvedFilePath) {
+            logger.warn(`[Media Protocol] Blocked path outside allowed bases: ${filePath}`);
             return new Response("Forbidden", { status: 403 });
           }
+          filePath = resolvedFilePath;
 
-          if (configuredExternalMediaBases.length > 0) {
-            allowedBases.push(...configuredExternalMediaBases);
-          } else {
-            // Backward-compatible permissive mode: allow readable files on the resolved drive root.
-            const driveRoot = path.parse(path.resolve(filePath)).root;
-            if (driveRoot) {
-              allowedBases.push(driveRoot);
-            }
-            if (
-              process.platform === "win32" &&
-              hostname &&
-              hostname.length === 1 &&
-              /^[a-zA-Z]$/.test(hostname)
-            ) {
-              allowedBases.push(path.resolve(`${hostname}:\\`));
-            }
-
-            if (!hasLoggedPermissiveExternalMediaMode) {
-              logger.warn(
-                `[Media Protocol] External media requests are using permissive drive-root mode. Set ${EXTERNAL_MEDIA_DIRS_ENV_KEY} to a ${path.delimiter}-separated list of allowed directories to restrict access.`
-              );
-              hasLoggedPermissiveExternalMediaMode = true;
-            }
+          try {
+            await fs.promises.access(filePath, fs.constants.R_OK);
+          } catch (e) {
+            return new Response("File not found", { status: 404 });
           }
-        }
 
-        // Remove any surrounding quotes that might have been pasted
-        filePath = filePath.replace(/^["']|["']$/g, "").trim();
-        filePath = path.normalize(filePath);
+          const buffer = await fs.promises.readFile(filePath);
+          const ext = path.extname(filePath).toLowerCase();
+          logger.debug(`[Protocol:Media] Serving file: ${filePath} (${ext})`);
+          const mimeTypes = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".ico": "image/x-icon",
+            ".svg": "image/svg+xml",
+            ".bmp": "image/bmp",
+          };
 
-        const resolvedFilePath = resolveAndValidatePath(filePath, allowedBases);
-        if (!resolvedFilePath) {
-          logger.warn(`[Media Protocol] Blocked path outside allowed bases: ${filePath}`);
-          return new Response("Forbidden", { status: 403 });
-        }
-        filePath = resolvedFilePath;
-
-        try {
-          await fs.promises.access(filePath, fs.constants.R_OK);
+          return new Response(buffer, {
+            headers: {
+              "Content-Type": mimeTypes[ext] || "application/octet-stream",
+              "Cache-Control": "public, max-age=3600",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
         } catch (e) {
-          return new Response("File not found", { status: 404 });
+          logger.error("[Media Protocol] Error:", e);
+          return new Response("Internal Error", { status: 500 });
         }
+      });
 
-        const buffer = await fs.promises.readFile(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-        logger.debug(`[Protocol:Media] Serving file: ${filePath} (${ext})`);
-        const mimeTypes = {
-          ".png": "image/png",
-          ".jpg": "image/jpeg",
-          ".jpeg": "image/jpeg",
-          ".gif": "image/gif",
-          ".webp": "image/webp",
-          ".ico": "image/x-icon",
-          ".svg": "image/svg+xml",
-          ".bmp": "image/bmp",
-        };
+      await initializeDatabase();
+      registerHandlers(ipcMain);
 
-        return new Response(buffer, {
-          headers: {
-            "Content-Type": mimeTypes[ext] || "application/octet-stream",
-            "Cache-Control": "public, max-age=3600",
-            "Access-Control-Allow-Origin": "*",
-          },
-        });
-      } catch (e) {
-        logger.error("[Media Protocol] Error:", e);
-        return new Response("Internal Error", { status: 500 });
+      const { initUpdateService } = await import("./services/updateService.js");
+      try {
+        await initUpdateService();
+      } catch (err) {
+        logger.error(
+          "[Startup] Update service init failed (continuing without updates):",
+          err?.message,
+          err?.stack
+        );
       }
-    });
 
-    await initializeDatabase();
-    registerHandlers(ipcMain);
+      // Create the main window *before* starting or recovering projects so that
+      // status and stats events can be delivered to the renderer.
+      const window = await createWindow();
+      if (!window) {
+        logger.error("[Window] createWindow returned null during startup. Aborting tray setup.");
+        app.quit();
+        return;
+      }
 
-    const { initUpdateService } = await import("./services/updateService.js");
-    try {
-      await initUpdateService();
-    } catch (err) {
-      logger.error(
-        "[Startup] Update service init failed (continuing without updates):",
-        err?.message,
-        err?.stack
-      );
-    }
-
-    // Create the main window *before* starting or recovering projects so that
-    // status and stats events can be delivered to the renderer.
-    const window = await createWindow();
-    if (!window) {
-      logger.error("[Window] createWindow returned null during startup. Aborting tray setup.");
-      app.quit();
-      return;
-    }
-
-    const {
-      startProject,
-      stopProject,
-      restartProject,
-      startAllProjects,
-      stopAllProjects,
-      getRunningProjects,
-      onStatusChange,
-      onProjectListChange,
-    } = await import("./services/projectsManager.js");
-    const { getProjects, getCategories } = await import("./services/database.js");
-    const { updateTrayMenu } = await import("./tray/tray.js");
-
-    const refreshTray = async () => {
-      logger.debug("[Tray] Refreshing menu state.");
-      const [projects, categories] = await Promise.all([getProjects(), getCategories()]);
-      const runningIds = getRunningProjects();
-      updateTrayMenu(
-        projects,
-        categories,
-        runningIds,
+      const {
         startProject,
         stopProject,
         restartProject,
         startAllProjects,
-        stopAllProjects
-      );
-    };
+        stopAllProjects,
+        getRunningProjects,
+        onStatusChange,
+        onProjectListChange,
+      } = await import("./services/projectsManager.js");
+      const { getProjects, getCategories } = await import("./services/database.js");
+      const { updateTrayMenu } = await import("./tray/tray.js");
 
-    tray = initTray(window, () => {
-      isQuitting = true;
-      app.quit();
-    });
-
-    // Update tray on status changes
-    onStatusChange(() => {
-      refreshTray();
-    });
-
-    // Update tray on project list changes (add/delete)
-    onProjectListChange(() => {
-      refreshTray();
-    });
-
-    // Initial tray setup
-    refreshTray();
-
-    // Auto-start projects and check for zombies *after* window + tray exist so
-    // that sendStatus / stats events have an attached BrowserWindow.
-    const {
-      startAutoStartProjects,
-      checkZombieProcesses,
-      relaunchProjectsAfterUpdate,
-      getProjectStartTime,
-    } = await import("./services/projectsManager.js");
-    await checkZombieProcesses();
-    await startAutoStartProjects();
-    await relaunchProjectsAfterUpdate();
-
-    // Sync running status to renderer so it doesn't show stale "stopped" for auto-started projects
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      try {
+      const refreshTray = async () => {
+        logger.debug("[Tray] Refreshing menu state.");
+        const [projects, categories] = await Promise.all([getProjects(), getCategories()]);
         const runningIds = getRunningProjects();
-        const running = runningIds.map((id) => {
-          const startTime = getProjectStartTime(id);
-          return {
-            id,
-            startTime: startTime instanceof Date ? startTime.getTime() : (startTime ?? null),
-          };
-        });
-        if (running.length > 0) {
-          mainWindow.webContents.send("project:status-sync", { running });
-        }
-      } catch (err) {
-        logger.warn("[Window] Failed to send project:status-sync:", err);
-      }
-    }
+        updateTrayMenu(
+          projects,
+          categories,
+          runningIds,
+          startProject,
+          stopProject,
+          restartProject,
+          startAllProjects,
+          stopAllProjects
+        );
+      };
 
-    app.on("activate", async () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
+      tray = initTray(window, () => {
+        isQuitting = true;
+        app.quit();
+      });
+
+      // Update tray on status changes
+      onStatusChange(() => {
+        refreshTray();
+      });
+
+      // Update tray on project list changes (add/delete)
+      onProjectListChange(() => {
+        refreshTray();
+      });
+
+      // Initial tray setup
+      refreshTray();
+
+      // Auto-start projects and check for zombies *after* window + tray exist so
+      // that sendStatus / stats events have an attached BrowserWindow.
+      const {
+        startAutoStartProjects,
+        checkZombieProcesses,
+        relaunchProjectsAfterUpdate,
+        getProjectStartTime,
+      } = await import("./services/projectsManager.js");
+      await checkZombieProcesses();
+      await startAutoStartProjects();
+      await relaunchProjectsAfterUpdate();
+
+      // Sync running status to renderer so it doesn't show stale "stopped" for auto-started projects
+      if (mainWindow && !mainWindow.isDestroyed()) {
         try {
-          const createdWindow = await createWindow();
-          if (!createdWindow) {
-            logger.error("[Window] createWindow returned null on activate.");
+          const runningIds = getRunningProjects();
+          const running = runningIds.map((id) => {
+            const startTime = getProjectStartTime(id);
+            return {
+              id,
+              startTime: startTime instanceof Date ? startTime.getTime() : (startTime ?? null),
+            };
+          });
+          if (running.length > 0) {
+            mainWindow.webContents.send("project:status-sync", { running });
           }
-        } catch (error) {
-          logger.error("[Window] Failed to create window on activate:", error);
+        } catch (err) {
+          logger.warn("[Window] Failed to send project:status-sync:", err);
         }
-      } else if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show();
       }
+
+      app.on("activate", async () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          try {
+            const createdWindow = await createWindow();
+            if (!createdWindow) {
+              logger.error("[Window] createWindow returned null on activate.");
+            }
+          } catch (error) {
+            logger.error("[Window] Failed to create window on activate:", error);
+          }
+        } else if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show();
+        }
+      });
+    })
+    .catch((error) => {
+      logger.error("[Startup] Fatal initialization error:", error);
+      app.exit(1);
     });
-  })
-  .catch((error) => {
-    logger.error("[Startup] Fatal initialization error:", error);
-    app.exit(1);
-  });
+}
 
 let isShuttingDown = false;
 
@@ -473,16 +488,3 @@ app.on("window-all-closed", () => {
     // Keep running in tray
   }
 });
-
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-}
