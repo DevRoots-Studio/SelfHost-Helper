@@ -659,6 +659,32 @@ export const registerHandlers = () => {
   ipcMain.on("window:close", () => {
     const window = BrowserWindow.getFocusedWindow() || global.mainWindow;
     if (window) {
+      // #region agent log
+      fetch("http://127.0.0.1:7608/ingest/3e572759-2eef-44d1-ae55-79a863313eca", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "fa43e1",
+        },
+        body: JSON.stringify({
+          sessionId: "fa43e1",
+          runId: "pre-fix",
+          hypothesisId: "H1",
+          location: "electron/ipc/handlers.js:window:close",
+          message: "window:close IPC received",
+          data: {
+            hasFocusedWindow: !!BrowserWindow.getFocusedWindow(),
+            hasGlobalMainWindow: !!global.mainWindow,
+            isMainWindowMaximized:
+              !!global.mainWindow && typeof global.mainWindow.isMaximized === "function"
+                ? global.mainWindow.isMaximized()
+                : null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       window.close();
     }
   });

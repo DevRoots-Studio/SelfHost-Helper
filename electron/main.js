@@ -151,11 +151,60 @@ async function createWindow() {
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
+      // #region agent log
+      fetch("http://127.0.0.1:7608/ingest/3e572759-2eef-44d1-ae55-79a863313eca", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "fa43e1",
+        },
+        body: JSON.stringify({
+          sessionId: "fa43e1",
+          runId: "pre-fix",
+          hypothesisId: "H2",
+          location: "electron/main.js:mainWindow:close:hidden-to-tray",
+          message: "mainWindow close intercepted (hide to tray)",
+          data: {
+            isQuitting,
+            isShuttingDown,
+            isMaximized: mainWindow.isMaximized(),
+            isVisible: mainWindow.isVisible(),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       logger.debug("[Window] Intercepted close event, hiding to tray.");
       event.preventDefault();
       mainWindow.hide();
       return false;
     }
+
+    // #region agent log
+    fetch("http://127.0.0.1:7608/ingest/3e572759-2eef-44d1-ae55-79a863313eca", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "fa43e1",
+      },
+      body: JSON.stringify({
+        sessionId: "fa43e1",
+        runId: "pre-fix",
+        hypothesisId: "H2",
+        location: "electron/main.js:mainWindow:close:isQuitting",
+        message: "mainWindow close with isQuitting=true",
+        data: {
+          isQuitting,
+          isShuttingDown,
+          isMaximized: mainWindow.isMaximized(),
+          isVisible: mainWindow.isVisible(),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     logger.info("[Window] Closing for real (isQuitting=true).");
   });
 
@@ -172,6 +221,29 @@ async function createWindow() {
   });
 
   const startMaximized = await settingsService.get("startMaximized");
+
+  // #region agent log
+  fetch("http://127.0.0.1:7608/ingest/3e572759-2eef-44d1-ae55-79a863313eca", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "fa43e1",
+    },
+    body: JSON.stringify({
+      sessionId: "fa43e1",
+      runId: "pre-fix",
+      hypothesisId: "H3",
+      location: "electron/main.js:createWindow:startMaximized",
+      message: "createWindow startMaximized state",
+      data: {
+        startMaximized,
+        isDev,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+
   if (startMaximized && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.maximize();
   }
@@ -448,6 +520,32 @@ app.on("before-quit", async (e) => {
   if (isShuttingDown) return;
   e.preventDefault();
   isShuttingDown = true;
+
+  // #region agent log
+  fetch("http://127.0.0.1:7608/ingest/3e572759-2eef-44d1-ae55-79a863313eca", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "fa43e1",
+    },
+    body: JSON.stringify({
+      sessionId: "fa43e1",
+      runId: "pre-fix",
+      hypothesisId: "H1",
+      location: "electron/main.js:before-quit",
+      message: "before-quit triggered",
+      data: {
+        isShuttingDown,
+        isQuitting,
+        hasMainWindow: !!mainWindow,
+        mainWindowIsDestroyed: !!mainWindow && mainWindow.isDestroyed(),
+        mainWindowIsVisible: !!mainWindow && mainWindow.isVisible(),
+        mainWindowIsMaximized: !!mainWindow && mainWindow.isMaximized(),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   logger.info("Shutting down... performing fast cleanup.");
 
