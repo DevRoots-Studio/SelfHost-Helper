@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   FileCode,
@@ -14,12 +14,20 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import * as atoms from "@/store/atoms";
 import FileTree from "@/components/FileTree";
 import SearchPanel from "@/components/SearchPanel";
 import GitPanel from "@/components/GitPanel";
 import MonacoEditor from "@/editors/MonacoEditor";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const API = window.api;
 
@@ -91,7 +99,25 @@ export default function EditorView() {
   const fileTree = context?.fileTree ?? [];
   const isFileTreeLoading = context?.isFileTreeLoading ?? false;
   const projectEditorStates = context?.projectEditorStates ?? {};
-  const initialFile = project ? projectEditorStates[project.id] : null;
+  const rawProjectState = project ? projectEditorStates[project.id] : null;
+  const initialProjectState = useMemo(() => {
+    if (!project) return null;
+    if (!rawProjectState || typeof rawProjectState !== "object") {
+      return {
+        openTabs: [],
+        activeTabId: null,
+        explorerExpanded: {},
+        lastActiveFile: rawProjectState || null,
+      };
+    }
+    return {
+      openTabs: Array.isArray(rawProjectState.openTabs) ? rawProjectState.openTabs : [],
+      activeTabId:
+        typeof rawProjectState.activeTabId === "string" ? rawProjectState.activeTabId : null,
+      explorerExpanded: rawProjectState.explorerExpanded || {},
+      lastActiveFile: rawProjectState.lastActiveFile || null,
+    };
+  }, [project, rawProjectState]);
   const onFileSelect = context?.handleEditorFileChange
     ? (path) => context.handleEditorFileChange(project?.id, path)
     : () => {};
@@ -99,7 +125,7 @@ export default function EditorView() {
     ? () => project?.path && context.loadFileTree(project.path)
     : () => {};
   const [editorContent, setEditorContent] = useState("");
-  const [currentFile, setCurrentFile] = useState(null);
+  const [currentFile, setCurrentFile] = useState(initialProjectState?.lastActiveFile || null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [fileLoadError, setFileLoadError] = useState(null);
   const [unsavedChanges, setUnsavedChanges] = useAtom(atoms.unsavedChangesAtom);
@@ -107,6 +133,15 @@ export default function EditorView() {
   const [gitOpen, setGitOpen] = useState(false);
   const [scrollToLine, setScrollToLine] = useState(null);
   const [gitStatusByPath, setGitStatusByPath] = useState({});
+  const [openTabs, setOpenTabs] = useState(initialProjectState?.openTabs || []);
+  const [activeTabId, setActiveTabId] = useState(initialProjectState?.activeTabId || null);
+  const [explorerExpanded, setExplorerExpanded] = useState(
+    initialProjectState?.explorerExpanded || {}
+  );
+  const [pendingCloseTabId, setPendingCloseTabId] = useState(null);
+  const [isSavingCloseTab, setIsSavingCloseTab] = useState(false);
+
+  const setProjectEditorStates = useSetAtom(atoms.projectEditorStatesAtom);
 
   const editorContentRef = useRef(editorContent);
   const currentFileRef = useRef(currentFile);
@@ -123,6 +158,20 @@ export default function EditorView() {
   useEffect(() => {
     unsavedChangesRef.current = unsavedChanges;
   }, [unsavedChanges]);
+
+  // Persist per-project editor UI state whenever relevant pieces change.
+  useEffect(() => {
+    if (!projectId) return;
+    setProjectEditorStates((prev) => ({
+      ...prev,
+      [projectId]: {
+        openTabs,
+        activeTabId,
+        explorerExpanded,
+        lastActiveFile: currentFile || null,
+      },
+    }));
+  }, [projectId, openTabs, activeTabId, explorerExpanded, currentFile, setProjectEditorStates]);
 
   const normalizePath = (p) => (p || "").replace(/\\/g, "/");
 
@@ -264,16 +313,18 @@ export default function EditorView() {
     searchPanelHeight,
   ]);
 
+  // On project change, ensure initial file (if any) is loaded and tabs are restored.
   useEffect(() => {
-    if (initialFile) {
-      if (initialFile !== currentFile) {
-        loadFile(initialFile);
+    if (!projectId) return;
+    if (initialProjectState?.lastActiveFile) {
+      if (initialProjectState.lastActiveFile !== currentFileRef.current) {
+        loadFile(initialProjectState.lastActiveFile);
       }
     } else {
       setCurrentFile(null);
       setEditorContent("");
     }
-  }, [projectId, initialFile]);
+  }, [projectId]);
 
   useEffect(() => {
     loadGitStatus();
@@ -308,6 +359,28 @@ export default function EditorView() {
     setIsFileLoading(true);
     setFileLoadError(null);
     setCurrentFile(filePath);
+
+    // Ensure tab exists for this file
+    setOpenTabs((prev) => {
+      const existing = prev.find((t) => t.path === filePath);
+      if (existing) {
+        setActiveTabId(existing.id);
+        return prev;
+      }
+      const id = filePath;
+      const fileName = filePath.split(/[/\\]/).pop() || filePath;
+      const next = [
+        ...prev,
+        {
+          id,
+          path: filePath,
+          fileName,
+          language: getLanguageFromPath(filePath),
+        },
+      ];
+      setActiveTabId(id);
+      return next;
+    });
 
     // Use ref so callers (e.g. onFileChange) always see latest unsaved state
     if (unsavedChangesRef.current[filePath] !== undefined) {
@@ -352,6 +425,109 @@ export default function EditorView() {
       loadFile(node.path);
     }
   };
+
+  const handleToggleFolder = useCallback(
+    (folderPath) => {
+      const norm = normalizePath(folderPath);
+      setExplorerExpanded((prev) => ({
+        ...prev,
+        [norm]: !prev[norm],
+      }));
+    },
+    [setExplorerExpanded]
+  );
+
+  const handleSelectTab = (tabId) => {
+    const tab = openTabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    setActiveTabId(tabId);
+    if (tab.path !== currentFileRef.current) {
+      loadFile(tab.path);
+    }
+  };
+
+  const performCloseTab = useCallback(
+    (tabId) => {
+      const tab = openTabs.find((t) => t.id === tabId);
+      if (!tab) return;
+      const nextTabs = openTabs.filter((t) => t.id !== tabId);
+      setOpenTabs(nextTabs);
+      setUnsavedChanges((prev) => {
+        const updated = { ...prev };
+        delete updated[tab.path];
+        return updated;
+      });
+      if (activeTabId === tabId) {
+        const idx = openTabs.findIndex((t) => t.id === tabId);
+        const replacement = nextTabs[idx] ?? nextTabs[idx - 1] ?? null;
+        setActiveTabId(replacement ? replacement.id : null);
+        if (replacement) {
+          if (replacement.path !== currentFileRef.current) {
+            loadFile(replacement.path);
+          }
+        } else {
+          setCurrentFile(null);
+          setEditorContent("");
+        }
+      }
+      setPendingCloseTabId(null);
+    },
+    [openTabs, activeTabId, setUnsavedChanges]
+  );
+
+  const handleCloseTab = (tabId) => {
+    const tab = openTabs.find((t) => t.id === tabId);
+    if (tab && unsavedChangesRef.current[tab.path] !== undefined) {
+      setPendingCloseTabId(tabId);
+      return;
+    }
+    performCloseTab(tabId);
+  };
+
+  const handleConfirmCloseSave = useCallback(async () => {
+    if (pendingCloseTabId == null) return;
+    const tab = openTabs.find((t) => t.id === pendingCloseTabId);
+    if (!tab) {
+      setPendingCloseTabId(null);
+      return;
+    }
+    setIsSavingCloseTab(true);
+    const content =
+      currentFileRef.current === tab.path
+        ? editorContentRef.current
+        : unsavedChangesRef.current[tab.path];
+    const contentToWrite = content ?? "";
+    try {
+      const success = await API.writeFile(tab.path, contentToWrite);
+      if (success) {
+        toast.success("File saved");
+        performCloseTab(pendingCloseTabId);
+      } else {
+        toast.error("Failed to save file");
+        setPendingCloseTabId(null);
+      }
+    } catch (err) {
+      const isDeleted =
+        (err?.message && err.message.includes("no longer exists")) || err?.code === "ENOENT";
+      if (isDeleted) {
+        toast.info("File was deleted or moved; cannot save.");
+      } else {
+        toast.error(`Error saving file: ${err?.message || "Unknown error"}`);
+      }
+      setPendingCloseTabId(null);
+    } finally {
+      setIsSavingCloseTab(false);
+    }
+  }, [pendingCloseTabId, openTabs, performCloseTab]);
+
+  const handleConfirmCloseDiscard = useCallback(() => {
+    if (pendingCloseTabId == null) return;
+    performCloseTab(pendingCloseTabId);
+  }, [pendingCloseTabId, performCloseTab]);
+
+  const handleConfirmCloseCancel = useCallback(() => {
+    setPendingCloseTabId(null);
+  }, []);
 
   const handleOpenSearchResult = (filePath, lineNumber) => {
     const current = currentFileRef.current;
@@ -412,12 +588,38 @@ export default function EditorView() {
       if (isSave) {
         e.preventDefault();
         handleSaveFile();
+        return;
+      }
+
+      const isCloseTab = (e.ctrlKey || e.metaKey) && (e.key === "w" || e.key === "W");
+      if (isCloseTab) {
+        e.preventDefault();
+        if (activeTabId) {
+          handleCloseTab(activeTabId);
+        }
+        return;
+      }
+
+      const isNextTab =
+        (e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "Tab" || e.key === "tab");
+      const isPrevTab =
+        (e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "Tab" || e.key === "tab");
+      if ((isNextTab || isPrevTab) && openTabs.length > 0) {
+        e.preventDefault();
+        const idx = openTabs.findIndex((t) => t.id === activeTabId);
+        if (idx === -1) return;
+        const delta = isNextTab ? 1 : -1;
+        const nextIdx = (idx + delta + openTabs.length) % openTabs.length;
+        const nextTab = openTabs[nextIdx];
+        if (nextTab) {
+          handleSelectTab(nextTab.id);
+        }
       }
     };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [handleSaveFile]);
+  }, [handleSaveFile, activeTabId, openTabs, handleCloseTab]);
 
   if (!project) return null;
 
@@ -512,21 +714,53 @@ export default function EditorView() {
               projectRoot={projectPath}
               onRefresh={onRefreshFileTree}
               gitStatusByPath={gitStatusByPath}
+              expandedPaths={explorerExpanded}
+              onToggleFolder={handleToggleFolder}
             />
           )}
         </div>
       </div>
       {/* Editor Main */}
       <div className="flex-1 min-h-0 flex flex-col bg-transparent relative z-0">
-        <div className="px-4 h-12 flex items-center justify-between text-xs border-b border-white/5 z-10 shadow-sm shrink-0">
-          <div className="flex items-center space-x-2 flex-1 min-w-0">
-            {currentFile ? (
-              <span className="flex items-center text-foreground font-medium truncate">
-                <FileCode className="h-4 w-4 mr-2 text-primary opacity-80" />
-                {currentFile.replace(projectPath, "")}
+        <div className="px-2 h-10 flex items-center justify-between text-xs border-b border-white/5 z-10 shadow-sm shrink-0">
+          <div className="flex items-center space-x-1 flex-1 min-w-0 overflow-x-auto">
+            {openTabs.length === 0 ? (
+              <span className="ml-2 opacity-40 italic whitespace-nowrap">
+                Select a file to edit
               </span>
             ) : (
-              <span className="opacity-40 italic">Select a file to edit</span>
+              openTabs.map((tab) => {
+                const isActive = tab.id === activeTabId;
+                const isDirty = unsavedChanges[tab.path] !== undefined;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={cn(
+                      "group flex items-center px-2 h-7 rounded-md border text-xs mr-1 whitespace-nowrap cursor-pointer",
+                      isActive
+                        ? "bg-background text-foreground border-primary/60"
+                        : "bg-black/10 text-muted-foreground border-transparent hover:bg-white/5"
+                    )}
+                    onClick={() => handleSelectTab(tab.id)}
+                  >
+                    <FileCode className="h-3.5 w-3.5 mr-1 text-primary/80" />
+                    <span className="truncate max-w-[140px]">{tab.fileName}</span>
+                    {isDirty && (
+                      <span className="ml-1 text-primary text-[11px] group-hover:hidden">*</span>
+                    )}
+                    <span
+                      className="ml-1 text-xs opacity-60 hover:opacity-100 px-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseTab(tab.id);
+                      }}
+                    >
+                      ×
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
           <div className="flex items-center gap-2 pl-2">
@@ -719,6 +953,60 @@ export default function EditorView() {
           )}
         </div>
       </div>
+
+      <Dialog open={pendingCloseTabId != null} onOpenChange={(open) => !open && setPendingCloseTabId(null)}>
+        <DialogContent
+          className="sm:max-w-md"
+          aria-describedby="unsaved-dialog-description"
+          onPointerDownOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Unsaved changes</DialogTitle>
+            <DialogDescription id="unsaved-dialog-description">
+              {pendingCloseTabId != null && (() => {
+                const tab = openTabs.find((t) => t.id === pendingCloseTabId);
+                return tab
+                  ? `Do you want to save the changes you made to "${tab.fileName}"?`
+                  : null;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleConfirmCloseCancel}
+              disabled={isSavingCloseTab}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-amber-500/60 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+              onClick={handleConfirmCloseDiscard}
+              disabled={isSavingCloseTab}
+            >
+              Don&apos;t save
+            </Button>
+            <Button
+              type="button"
+              className="btn-primary cursor-pointer"
+              onClick={handleConfirmCloseSave}
+              disabled={isSavingCloseTab}
+            >
+              {isSavingCloseTab ? (
+                "Saving…"
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  Save
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

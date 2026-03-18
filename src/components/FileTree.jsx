@@ -124,17 +124,21 @@ const FileTreeNode = ({
   onSelect,
   selectedPath,
   level = 0,
-  defaultOpen = false,
   projectRoot,
   onRefresh,
   onRequestCreate,
   gitStatusByPath,
   folderChangesByPath,
+  expandedPaths,
+  onToggleFolder,
 }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen); // All folders closed by default
+  const isDirectory = node.type === "directory";
+  const isOpen =
+    isDirectory && expandedPaths
+      ? !!expandedPaths[normalizePath(node.path)]
+      : false;
   const [iconError, setIconError] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const isDirectory = node.type === "directory";
   const isSelected = selectedPath === node.path;
   const hasChildren = isDirectory && node.children && node.children.length > 0;
   const parentPath = isDirectory ? node.path : dirname(node.path);
@@ -145,16 +149,16 @@ const FileTreeNode = ({
 
   const handleToggle = (e) => {
     e.stopPropagation();
-    if (isDirectory) {
-      setIsOpen(!isOpen);
+    if (isDirectory && onToggleFolder) {
+      onToggleFolder(node.path);
     }
   };
 
   const handleSelect = (e) => {
     e.stopPropagation();
     if (isDirectory) {
-      if (hasChildren) {
-        setIsOpen(!isOpen);
+      if (hasChildren && onToggleFolder) {
+        onToggleFolder(node.path);
       }
       // Don't call onSelect for directories
       return;
@@ -469,18 +473,20 @@ const FileTreeNode = ({
             className="overflow-hidden"
           >
             {node.children.map((child) => (
-              <FileTreeNode
-                key={child.path}
-                node={child}
-                onSelect={onSelect}
-                selectedPath={selectedPath}
-                level={level + 1}
-                projectRoot={projectRoot}
-                onRefresh={onRefresh}
-                onRequestCreate={onRequestCreate}
-                gitStatusByPath={gitStatusByPath}
-                folderChangesByPath={folderChangesByPath}
-              />
+                <FileTreeNode
+                  key={child.path}
+                  node={child}
+                  onSelect={onSelect}
+                  selectedPath={selectedPath}
+                  level={level + 1}
+                  projectRoot={projectRoot}
+                  onRefresh={onRefresh}
+                  onRequestCreate={onRequestCreate}
+                  gitStatusByPath={gitStatusByPath}
+                  folderChangesByPath={folderChangesByPath}
+                  expandedPaths={expandedPaths}
+                  onToggleFolder={onToggleFolder}
+                />
             ))}
           </motion.div>
         )}
@@ -496,6 +502,8 @@ export default function FileTree({
   projectRoot,
   onRefresh,
   gitStatusByPath,
+  expandedPaths = {},
+  onToggleFolder,
 }) {
   // Sort files and compute which folders contain any changes
   const { sortedFiles, folderChangesByPath } = useMemo(() => {
@@ -658,6 +666,8 @@ export default function FileTree({
                   onRequestCreate={openCreateDialog}
                   gitStatusByPath={gitStatusByPath}
                   folderChangesByPath={folderChangesByPath}
+                  expandedPaths={expandedPaths}
+                  onToggleFolder={onToggleFolder}
                 />
               ))
             )}
