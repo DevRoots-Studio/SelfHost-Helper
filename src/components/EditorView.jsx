@@ -313,18 +313,22 @@ export default function EditorView() {
     searchPanelHeight,
   ]);
 
-  // On project change, ensure initial file (if any) is loaded and tabs are restored.
+  // On project change, ensure initial file content is loaded.
+  // Without this, we may restore `currentFile` from state but keep `editorContent`
+  // at the initial empty string, resulting in an empty editor on re-open.
   useEffect(() => {
     if (!projectId) return;
-    if (initialProjectState?.lastActiveFile) {
-      if (initialProjectState.lastActiveFile !== currentFileRef.current) {
-        loadFile(initialProjectState.lastActiveFile);
+    const targetFile = initialProjectState?.lastActiveFile;
+    if (targetFile) {
+      const shouldLoad = targetFile !== currentFileRef.current || editorContentRef.current === "";
+      if (shouldLoad) {
+        loadFile(targetFile);
       }
     } else {
       setCurrentFile(null);
       setEditorContent("");
     }
-  }, [projectId]);
+  }, [projectId, initialProjectState?.lastActiveFile]);
 
   useEffect(() => {
     loadGitStatus();
@@ -457,6 +461,9 @@ export default function EditorView() {
         delete updated[tab.path];
         return updated;
       });
+      // Keep watcher dirty-check in sync immediately.
+      // This avoids a race where chokidar fires before the Jotai atom propagates.
+      delete unsavedChangesRef.current?.[tab.path];
       if (activeTabId === tabId) {
         const idx = openTabs.findIndex((t) => t.id === tabId);
         const replacement = nextTabs[idx] ?? nextTabs[idx - 1] ?? null;
@@ -550,6 +557,8 @@ export default function EditorView() {
         const success = await API.writeFile(fileToSave, contentToSave);
         if (success) {
           toast.success("File saved");
+          // Ensure watcher sees this as clean right away.
+          delete unsavedChangesRef.current?.[fileToSave];
           // Remove from unsaved changes
           setUnsavedChanges((prev) => {
             const next = { ...prev };
@@ -572,8 +581,15 @@ export default function EditorView() {
   }, [setUnsavedChanges]);
 
   const handleEditorChange = (newContent) => {
-    setEditorContent(newContent);
+    // IMPORTANT:
+    // Do not update `editorContent` state on every keystroke.
+    // Updating the controlled Monaco `value` frequently can cause Monaco
+    // to reset cursor/selection and sometimes drop keystrokes.
+    // We keep the latest text in refs + dirty atom instead.
+    editorContentRef.current = newContent;
     if (currentFile) {
+      // Keep watcher dirty-check in sync immediately.
+      unsavedChangesRef.current[currentFile] = newContent;
       setUnsavedChanges((prev) => ({
         ...prev,
         [currentFile]: newContent,
@@ -954,7 +970,10 @@ export default function EditorView() {
         </div>
       </div>
 
-      <Dialog open={pendingCloseTabId != null} onOpenChange={(open) => !open && setPendingCloseTabId(null)}>
+      <Dialog
+        open={pendingCloseTabId != null}
+        onOpenChange={(open) => !open && setPendingCloseTabId(null)}
+      >
         <DialogContent
           className="sm:max-w-md"
           aria-describedby="unsaved-dialog-description"
@@ -963,12 +982,13 @@ export default function EditorView() {
           <DialogHeader>
             <DialogTitle>Unsaved changes</DialogTitle>
             <DialogDescription id="unsaved-dialog-description">
-              {pendingCloseTabId != null && (() => {
-                const tab = openTabs.find((t) => t.id === pendingCloseTabId);
-                return tab
-                  ? `Do you want to save the changes you made to "${tab.fileName}"?`
-                  : null;
-              })()}
+              {pendingCloseTabId != null &&
+                (() => {
+                  const tab = openTabs.find((t) => t.id === pendingCloseTabId);
+                  return tab
+                    ? `Do you want to save the changes you made to "${tab.fileName}"?`
+                    : null;
+                })()}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0 mt-4">

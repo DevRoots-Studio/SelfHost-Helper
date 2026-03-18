@@ -15,6 +15,18 @@ const MonacoEditor = ({
     onChange(value);
   };
 
+  // When `value` changes due to file load/reload, update the editor model.
+  // We intentionally do not fully control Monaco on every keystroke.
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const nextValue = value ?? "";
+    const currentValue = editor.getValue();
+    if (currentValue !== nextValue) {
+      editor.setValue(nextValue);
+    }
+  }, [value]);
+
   useEffect(() => {
     if (scrollToLine != null && editorRef.current) {
       editorRef.current.revealLineInCenter(Math.max(1, scrollToLine));
@@ -28,7 +40,7 @@ const MonacoEditor = ({
         width="100%"
         defaultLanguage={language}
         language={language}
-        value={value}
+        defaultValue={value}
         theme={theme}
         onChange={handleEditorChange}
         onMount={(editor, monaco) => {
