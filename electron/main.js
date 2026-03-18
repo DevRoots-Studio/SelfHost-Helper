@@ -24,7 +24,6 @@ protocol.registerSchemesAsPrivileged([
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
-let shutdownReason = "unknown";
 
 global.mainWindow = null;
 const EXTERNAL_MEDIA_DIRS_ENV_KEY = "SELFHOST_MEDIA_ALLOWED_DIRS";
@@ -196,7 +195,6 @@ logger.init();
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  shutdownReason = "single-instance-lock-failed";
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -356,7 +354,6 @@ if (!gotTheLock) {
       const window = await createWindow();
       if (!window) {
         logger.error("[Window] createWindow returned null during startup. Aborting tray setup.");
-        shutdownReason = "createWindow-null";
         app.quit();
         return;
       }
@@ -392,7 +389,6 @@ if (!gotTheLock) {
 
       tray = initTray(window, () => {
         isQuitting = true;
-        shutdownReason = "tray-quit";
         app.quit();
       });
 
@@ -468,7 +464,7 @@ app.on("before-quit", async (e) => {
   e.preventDefault();
   isShuttingDown = true;
 
-  logger.info(`Shutting down... performing fast cleanup. reason=${shutdownReason}`);
+  logger.info("Shutting down... performing fast cleanup.");
 
   try {
     const { stopAllProjects } = await import("./services/projectsManager.js");
