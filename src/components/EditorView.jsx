@@ -146,6 +146,7 @@ export default function EditorView() {
   const editorContentRef = useRef(editorContent);
   const currentFileRef = useRef(currentFile);
   const unsavedChangesRef = useRef(unsavedChanges);
+  const suppressReloadForPathRef = useRef({});
 
   useEffect(() => {
     editorContentRef.current = editorContent;
@@ -345,11 +346,17 @@ export default function EditorView() {
 
   // Sync with external file changes: reload current file if it changed on disk
   useEffect(() => {
-    const unsub = API.onFileChange?.(({ filePath }) => {
+    const unsub = API.onFileChange?.(({ event, filePath }) => {
       const current = currentFileRef.current;
       if (!current || !filePath) return;
       const norm = (p) => (p || "").replace(/\\/g, "/");
       if (norm(filePath) !== norm(current)) return;
+
+      const suppressedAt = suppressReloadForPathRef.current[current];
+      if (suppressedAt && Date.now() - suppressedAt < 2000) {
+        return;
+      }
+
       if (unsavedChangesRef.current[current] !== undefined) {
         toast.info("File changed on disk. Save or reload to see changes.");
         return;
@@ -554,6 +561,10 @@ export default function EditorView() {
 
     if (fileToSave && contentToSave !== undefined) {
       try {
+        // Prevent the file watcher from re-loading the editor immediately after
+        // our own save (which can look like the file "re-opens" and disrupt cursor).
+        suppressReloadForPathRef.current[fileToSave] = Date.now();
+
         const success = await API.writeFile(fileToSave, contentToSave);
         if (success) {
           toast.success("File saved");
@@ -600,13 +611,6 @@ export default function EditorView() {
   // Bind Ctrl/Cmd+S to save the current file (capture phase to prevent browser default)
   useEffect(() => {
     const onKeyDown = (e) => {
-      const isSave = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
-      if (isSave) {
-        e.preventDefault();
-        handleSaveFile();
-        return;
-      }
-
       const isCloseTab = (e.ctrlKey || e.metaKey) && (e.key === "w" || e.key === "W");
       if (isCloseTab) {
         e.preventDefault();
@@ -635,7 +639,7 @@ export default function EditorView() {
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [handleSaveFile, activeTabId, openTabs, handleCloseTab]);
+  }, [activeTabId, openTabs, handleCloseTab]);
 
   if (!project) return null;
 
