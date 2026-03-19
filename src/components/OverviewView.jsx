@@ -14,6 +14,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import TunnelLogViewer from "./TunnelLogViewer";
+import OverviewGrid from "./overview/OverviewGrid";
 
 const ReactGridLayout = WidthProvider(GridLayout);
 const API = window.api;
@@ -713,7 +714,6 @@ export default function OverviewView() {
   const stats = useAtomValue(statsAtom);
   const resourceHistory = useAtomValue(resourceHistoryAtom);
   const tunnelState = useAtomValue(tunnelStateAtom);
-  const projectTunnelState = project ? tunnelState?.[project.id] : null;
 
   const historySamples = useMemo(() => {
     if (!project) return [];
@@ -721,139 +721,23 @@ export default function OverviewView() {
     return bucket?.samples ?? [];
   }, [resourceHistory, project]);
 
-  const defaultLayout = useMemo(
-    () => [
-      // Tuned to keep the Overview page shorter while still showing usable mini previews.
-      { i: "console", x: 0, y: 0, w: 8, h: 6, minW: 4, minH: 4 },
-      { i: "tunnel", x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-      { i: "tunnelLogs", x: 8, y: 3, w: 4, h: 6, minW: 3, minH: 4 },
-      { i: "files", x: 0, y: 6, w: 6, h: 4, minW: 3, minH: 3 },
-      { i: "cpu", x: 6, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
-      { i: "ram", x: 6, y: 8, w: 2, h: 2, minW: 2, minH: 2 },
-      { i: "pids", x: 8, y: 9, w: 4, h: 3, minW: 3, minH: 2 },
-    ],
-    []
-  );
-
-  const { layout, onLayoutChange } = useProjectLayout({
-    projectId: project?.id ?? null,
-    defaultLayout,
-  });
+  const onOpenFile = (path) => {
+    handleEditorFileChange?.(project.id, path);
+    navigate(`/project/${project.id}/editor`);
+  };
 
   if (!project) return null;
 
-  const tiles = [
-    {
-      i: "console",
-      headerRight: (
-        <span
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${project.status === "running" ? "bg-green-500" : "bg-destructive"}`}
-        />
-      ),
-      render: (
-        <ConsoleMiniTile
-          projectId={project.id}
-          status={project.status}
-          onSendInput={handleSendInput}
-        />
-      ),
-    },
-    {
-      i: "tunnel",
-      headerRight: (
-        <span
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-            projectTunnelState?.status === "running"
-              ? "bg-green-500"
-              : projectTunnelState?.status === "connecting"
-                ? "bg-yellow-500"
-                : "bg-destructive"
-          }`}
-        />
-      ),
-      render: <TunnelMiniTile project={project} tunnelState={tunnelState} />,
-    },
-    {
-      i: "tunnelLogs",
-      render: (
-        <div className="h-full overflow-hidden">
-          <TunnelLogsMiniTile logs={tunnelState?.[project.id]?.logs ?? []} />
-        </div>
-      ),
-    },
-    {
-      i: "files",
-      render: (
-        <MiniFileExhibitorTile
-          fileTree={fileTree}
-          isLoading={isFileTreeLoading}
-          onOpenFile={(path) => {
-            handleEditorFileChange?.(project.id, path);
-            navigate(`/project/${project.id}/editor`);
-          }}
-        />
-      ),
-    },
-    {
-      i: "cpu",
-      render: <CpuTile stats={stats} historySamples={historySamples} />,
-    },
-    {
-      i: "ram",
-      render: <RamTile stats={stats} historySamples={historySamples} />,
-    },
-    {
-      i: "pids",
-      render: <ProcessIdsTile stats={stats} />,
-    },
-  ];
-
-  const shouldAllowDragging = true;
-
   return (
-    <div className="h-full min-h-0 p-3 bg-transparent overflow-y-auto overflow-x-hidden">
-      <ReactGridLayout
-        key={project.id}
-        layout={layout}
-        cols={12}
-        rowHeight={40}
-        margin={[10, 10]}
-        containerPadding={[0, 0]}
-        isDraggable={shouldAllowDragging}
-        isResizable={true}
-        draggableHandle=".overview-tile-handle"
-        // Extra safety: avoid dragging when user interacts with terminal text/input.
-        draggableCancel=".xterm, input, textarea, button"
-        autoSize={false}
-        compactType="vertical"
-        onDragStop={(nextLayout) => onLayoutChange(nextLayout)}
-        onResizeStop={(nextLayout) => onLayoutChange(nextLayout)}
-      >
-        {tiles.map((t) => (
-          <div key={t.i} className="h-full w-full">
-            <TileShell
-              title={
-                t.i === "console"
-                  ? "Console"
-                  : t.i === "tunnel"
-                    ? "Tunnel"
-                    : t.i === "tunnelLogs"
-                      ? "Tunnel Logs"
-                      : t.i === "files"
-                        ? "Files"
-                        : t.i === "cpu"
-                          ? "CPU"
-                          : t.i === "ram"
-                            ? "RAM"
-                            : "PIDs"
-              }
-              right={t.headerRight ?? null}
-            >
-              {t.render}
-            </TileShell>
-          </div>
-        ))}
-      </ReactGridLayout>
-    </div>
+    <OverviewGrid
+      project={project}
+      fileTree={fileTree}
+      isFileTreeLoading={isFileTreeLoading}
+      stats={stats}
+      historySamples={historySamples}
+      tunnelState={tunnelState}
+      onSendInput={handleSendInput}
+      onOpenFile={onOpenFile}
+    />
   );
 }

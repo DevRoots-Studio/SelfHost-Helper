@@ -1,12 +1,21 @@
-import React from "react";
-import { Terminal, FileCode, Cloud, Activity, LayoutDashboard } from "lucide-react";
+import React, { useState } from "react";
+import { Terminal, FileCode, Cloud, Activity, LayoutDashboard, RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAtomValue } from "jotai";
-import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
+import { useAtomValue, useSetAtom } from "jotai";
+import { statsAtom, resourceHistoryAtom, overviewLayoutResetSignalAtom } from "@/store/atoms";
 import { useParams } from "react-router-dom";
 import { formatMemory } from "@/lib/formatMemory";
 import { useSelectedProject } from "@/hooks/useSelectedProject";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const TAB_PATHS = ["overview", "console", "editor", "tunnel", "resources"];
 
@@ -133,46 +142,95 @@ const ViewTabs = React.memo(() => {
   const inactiveStyle =
     "text-muted-foreground hover:text-foreground hover:bg-white/5 hover:border-white/10";
 
+  const projectBasePath = projectId ? `/project/${projectId}` : null;
+  const navigateToTab = (tab) => {
+    if (!projectBasePath) {
+      navigate(tab);
+      return;
+    }
+    navigate(`${projectBasePath}/${tab}`);
+  };
+
+  const setResetSignal = useSetAtom(overviewLayoutResetSignalAtom);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const openResetDialog = () => setResetDialogOpen(true);
+  const confirmReset = () => {
+    setResetDialogOpen(false);
+    setResetSignal((prev) => prev + 1);
+  };
+
   return (
     <div className="px-4 pt-2">
       <div className="flex items-center gap-2 border border-white/5 bg-transparent backdrop-blur-sm rounded-t-lg overflow-hidden">
         <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap px-2 py-2 flex-1">
           <button
-            onClick={() => navigate("overview")}
+            onClick={() => navigateToTab("overview")}
             className={cn(tabBase, currentTab === "overview" ? activeStyle : inactiveStyle)}
           >
             <LayoutDashboard className="mr-2 h-4 w-4" /> Overview
           </button>
           <button
-            onClick={() => navigate("console")}
+            onClick={() => navigateToTab("console")}
             className={cn(tabBase, currentTab === "console" ? activeStyle : inactiveStyle)}
           >
             <Terminal className="mr-2 h-4 w-4" /> Console
           </button>
           <button
-            onClick={() => navigate("editor")}
+            onClick={() => navigateToTab("editor")}
             className={cn(tabBase, currentTab === "editor" ? activeStyle : inactiveStyle)}
           >
             <FileCode className="mr-2 h-4 w-4" /> Editor
           </button>
           <button
-            onClick={() => navigate("tunnel")}
+            onClick={() => navigateToTab("tunnel")}
             className={cn(tabBase, currentTab === "tunnel" ? activeStyle : inactiveStyle)}
           >
             <Cloud className="mr-2 h-4 w-4" /> Tunnel
           </button>
           <button
-            onClick={() => navigate("resources")}
+            onClick={() => navigateToTab("resources")}
             className={cn(tabBase, currentTab === "resources" ? activeStyle : inactiveStyle)}
           >
             <Activity className="mr-2 h-4 w-4" /> Resources
           </button>
         </div>
 
-        <div className="shrink-0 pr-2 pb-2 pt-2">
+        <div className="shrink-0 pr-2 pb-2 pt-2 flex items-center gap-2">
           {shouldShowStats && <StatsPill stats={stats} history={history} />}
+          {currentTab === "overview" && projectId && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="border border-white/10 bg-[#07070d]/60 hover:bg-white/5"
+              onClick={openResetDialog}
+              title="Reset overview layout"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset overview layout?</DialogTitle>
+            <DialogDescription>
+              This will clear the saved Overview grid layout for the current project and restore the
+              default tile positions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setResetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmReset}>
+              Reset layout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
