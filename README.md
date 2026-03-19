@@ -7,7 +7,7 @@
 
 <em>Simplify local project hosting, process management, and tunneling</em>
 
-**v0.18.0**
+**v0.39.0**
 
 <!-- BADGES -->
 <img src="https://img.shields.io/github/license/DevRoots-Studio/SelfHost-Helper?style=flat&logo=opensourceinitiative&logoColor=white&color=0080ff" alt="license">
