@@ -1,14 +1,23 @@
-import React from "react";
-import { Terminal, FileCode, Cloud, Activity } from "lucide-react";
+import React, { useState } from "react";
+import { Terminal, FileCode, Cloud, Activity, LayoutDashboard, RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAtomValue } from "jotai";
-import { statsAtom, resourceHistoryAtom } from "@/store/atoms";
+import { useAtomValue, useSetAtom } from "jotai";
+import { statsAtom, resourceHistoryAtom, overviewLayoutResetSignalAtom } from "@/store/atoms";
 import { useParams } from "react-router-dom";
 import { formatMemory } from "@/lib/formatMemory";
 import { useSelectedProject } from "@/hooks/useSelectedProject";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-const TAB_PATHS = ["console", "editor", "tunnel", "resources"];
+const TAB_PATHS = ["overview", "console", "editor", "tunnel", "resources"];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tiny inline sparkline (8 points, 36×14 px)
@@ -119,50 +128,109 @@ const ViewTabs = React.memo(() => {
   const { projectId } = useParams();
   const project = useSelectedProject();
   const history = projectId ? (allHistory[Number(projectId)]?.samples ?? []) : [];
-  const shouldShowStats =
-    !!stats && !!project && project.status === "running";
+  const shouldShowStats = !!stats && !!project && project.status === "running";
 
   const pathname = location.pathname || "";
   const segments = pathname.split("/").filter(Boolean);
   const currentTab = TAB_PATHS.includes(segments[segments.length - 1])
     ? segments[segments.length - 1]
-    : "console";
+    : "overview";
 
   const tabBase =
-    "px-4 py-2 text-sm font-medium rounded-t-lg transition-all flex items-center focus:outline-none cursor-pointer border-t border-x border-transparent";
+    "px-4 py-2 text-sm font-medium transition-all flex items-center focus:outline-none cursor-pointer border border-transparent border-b-0 rounded-t-lg flex-shrink-0";
   const activeStyle = "bg-muted/40 text-primary border-white/10 backdrop-blur-md shadow-none";
-  const inactiveStyle = "text-muted-foreground hover:text-foreground hover:bg-white/5";
+  const inactiveStyle =
+    "text-muted-foreground hover:text-foreground hover:bg-white/5 hover:border-white/10";
+
+  const projectBasePath = projectId ? `/project/${projectId}` : null;
+  const navigateToTab = (tab) => {
+    if (!projectBasePath) {
+      navigate(tab);
+      return;
+    }
+    navigate(`${projectBasePath}/${tab}`);
+  };
+
+  const setResetSignal = useSetAtom(overviewLayoutResetSignalAtom);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const openResetDialog = () => setResetDialogOpen(true);
+  const confirmReset = () => {
+    setResetDialogOpen(false);
+    setResetSignal((prev) => prev + 1);
+  };
 
   return (
-    <div className="flex border-b-0 bg-transparent backdrop-blur-sm px-4 pt-2 gap-2">
-      <button
-        onClick={() => navigate("console")}
-        className={cn(tabBase, currentTab === "console" ? activeStyle : inactiveStyle)}
-      >
-        <Terminal className="mr-2 h-4 w-4" /> Console
-      </button>
-      <button
-        onClick={() => navigate("editor")}
-        className={cn(tabBase, currentTab === "editor" ? activeStyle : inactiveStyle)}
-      >
-        <FileCode className="mr-2 h-4 w-4" /> Editor
-      </button>
-      <button
-        onClick={() => navigate("tunnel")}
-        className={cn(tabBase, currentTab === "tunnel" ? activeStyle : inactiveStyle)}
-      >
-        <Cloud className="mr-2 h-4 w-4" /> Tunnel
-      </button>
-      <button
-        onClick={() => navigate("resources")}
-        className={cn(tabBase, currentTab === "resources" ? activeStyle : inactiveStyle)}
-      >
-        <Activity className="mr-2 h-4 w-4" /> Resources
-      </button>
+    <div className="px-4 pt-2">
+      <div className="flex items-center gap-2 border border-white/5 bg-transparent backdrop-blur-sm rounded-t-lg overflow-hidden">
+        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap px-2 py-2 flex-1">
+          <button
+            onClick={() => navigateToTab("overview")}
+            className={cn(tabBase, currentTab === "overview" ? activeStyle : inactiveStyle)}
+          >
+            <LayoutDashboard className="mr-2 h-4 w-4" /> Overview
+          </button>
+          <button
+            onClick={() => navigateToTab("console")}
+            className={cn(tabBase, currentTab === "console" ? activeStyle : inactiveStyle)}
+          >
+            <Terminal className="mr-2 h-4 w-4" /> Console
+          </button>
+          <button
+            onClick={() => navigateToTab("editor")}
+            className={cn(tabBase, currentTab === "editor" ? activeStyle : inactiveStyle)}
+          >
+            <FileCode className="mr-2 h-4 w-4" /> Editor
+          </button>
+          <button
+            onClick={() => navigateToTab("tunnel")}
+            className={cn(tabBase, currentTab === "tunnel" ? activeStyle : inactiveStyle)}
+          >
+            <Cloud className="mr-2 h-4 w-4" /> Tunnel
+          </button>
+          <button
+            onClick={() => navigateToTab("resources")}
+            className={cn(tabBase, currentTab === "resources" ? activeStyle : inactiveStyle)}
+          >
+            <Activity className="mr-2 h-4 w-4" /> Resources
+          </button>
+        </div>
 
-      <div className="ml-auto flex items-center gap-3 pb-2">
-        {shouldShowStats && <StatsPill stats={stats} history={history} />}
+        <div className="shrink-0 pr-2 pb-2 pt-2 flex items-center gap-2">
+          {shouldShowStats && <StatsPill stats={stats} history={history} />}
+          {currentTab === "overview" && projectId && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="border border-white/10 bg-[#07070d]/60 hover:bg-white/5"
+              onClick={openResetDialog}
+              title="Reset overview layout"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset overview layout?</DialogTitle>
+            <DialogDescription>
+              This will clear the saved Overview grid layout for the current project and restore the
+              default tile positions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setResetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmReset}>
+              Reset layout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

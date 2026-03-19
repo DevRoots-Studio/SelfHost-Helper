@@ -51,3 +51,7 @@ export const tunnelStateAtom = atom({});
 
 // Window control buttons position: "left" | "right" (used for RTL / dev testing)
 export const windowButtonsSideAtom = atom("right");
+
+// Signals the Overview tiles grid to reset its saved layout.
+// Used so the reset button can live in `ViewTabs` header while the grid lives in `OverviewGrid`.
+export const overviewLayoutResetSignalAtom = atom(0);
