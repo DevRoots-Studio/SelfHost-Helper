@@ -337,6 +337,12 @@ export const getTunnelLogs = (projectId) => {
 };
 
 /**
+ * Get all in-memory tunnel logs per project.
+ * Returned object shape: { [projectId: string]: Array<{message,type,timestamp}> }
+ */
+export const getAllTunnelLogs = () => ({ ...tunnelLogs });
+
+/**
  * Clear tunnel logs for a project
  * @param {number} projectId - Project ID
  */

@@ -1390,11 +1390,13 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                         <div className="flex items-center gap-2 text-xs text-zinc-400 mt-1">
                           <span className="flex items-center gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                            {discordInfo?.approximate_presence_count?.toLocaleString() || "-"}
+                            {discordInfo?.approximate_presence_count?.toLocaleString("en-US") ||
+                              "-"}
                           </span>
                           <span>•</span>
                           <span>
-                            {discordInfo?.approximate_member_count?.toLocaleString() || "-"} Members
+                            {discordInfo?.approximate_member_count?.toLocaleString("en-US") || "-"}{" "}
+                            Members
                           </span>
                         </div>
                       </div>

@@ -1,6 +1,7 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from "electron";
 import fs from "fs/promises";
 import path from "path";
+import AdmZip from "adm-zip";
 import AutoLaunch from "auto-launch";
 import {
   getProjects,
@@ -24,6 +25,7 @@ import {
   restartProject,
   getRunningProjects,
   getProjectLogs,
+  getAllProjectLogs,
   writeToProcess,
   getProjectStats,
   getProjectStartTime,
@@ -34,6 +36,7 @@ import {
   startTunnel,
   stopTunnel,
   getTunnelLogs,
+  getAllTunnelLogs,
   clearTunnelLogs,
   getTunnelStatus,
 } from "../services/tunnelManager.js";
@@ -64,6 +67,19 @@ const appLauncher = new AutoLaunch({
   name: "SelfHost Helper",
   path: process.execPath,
 });
+
+/**
+ * Create a filesystem-safe filename segment for Windows/macOS/Linux.
+ * Removes characters that are invalid on Windows and trims length.
+ */
+const sanitizeFileName = (value) => {
+  const name = typeof value === "string" ? value : "";
+  const cleaned = name
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length > 0 ? cleaned.slice(0, 120) : "project";
+};
 
 export const registerHandlers = () => {
   // Helper to log all IPC calls
@@ -289,9 +305,87 @@ export const registerHandlers = () => {
   ipcMain.handle("logs:get", async (_, id) => {
     return getProjectLogs(id);
   });
+  ipcMain.handle("logs:getAll", async () => {
+    return getAllProjectLogs();
+  });
   ipcMain.handle("logs:clear", async (_, id) => {
     clearProjectLogs(id);
     return true;
+  });
+
+  ipcMain.handle("logs:exportProject", async (_, projectId) => {
+    const numericId = Number(projectId);
+    if (!Number.isFinite(numericId)) {
+      throw new Error("Invalid projectId for logs export");
+    }
+
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow || null;
+    const projects = await getProjects();
+    const project = projects.find((p) => Number(p.id) === numericId) || null;
+    const projectName = project?.name || `Project ${numericId}`;
+
+    const fileName = `${sanitizeFileName(projectName)}-${numericId}.log`;
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      title: `Export console logs - ${projectName}`,
+      defaultPath: fileName,
+      filters: [
+        { name: "Log Files", extensions: ["log"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const logs = getProjectLogs(numericId);
+    const header = `===== Console Logs: ${projectName} (ID: ${numericId}) =====\n`;
+    const body = Array.isArray(logs) ? logs.map((l) => l?.data ?? "").join("") : "";
+    const text = `${header}${body}`;
+
+    await fs.writeFile(filePath, text, "utf8");
+    return { success: true, path: filePath };
+  });
+
+  ipcMain.handle("logs:exportAll", async () => {
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow || null;
+
+    const projects = await getProjects();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const defaultName = `console-logs-all-${timestamp}.zip`;
+
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      title: "Export console logs (.zip)",
+      defaultPath: defaultName,
+      filters: [
+        { name: "Zip Files", extensions: ["zip"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const zip = new AdmZip();
+
+    for (const project of projects) {
+      const numericId = Number(project?.id);
+      if (!Number.isFinite(numericId)) continue;
+
+      const projectName = project?.name || `Project ${numericId}`;
+      const logs = getProjectLogs(numericId);
+      const header = `===== Console Logs: ${projectName} (ID: ${numericId}) =====\n`;
+      const body = Array.isArray(logs) ? logs.map((l) => l?.data ?? "").join("") : "";
+      const text = `${header}${body}`;
+
+      const fileName = `${sanitizeFileName(projectName)}-${numericId}.log`;
+      zip.addFile(fileName, Buffer.from(text, "utf8"));
+    }
+
+    const out = zip.toBuffer();
+    await fs.writeFile(filePath, out);
+    return { success: true, path: filePath };
   });
 
   ipcMain.handle("project:getStats", async (_, id) => {
@@ -314,6 +408,9 @@ export const registerHandlers = () => {
   ipcMain.handle("tunnel:getLogs", async (_, id) => {
     return getTunnelLogs(id);
   });
+  ipcMain.handle("tunnel:getAllLogs", async () => {
+    return getAllTunnelLogs();
+  });
 
   ipcMain.handle("tunnel:clearLogs", async (_, id) => {
     return clearTunnelLogs(id);
@@ -321,6 +418,96 @@ export const registerHandlers = () => {
 
   ipcMain.handle("tunnel:getStatus", async (_, id) => {
     return getTunnelStatus(id);
+  });
+
+  ipcMain.handle("tunnel:exportProject", async (_, projectId) => {
+    const numericId = Number(projectId);
+    if (!Number.isFinite(numericId)) {
+      throw new Error("Invalid projectId for tunnel logs export");
+    }
+
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow || null;
+    const projects = await getProjects();
+    const project = projects.find((p) => Number(p.id) === numericId) || null;
+    const projectName = project?.name || `Project ${numericId}`;
+
+    const fileName = `${sanitizeFileName(projectName)}-${numericId}.log`;
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      title: `Export tunnel logs - ${projectName}`,
+      defaultPath: fileName,
+      filters: [
+        { name: "Log Files", extensions: ["log"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const logs = getTunnelLogs(numericId);
+    const header = `===== Tunnel Logs: ${projectName} (ID: ${numericId}) =====\n`;
+
+    const formatLine = (entry) => {
+      const timestamp = entry?.timestamp ? new Date(entry.timestamp) : null;
+      const time = timestamp ? timestamp.toLocaleTimeString("en-US", { hour12: false }) : "unknown";
+      const message = entry?.message ?? "";
+      return `[${time}] ${message}\n`;
+    };
+
+    const body = Array.isArray(logs) ? logs.map(formatLine).join("") : "";
+    const text = `${header}${body}`;
+
+    await fs.writeFile(filePath, text, "utf8");
+    return { success: true, path: filePath };
+  });
+
+  ipcMain.handle("tunnel:exportAll", async () => {
+    const window = BrowserWindow.getFocusedWindow() || global.mainWindow || null;
+
+    const projects = await getProjects();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const defaultName = `tunnel-logs-all-${timestamp}.zip`;
+
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      title: "Export tunnel logs (.zip)",
+      defaultPath: defaultName,
+      filters: [
+        { name: "Zip Files", extensions: ["zip"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const formatLine = (entry) => {
+      const timestamp = entry?.timestamp ? new Date(entry.timestamp) : null;
+      const time = timestamp ? timestamp.toLocaleTimeString("en-US", { hour12: false }) : "unknown";
+      const message = entry?.message ?? "";
+      return `[${time}] ${message}\n`;
+    };
+
+    const zip = new AdmZip();
+
+    for (const project of projects) {
+      const numericId = Number(project?.id);
+      if (!Number.isFinite(numericId)) continue;
+
+      const projectName = project?.name || `Project ${numericId}`;
+      const logs = getTunnelLogs(numericId);
+      const header = `===== Tunnel Logs: ${projectName} (ID: ${numericId}) =====\n`;
+      const body = Array.isArray(logs) ? logs.map(formatLine).join("") : "";
+      const text = `${header}${body}`;
+
+      const fileName = `${sanitizeFileName(projectName)}-${numericId}.log`;
+      zip.addFile(fileName, Buffer.from(text, "utf8"));
+    }
+
+    const out = zip.toBuffer();
+    await fs.writeFile(filePath, out);
+    return { success: true, path: filePath };
   });
 
   // Dialogs

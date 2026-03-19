@@ -50,7 +50,10 @@ contextBridge.exposeInMainWorld("api", {
   stopWatchingFolder: (folderPath) => ipcRenderer.invoke("watcher:stop", folderPath),
 
   getLogs: (id) => ipcRenderer.invoke("logs:get", id),
+  getAllLogs: () => ipcRenderer.invoke("logs:getAll"),
   clearLogs: (id) => ipcRenderer.invoke("logs:clear", id),
+  exportConsoleLogsProject: (id) => ipcRenderer.invoke("logs:exportProject", id),
+  exportConsoleLogsAll: () => ipcRenderer.invoke("logs:exportAll"),
 
   isAutoLaunchEnabled: () => ipcRenderer.invoke("app:isAutoLaunchEnabled"),
   enableAutoLaunch: () => ipcRenderer.invoke("app:enableAutoLaunch"),
@@ -181,6 +184,9 @@ contextBridge.exposeInMainWorld("api", {
   clearTunnelLogs: (id) => ipcRenderer.invoke("tunnel:clearLogs", id),
   getTunnelStatus: (id) => ipcRenderer.invoke("tunnel:getStatus", id),
   getTunnelLogs: (id) => ipcRenderer.invoke("tunnel:getLogs", id),
+  getAllTunnelLogs: () => ipcRenderer.invoke("tunnel:getAllLogs"),
+  exportTunnelLogsProject: (id) => ipcRenderer.invoke("tunnel:exportProject", id),
+  exportTunnelLogsAll: () => ipcRenderer.invoke("tunnel:exportAll"),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   updateSettings: (settings) => ipcRenderer.invoke("settings:update", settings),
   getUserDataPath: () => ipcRenderer.invoke("database:getUserDataPath"),

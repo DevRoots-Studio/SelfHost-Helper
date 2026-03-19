@@ -102,7 +102,7 @@ export default function TunnelLogViewer({ logs = [] }) {
 
     for (let i = lastLogIndexRef.current; i < logs.length; i++) {
       const log = logs[i];
-      const timestamp = new Date(log.timestamp).toLocaleTimeString([], { hour12: false });
+      const timestamp = new Date(log.timestamp).toLocaleTimeString("en-US", { hour12: false });
       const color = colors[log.type] || colors.info;
 
       term.write(`\x1b[90m[${timestamp}]\x1b[0m ${color}${log.message}${colors.reset}\n`);

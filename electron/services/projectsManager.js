@@ -202,6 +202,11 @@ async function isProcessGroupAlive(rootPid, platform) {
 
 export const getRunningProjects = () => Object.keys(runningRuntimes);
 export const getProjectLogs = (id) => logHistory[id] || [];
+/**
+ * Get all in-memory project console logs.
+ * Returned object shape: { [projectId: string]: Array<{data,type,timestamp,projectId}> }
+ */
+export const getAllProjectLogs = () => ({ ...logHistory });
 export const getProjectStartTime = (id) =>
   runningRuntimes[id] ? runningRuntimes[id].startTime : null;
 

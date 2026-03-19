@@ -240,7 +240,28 @@ export default function ProjectLayout() {
   };
 
   const handleEditorFileChange = (projectId, filePath) => {
-    setProjectEditorStates((prev) => ({ ...prev, [projectId]: filePath }));
+    setProjectEditorStates((prev) => {
+      const existing = prev?.[projectId];
+      // Backwards-compatible: if previous value was just a string, lift it into the new shape.
+      if (!existing || typeof existing !== "object") {
+        return {
+          ...prev,
+          [projectId]: {
+            openTabs: [],
+            activeTabId: null,
+            explorerExpanded: {},
+            lastActiveFile: filePath,
+          },
+        };
+      }
+      return {
+        ...prev,
+        [projectId]: {
+          ...existing,
+          lastActiveFile: filePath,
+        },
+      };
+    });
   };
 
   if (project == null) return null;

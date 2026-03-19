@@ -14,6 +14,9 @@ import {
   Globe,
   ShieldCheck,
   Zap,
+  Download,
+  BrushCleaning,
+  MoreVertical,
 } from "lucide-react";
 import TunnelLogViewer from "./TunnelLogViewer";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,14 @@ import { useAtom } from "jotai";
 import { tunnelStateAtom } from "@/store/atoms";
 import { useOutletContext } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { normalizeDigitsToEnglish } from "@/lib/numberUtils";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 
 export default function TunnelView(props) {
   const context = useOutletContext();
@@ -44,12 +55,16 @@ export default function TunnelView(props) {
     : { status: "stopped", url: null, logs: [] };
 
   const [mode, setMode] = useState(selectedProject?.tunnelMode || "quick");
-  const [port, setPort] = useState(selectedProject?.tunnelPort ?? 3000);
+  const [port, setPort] = useState(
+    selectedProject?.tunnelPort != null ? String(selectedProject.tunnelPort) : "3000"
+  );
   const [token, setToken] = useState(selectedProject?.encryptedTunnelToken || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [autoStart, setAutoStart] = useState(selectedProject?.autoStartTunnel || false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCopyingLogs, setIsCopyingLogs] = useState(false);
+  const [isExportingLogs, setIsExportingLogs] = useState(false);
 
   const [config, setConfig] = useState({
     protocol: selectedProject?.tunnelConfig?.protocol || "http2",
@@ -65,7 +80,7 @@ export default function TunnelView(props) {
   useEffect(() => {
     if (!selectedProject) return;
     setMode(selectedProject.tunnelMode || "quick");
-    setPort(selectedProject.tunnelPort || 3000);
+    setPort(selectedProject?.tunnelPort != null ? String(selectedProject.tunnelPort) : "3000");
     setToken(selectedProject.encryptedTunnelToken || "");
     setShowAdvanced(false);
     setShowHelp(false);
@@ -94,7 +109,7 @@ export default function TunnelView(props) {
     const updatedProject = {
       ...selectedProject,
       tunnelMode: mode,
-      tunnelPort: port === "" ? 3000 : port,
+      tunnelPort: port === "" ? 3000 : parseInt(port, 10),
       encryptedTunnelToken: token,
       tunnelConfig: config,
       autoStartTunnel: autoStart,
@@ -104,8 +119,8 @@ export default function TunnelView(props) {
 
   const handleStart = async () => {
     // Port validation
-    const portToCheck = port === "" ? 3000 : port;
-    const portNum = parseInt(portToCheck);
+    const portToCheck = port === "" ? "3000" : port;
+    const portNum = parseInt(portToCheck, 10);
 
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
       toast.error("Please enter a valid port number (1-65535)");
@@ -161,6 +176,112 @@ export default function TunnelView(props) {
 
   const openUrl = (url) => {
     window.api.openExternal(url);
+  };
+
+  const formatTunnelLogEntry = (log) => {
+    const timestamp = log?.timestamp ? new Date(log.timestamp) : null;
+    const time = timestamp ? timestamp.toLocaleTimeString("en-US", { hour12: false }) : "unknown";
+    return `[${time}] ${log?.message ?? ""}`;
+  };
+
+  const handleCopyCurrentTunnelLogs = async () => {
+    const currentLogs = projectTunnelState?.logs || [];
+    if (currentLogs.length === 0) {
+      toast.info("No tunnel logs to copy");
+      return;
+    }
+    setIsCopyingLogs(true);
+    try {
+      const text = currentLogs.map(formatTunnelLogEntry).join("\n");
+      await navigator.clipboard.writeText(text);
+      toast.success("Tunnel logs copied");
+    } catch (err) {
+      console.error("Failed to copy tunnel logs:", err);
+      toast.error("Failed to copy tunnel logs");
+    } finally {
+      setIsCopyingLogs(false);
+    }
+  };
+
+  const handleExportCurrentTunnelLogs = async () => {
+    setIsExportingLogs(true);
+    try {
+      const res = await window.api.exportTunnelLogsProject(selectedProject.id);
+      if (res?.canceled) {
+        toast.info("Export canceled");
+        return;
+      }
+      toast.success("Tunnel logs exported");
+    } catch (err) {
+      console.error("Failed to export tunnel logs:", err);
+      toast.error("Failed to export tunnel logs");
+    } finally {
+      setIsExportingLogs(false);
+    }
+  };
+
+  const handleCopyAllTunnelLogs = async () => {
+    setIsCopyingLogs(true);
+    try {
+      const [projects, allTunnelLogs] = await Promise.all([
+        window.api.getProjects(),
+        window.api.getAllTunnelLogs(),
+      ]);
+
+      const parts = projects.map((p) => {
+        const id = p?.id;
+        const key = String(id);
+        const projectLogs = allTunnelLogs?.[key] || [];
+        const projectName = p?.name || `Project ${id}`;
+        const header = `===== Tunnel Logs: ${projectName} (ID: ${id}) =====`;
+        const body = projectLogs.length ? projectLogs.map(formatTunnelLogEntry).join("\n") : "";
+        return body ? `${header}\n${body}` : header;
+      });
+
+      const text = parts.join("\n\n");
+      await navigator.clipboard.writeText(text);
+      toast.success("All tunnel logs copied");
+    } catch (err) {
+      console.error("Failed to copy all tunnel logs:", err);
+      toast.error("Failed to copy all tunnel logs");
+    } finally {
+      setIsCopyingLogs(false);
+    }
+  };
+
+  const handleExportAllTunnelLogs = async () => {
+    setIsExportingLogs(true);
+    try {
+      const res = await window.api.exportTunnelLogsAll();
+      if (res?.canceled) {
+        toast.info("Export canceled");
+        return;
+      }
+      toast.success("Tunnel logs exported (.zip)");
+    } catch (err) {
+      console.error("Failed to export all tunnel logs:", err);
+      toast.error("Failed to export all tunnel logs");
+    } finally {
+      setIsExportingLogs(false);
+    }
+  };
+
+  const handleClearTunnelLogs = async () => {
+    try {
+      await window.api.clearTunnelLogs(selectedProject.id);
+      setTunnelState((prev) => ({
+        ...prev,
+        [selectedProject.id]: {
+          ...(prev[selectedProject.id] ||
+            projectTunnelState || { status: "stopped", url: null, logs: [] }),
+          logs: [],
+        },
+      }));
+      toast.success("Tunnel logs cleared");
+    } catch (err) {
+      console.error("Failed to clear logs:", err);
+      toast.error("Failed to clear tunnel logs");
+    }
   };
 
   return (
@@ -252,18 +373,14 @@ export default function TunnelView(props) {
                 </div>
               </Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={port}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "") {
-                    setPort("");
-                  } else {
-                    const parsed = parseInt(val);
-                    if (!isNaN(parsed)) {
-                      setPort(parsed);
-                    }
-                  }
+                  // Normalize any Unicode digits to ASCII so the input stays English-only.
+                  const ascii = normalizeDigitsToEnglish(e.target.value);
+                  const digitsOnly = ascii.replace(/[^\d]/g, "");
+                  setPort(digitsOnly);
                 }}
                 className="bg-black/20 border-white/5 h-11"
                 placeholder="3000"
@@ -614,28 +731,73 @@ export default function TunnelView(props) {
             <Terminal className="h-3.5 w-3.5" />
             Tunnel Logs
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={async () => {
-              try {
-                await window.api.clearTunnelLogs(selectedProject.id);
-                setTunnelState((prev) => ({
-                  ...prev,
-                  [selectedProject.id]: {
-                    ...projectTunnelState,
-                    logs: [],
-                  },
-                }));
-              } catch (err) {
-                console.error("Failed to clear logs:", err);
-                toast.error("Failed to clear logs");
-              }
-            }}
-          >
-            Clear
-          </Button>
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Tunnel logs actions"
+                className="h-8 w-8 text-muted-foreground hover:text-primary transition-all rounded-md"
+                onClick={(e) => {
+                  // Radix ContextMenu opens on right-click; for left-click we synthesize a `contextmenu` event.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const ev = new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                  });
+                  e.currentTarget.dispatchEvent(ev);
+                }}
+                onContextMenu={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onClick={handleCopyCurrentTunnelLogs}
+                disabled={isCopyingLogs || isExportingLogs}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy this project's tunnel logs
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={handleExportCurrentTunnelLogs}
+                disabled={isCopyingLogs || isExportingLogs}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export this project's tunnel logs (.log)
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={handleCopyAllTunnelLogs}
+                disabled={isCopyingLogs || isExportingLogs}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy all projects' tunnel logs
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={handleExportAllTunnelLogs}
+                disabled={isCopyingLogs || isExportingLogs}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export all projects' tunnel logs (.zip)
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={handleClearTunnelLogs}
+                disabled={isCopyingLogs || isExportingLogs}
+                className="text-destructive focus:text-destructive"
+              >
+                <BrushCleaning className="w-4 h-4 mr-2" />
+                Clear tunnel logs
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </CardHeader>
         <TunnelLogViewer logs={projectTunnelState.logs} />
       </Card>

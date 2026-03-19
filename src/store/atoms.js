@@ -22,14 +22,28 @@ export const resourceHistoryAtom = atom({});
 export const fileTreeAtom = atom([]);
 export const isFileTreeLoadingAtom = atom(false);
 
-// Editor file states per project
+// Editor UI state per project.
+// Shape:
+// {
+//   [projectId: string | number]: {
+//     openTabs: Array<{
+//       id: string;
+//       path: string;
+//       fileName: string;
+//       language?: string;
+//     }>;
+//     activeTabId: string | null;
+//     explorerExpanded: Record<string, boolean>;
+//     lastActiveFile?: string | null;
+//   };
+// }
 export const projectEditorStatesAtom = atom({});
 
 // Modal states
 export const isAddProjectModalOpenAtom = atom(false);
 export const isProjectSettingsOpenAtom = atom(false);
 
-// Unsaved changes in projects (filePath -> content)
+// Unsaved changes in projects (filePath -> content). Used to mark tabs as dirty.
 export const unsavedChangesAtom = atom({});
 
 // Cloudflare Tunnel State (projectId -> { status, url, logs })
