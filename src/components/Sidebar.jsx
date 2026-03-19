@@ -680,7 +680,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
-                    onClick={() => navigate(`/project/${p.id}/console`)}
+                    onClick={() => navigate(`/project/${p.id}/overview`)}
                     className={cn(
                       "sidebar-item group relative transition-all duration-200 select-none",
                       width < 120 ? "collapsed" : "",
@@ -788,7 +788,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                 <ContextMenuContent>
                   <ContextMenuItem
                     onClick={() => {
-                      navigate(`/project/${p.id}/console`);
+                      navigate(`/project/${p.id}/overview`);
                       setIsProjectSettingsOpen(true);
                     }}
                   >

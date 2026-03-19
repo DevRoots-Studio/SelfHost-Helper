@@ -1,6 +1,6 @@
 {
   "name": "selfhost-helper",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "description": "Node.js Project Manager",
   "main": "electron/main.js",
   "type": "module",
@@ -115,6 +115,7 @@
     "wait-on": "latest"
   },
   "dependencies": {
+    "@eleung/react-grid-layout": "^1.8.3",
     "@hello-pangea/dnd": "^18.0.1",
     "@monaco-editor/react": "latest",
     "@radix-ui/react-context-menu": "^2.2.16",

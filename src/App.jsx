@@ -13,6 +13,7 @@ import LogViewer from "./components/LogViewer";
 import EditorView from "./components/EditorView";
 import TunnelView from "./components/TunnelView";
 import ResourcesTab from "./components/ResourcesTab";
+import OverviewView from "./components/OverviewView";
 import TitleBar from "./components/TitleBar";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
@@ -40,11 +41,12 @@ function App() {
           <Route path="/" element={<Dashboard />}>
             <Route index element={<EmptyState />} />
             <Route path="project/:projectId" element={<ProjectLayout />}>
-              <Route index element={<Navigate to="console" replace />} />
+              <Route index element={<Navigate to="overview" replace />} />
               <Route path="console" element={<LogViewer />} />
               <Route path="editor" element={<EditorView />} />
               <Route path="tunnel" element={<TunnelView />} />
               <Route path="resources" element={<ResourcesTab />} />
+              <Route path="overview" element={<OverviewView />} />
             </Route>
           </Route>
           <Route path="/settings" element={<Settings />}>
