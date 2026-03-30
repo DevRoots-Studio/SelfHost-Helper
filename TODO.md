@@ -11,10 +11,10 @@
 - [x] Asynchronous I/O Logging (Stream-based)
 - [x] IPC Log Batching for High-Performance UI
 - [ ] docker support
-- [ ] multiple node.js versions support
+- [x] multiple node.js versions support
 - [ ] backuping and rollback
 - [ ] tasks and schedules
-- [ ] the ability to start the application minimized in the system tray
+- [x] the ability to start the application minimized in the system tray
 - [x] Robust System Tray implementation with real-time controls
 - [x] Application-wide notification system (react-toastify)
 - [x] Persistent UUIDs per project for collision-free identification
@@ -38,6 +38,6 @@
 - [x] Persistent server custom ordering
 - [x] O(1) Native Resource Monitoring (Job Objects)
 - [ ] resource usage history/graphs (In Progress)
-- [ ] auto-update system for the application
-- [ ] backup/restore for project configurations
+- [x] auto-update system for the application
+- [x] backup/restore for project configurations
 - [ ] plugin system or custom shell hooks
