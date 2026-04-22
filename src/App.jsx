@@ -8,6 +8,7 @@ import RuntimesSection from "./pages/settings/RuntimesSection";
 import UpdatesSection from "./pages/settings/UpdatesSection";
 import AboutSection from "./pages/settings/AboutSection";
 import ProjectLayout from "./components/ProjectLayout";
+import HomePage from "./components/HomePage";
 import EmptyState from "./components/EmptyState";
 import LogViewer from "./components/LogViewer";
 import EditorView from "./components/EditorView";
@@ -39,7 +40,7 @@ function App() {
         <title>{import.meta.env.DEV ? "SelfHost Helper Dev" : "SelfHost Helper"}</title>
         <Routes>
           <Route path="/" element={<Dashboard />}>
-            <Route index element={<EmptyState />} />
+            <Route index element={<HomePage />} />
             <Route path="project/:projectId" element={<ProjectLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="console" element={<LogViewer />} />
