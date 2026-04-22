@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   Plus,
   Settings,
+  Home,
   Folder as FolderIcon,
   ChevronLeft,
   ChevronRight,
@@ -962,6 +963,36 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                     </Button>
                   </div>
                 )}
+
+                {/* Home Navigation Button */}
+                <button
+                  onClick={() => navigate("/")}
+                  className={cn(
+                    "w-full px-3 py-3 rounded-lg border transition-all duration-300 flex items-center gap-3 text-sm font-medium cursor-pointer group/home",
+                    activeProjectId === null
+                      ? "bg-primary/20 border-primary/30 text-primary"
+                      : "border-white/5 hover:border-white/10 hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {isCollapsed ? (
+                    <div className={cn(
+                      "flex items-center justify-center w-10 h-10 rounded-lg border transition-all duration-300",
+                      activeProjectId === null
+                        ? "bg-primary/25 border-primary/30"
+                        : "border-white/10 hover:bg-white/5"
+                    )}>
+                      <Home className="h-5 w-5" />
+                    </div>
+                  ) : (
+                    <>
+                      <Home className="h-5 w-5 shrink-0" />
+                      <span className="flex-1 truncate">Home</span>
+                      {activeProjectId === null && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                      )}
+                    </>
+                  )}
+                </button>
 
                 <Droppable droppableId="sidebar-content" type="project" isCombineEnabled>
                   {(provided) => (
