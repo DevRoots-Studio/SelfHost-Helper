@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
-import { Plus, Grid3x3, List, Server, Activity, Clock, Cpu, HardDrive } from "lucide-react";
+import { Plus, Grid3x3, List, Server, Orbit, Clock, Cpu, HardDrive } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { projectsAtom, resourceHistoryAtom, isAddProjectModalOpenAtom } from "@/store/atoms";
@@ -26,9 +27,17 @@ function formatUptime(ms) {
 // Project Card (Grid View)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProjectCard({ project, onClick }) {
+function ProjectCard({ project, stats, onClick }) {
+  const latestCpu = stats?.cpu ?? 0;
+  const latestMemory = stats?.memory ?? 0;
+
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ y: -4 }}
       onClick={onClick}
       className="group relative overflow-hidden rounded-xl border border-white/5 bg-linear-to-br from-white/2 to-white/0.5 hover:border-white/10 hover:from-white/4 hover:to-white/1 transition-all duration-300 cursor-pointer p-5 hover:shadow-lg hover:shadow-primary/5"
     >
@@ -45,8 +54,8 @@ function ProjectCard({ project, onClick }) {
             <p className="text-xs text-muted-foreground/60 truncate mt-1">{project.path}</p>
           </div>
           <div className="shrink-0">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-              <Activity className="h-4 w-4 text-emerald-400" />
+            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+              <Orbit className="h-4 w-4 text-emerald-400" />
             </div>
           </div>
         </div>
@@ -74,7 +83,9 @@ function ProjectCard({ project, onClick }) {
                 CPU
               </span>
             </div>
-            <div className="text-sm font-mono font-bold text-foreground">—</div>
+            <div className="text-sm font-mono font-bold text-foreground">
+              {latestCpu > 0 ? `${latestCpu.toFixed(1)}%` : "—"}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -84,7 +95,9 @@ function ProjectCard({ project, onClick }) {
                 RAM
               </span>
             </div>
-            <div className="text-sm font-mono font-bold text-foreground">—</div>
+            <div className="text-sm font-mono font-bold text-foreground truncate">
+              {latestMemory > 0 ? formatMemory(latestMemory) : "—"}
+            </div>
           </div>
         </div>
       </div>
@@ -93,7 +106,7 @@ function ProjectCard({ project, onClick }) {
       <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <div className="text-[10px] text-muted-foreground/40 font-medium">View →</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -101,9 +114,17 @@ function ProjectCard({ project, onClick }) {
 // Project Row (List View)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProjectRow({ project, onClick }) {
+function ProjectRow({ project, stats, onClick }) {
+  const latestCpu = stats?.cpu ?? 0;
+  const latestMemory = stats?.memory ?? 0;
+
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      whileHover={{ x: 4 }}
       onClick={onClick}
       className="group relative overflow-hidden rounded-lg border border-white/5 hover:border-white/10 hover:bg-white/2 transition-all duration-300 cursor-pointer p-4 flex items-center justify-between gap-4 hover:shadow-md hover:shadow-primary/5"
     >
@@ -138,18 +159,22 @@ function ProjectRow({ project, onClick }) {
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right min-w-16">
           <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-semibold">
             CPU
           </div>
-          <div className="font-mono font-bold text-foreground text-sm">—</div>
+          <div className="font-mono font-bold text-foreground text-sm">
+            {latestCpu > 0 ? `${latestCpu.toFixed(1)}%` : "—"}
+          </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right min-w-20">
           <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-semibold">
             RAM
           </div>
-          <div className="font-mono font-bold text-foreground text-sm">—</div>
+          <div className="font-mono font-bold text-foreground text-sm">
+            {latestMemory > 0 ? formatMemory(latestMemory) : "—"}
+          </div>
         </div>
       </div>
 
@@ -157,7 +182,7 @@ function ProjectRow({ project, onClick }) {
       <div className="relative z-10 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
         →
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -167,14 +192,23 @@ function ProjectRow({ project, onClick }) {
 
 function EmptyRunningProjects({ onCreateServer }) {
   return (
-    <div className="flex-1 flex items-center justify-center px-4">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex-1 flex items-center justify-center px-4"
+    >
       <div className="max-w-md w-full text-center space-y-6">
         <div className="flex justify-center">
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full pointer-events-none" />
-            <div className="relative p-6 bg-white/5 rounded-full border border-white/10 backdrop-blur">
-              <Activity className="h-12 w-12 text-primary/80" />
-            </div>
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", damping: 12 }}
+              className="relative p-6 bg-white/5 rounded-full border border-white/10 backdrop-blur"
+            >
+              <Orbit className="h-12 w-12 text-primary/80" />
+            </motion.div>
           </div>
         </div>
 
@@ -194,7 +228,7 @@ function EmptyRunningProjects({ onCreateServer }) {
           Create New Server
         </Button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -231,13 +265,17 @@ export default function HomePage() {
 
   // Main content with header
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex-1 flex flex-col min-w-0 overflow-hidden"
+    >
       {/* Header */}
       <div className="shrink-0 px-6 py-5 border-b border-white/5 bg-background/50 backdrop-blur-sm sticky top-0 z-20">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Activity className="h-6 w-6 text-primary" />
+              <Orbit className="h-6 w-6 text-primary" />
               Running Servers
             </h1>
             <p className="text-sm text-muted-foreground/60 mt-1">
@@ -291,29 +329,53 @@ export default function HomePage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="p-6">
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {runningProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3 max-w-4xl">
-              {runningProjects.map((project) => (
-                <ProjectRow
-                  key={project.id}
-                  project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                />
-              ))}
-            </div>
-          )}
+          <AnimatePresence mode="popLayout">
+            {viewMode === "grid" ? (
+              <motion.div
+                key="grid-view"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              >
+                {runningProjects.map((project) => {
+                  const history = resourceHistory[project.id];
+                  const latestStats = history?.samples?.[history.samples.length - 1];
+                  return (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      stats={latestStats}
+                      onClick={() => handleProjectClick(project.id)}
+                    />
+                  );
+                })}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list-view"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-3 max-w-4xl"
+              >
+                {runningProjects.map((project) => {
+                  const history = resourceHistory[project.id];
+                  const latestStats = history?.samples?.[history.samples.length - 1];
+                  return (
+                    <ProjectRow
+                      key={project.id}
+                      project={project}
+                      stats={latestStats}
+                      onClick={() => handleProjectClick(project.id)}
+                    />
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

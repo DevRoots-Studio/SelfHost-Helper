@@ -989,9 +989,12 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                     <>
                       <Home className="h-5 w-5 shrink-0" />
                       <span className="flex-1 truncate">Home</span>
-                      {activeProjectId === null && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                      )}
+                      <div
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full bg-primary shrink-0 transition-all duration-300",
+                          activeProjectId === null ? "opacity-100 scale-100" : "opacity-0 scale-0"
+                        )}
+                      />
                     </>
                   )}
                 </button>

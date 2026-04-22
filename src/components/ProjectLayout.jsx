@@ -23,7 +23,6 @@ export default function ProjectLayout() {
   const [fileTree, setFileTree] = useAtom(atoms.fileTreeAtom);
   const [isFileTreeLoading, setIsFileTreeLoading] = useAtom(atoms.isFileTreeLoadingAtom);
   const setStats = useSetAtom(atoms.statsAtom);
-  const setResourceHistory = useSetAtom(atoms.resourceHistoryAtom);
   const [projectEditorStates, setProjectEditorStates] = useAtom(atoms.projectEditorStatesAtom);
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
   const projectPathRef = useRef(null);
@@ -139,19 +138,6 @@ export default function ProjectLayout() {
     const unsub = API.onProjectStats((payload) => {
       if (payload.projectId !== project.id) return;
       setStats(payload);
-      setResourceHistory((prev) => {
-        const existing = prev[project.id]?.samples ?? [];
-        const next = [
-          ...existing,
-          {
-            t: payload.timestamp,
-            cpu: payload.cpu ?? 0,
-            memory: payload.memory ?? 0,
-            processCount: payload.processCount ?? 0,
-          },
-        ].slice(-120);
-        return { ...prev, [project.id]: { samples: next } };
-      });
     });
 
     return () => {
@@ -159,7 +145,7 @@ export default function ProjectLayout() {
       // Clear stats display when unmounting / switching away
       setStats(null);
     };
-  }, [project?.id, setStats, setResourceHistory]);
+  }, [project?.id, setStats]);
 
   // Clear stats only when the current project is explicitly stopped or error
   // (avoids clearing on stale "stopped" before ResourcesTab verification or status-sync corrects it)
@@ -167,13 +153,8 @@ export default function ProjectLayout() {
     if (!project?.id) return;
     if (project.status === "stopped" || project.status === "error") {
       setStats(null);
-      setResourceHistory((prev) => {
-        const next = { ...prev };
-        delete next[project.id];
-        return next;
-      });
     }
-  }, [project?.id, project?.status, setStats, setResourceHistory]);
+  }, [project?.id, project?.status, setStats]);
 
   const handleStart = async (id) => {
     const res = await API.startProject(id);

@@ -14,6 +14,7 @@ export default function Dashboard() {
   const setCategories = useSetAtom(atoms.categoriesAtom);
   const setLogs = useSetAtom(atoms.logsAtom);
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
+  const setResourceHistory = useSetAtom(atoms.resourceHistoryAtom);
 
   const loadData = async () => {
     const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
@@ -23,6 +24,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+    const cleanupStats = API.onProjectStats((payload) => {
+      const pid = toNullableNumber(payload.projectId);
+      if (pid === null) return;
+
+      // Update global resource history
+      setResourceHistory((prev) => {
+        const existing = prev[pid]?.samples ?? [];
+        const next = [
+          ...existing,
+          {
+            t: payload.timestamp,
+            cpu: payload.cpu ?? 0,
+            memory: payload.memory ?? 0,
+            processCount: payload.processCount ?? 0,
+          },
+        ].slice(-120);
+        return { ...prev, [pid]: { samples: next } };
+      });
+    });
+
     const cleanupStatus = API.onStatusChange(({ projectId, status, startTime }) => {
       const normalizedProjectId = toNullableNumber(projectId);
       if (normalizedProjectId === null) return;
@@ -93,6 +114,7 @@ export default function Dashboard() {
       });
     });
     return () => {
+      cleanupStats();
       cleanupStatus();
       cleanupStatusSync();
       cleanupList();
