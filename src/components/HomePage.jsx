@@ -30,10 +30,10 @@ function ProjectCard({ project, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="group relative overflow-hidden rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.02] to-white/[0.005] hover:border-white/10 hover:from-white/[0.04] hover:to-white/[0.01] transition-all duration-300 cursor-pointer p-5 hover:shadow-lg hover:shadow-primary/5"
+      className="group relative overflow-hidden rounded-xl border border-white/5 bg-linear-to-br from-white/2 to-white/0.5 hover:border-white/10 hover:from-white/4 hover:to-white/1 transition-all duration-300 cursor-pointer p-5 hover:shadow-lg hover:shadow-primary/5"
     >
       {/* Background accent */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-transparent to-primary/0 group-hover:from-primary/5 group-hover:via-primary/2 group-hover:to-primary/5 transition-all duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-br from-primary/0 via-transparent to-primary/0 group-hover:from-primary/5 group-hover:via-primary/2 group-hover:to-primary/5 transition-all duration-500 pointer-events-none" />
 
       <div className="relative z-10 space-y-4">
         {/* Header with name and status */}
@@ -44,7 +44,7 @@ function ProjectCard({ project, onClick }) {
             </h3>
             <p className="text-xs text-muted-foreground/60 truncate mt-1">{project.path}</p>
           </div>
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
               <Activity className="h-4 w-4 text-emerald-400" />
             </div>
@@ -61,7 +61,9 @@ function ProjectCard({ project, onClick }) {
               </span>
             </div>
             <div className="text-sm font-mono font-bold text-foreground">
-              {formatUptime(project.startTime ? Date.now() - new Date(project.startTime).getTime() : 0)}
+              {formatUptime(
+                project.startTime ? Date.now() - new Date(project.startTime).getTime() : 0
+              )}
             </div>
           </div>
 
@@ -103,13 +105,13 @@ function ProjectRow({ project, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="group relative overflow-hidden rounded-lg border border-white/5 hover:border-white/10 hover:bg-white/[0.02] transition-all duration-300 cursor-pointer p-4 flex items-center justify-between gap-4 hover:shadow-md hover:shadow-primary/5"
+      className="group relative overflow-hidden rounded-lg border border-white/5 hover:border-white/10 hover:bg-white/2 transition-all duration-300 cursor-pointer p-4 flex items-center justify-between gap-4 hover:shadow-md hover:shadow-primary/5"
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-transparent to-primary/0 group-hover:from-primary/3 group-hover:via-primary/1 group-hover:to-primary/3 transition-all duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-r from-primary/0 via-transparent to-primary/0 group-hover:from-primary/3 group-hover:via-primary/1 group-hover:to-primary/3 transition-all duration-500 pointer-events-none" />
 
       <div className="relative z-10 flex-1 min-w-0 flex items-center gap-4">
         {/* Icon + name */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
             <Server className="h-5 w-5 text-emerald-400" />
           </div>
@@ -124,13 +126,15 @@ function ProjectRow({ project, onClick }) {
       </div>
 
       {/* Stats inline */}
-      <div className="relative z-10 flex-shrink-0 flex items-center gap-6 text-sm">
+      <div className="relative z-10 shrink-0 flex items-center gap-6 text-sm">
         <div className="text-right">
           <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-semibold">
             Uptime
           </div>
           <div className="font-mono font-bold text-foreground text-sm">
-            {formatUptime(project.startTime ? Date.now() - new Date(project.startTime).getTime() : 0)}
+            {formatUptime(
+              project.startTime ? Date.now() - new Date(project.startTime).getTime() : 0
+            )}
           </div>
         </div>
 
@@ -150,7 +154,7 @@ function ProjectRow({ project, onClick }) {
       </div>
 
       {/* Chevron hint */}
-      <div className="relative z-10 flex-shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
+      <div className="relative z-10 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
         →
       </div>
     </div>
@@ -177,7 +181,8 @@ function EmptyRunningProjects({ onCreateServer }) {
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-foreground">No Projects Running</h2>
           <p className="text-muted-foreground/70 text-sm leading-relaxed">
-            Start a project from the sidebar to see live monitoring data, resource usage, and insights here.
+            Start a project from the sidebar to see live monitoring data, resource usage, and
+            insights here.
           </p>
         </div>
 
@@ -206,7 +211,9 @@ export default function HomePage() {
 
   // Filter to only running projects
   const runningProjects = useMemo(() => {
-    return projects.filter((p) => p.status === "running").sort((a, b) => (a.order || 0) - (b.order || 0));
+    return projects
+      .filter((p) => p.status === "running")
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [projects]);
 
   const handleProjectClick = (projectId) => {
@@ -234,7 +241,8 @@ export default function HomePage() {
               Running Servers
             </h1>
             <p className="text-sm text-muted-foreground/60 mt-1">
-              {runningProjects.length} {runningProjects.length === 1 ? "project" : "projects"} actively running
+              {runningProjects.length} {runningProjects.length === 1 ? "project" : "projects"}{" "}
+              actively running
             </p>
           </div>
 

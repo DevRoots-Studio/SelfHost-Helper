@@ -869,7 +869,7 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
           className={cn(
             "flex items-center shrink-0 drag h-16 transition-all duration-300",
             width < 120 ? "justify-center px-0" : "justify-between px-4",
-            isRtl && "pl-[140px]"
+            isRtl && "pl-35"
           )}
         >
           {width < 120 ? (
@@ -975,12 +975,14 @@ const Sidebar = React.memo(({ onProjectsChange }) => {
                   )}
                 >
                   {isCollapsed ? (
-                    <div className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-lg border transition-all duration-300",
-                      activeProjectId === null
-                        ? "bg-primary/25 border-primary/30"
-                        : "border-white/10 hover:bg-white/5"
-                    )}>
+                    <div
+                      className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-lg border transition-all duration-300",
+                        activeProjectId === null
+                          ? "bg-primary/25 border-primary/30"
+                          : "border-white/10 hover:bg-white/5"
+                      )}
+                    >
                       <Home className="h-5 w-5" />
                     </div>
                   ) : (
