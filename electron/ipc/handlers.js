@@ -96,6 +96,35 @@ const sanitizeFileName = (value) => {
   return cleaned.length > 0 ? cleaned.slice(0, 120) : "project";
 };
 
+const normalizePathForComparison = (targetPath) => {
+  const normalizedPath = path.normalize(path.resolve(targetPath));
+  return process.platform === "win32" ? normalizedPath.toLowerCase() : normalizedPath;
+};
+
+const isUnderRoot = (fullPath, root) => {
+  const normalized = normalizePathForComparison(fullPath);
+  const normalizedRoot = normalizePathForComparison(root);
+  return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
+};
+
+const getProjectRoots = async () => {
+  const projects = await getProjects();
+  return projects.map((project) => project?.path).filter(Boolean);
+};
+
+const isInsideProjectRoot = async (targetPath) => {
+  if (!targetPath || typeof targetPath !== "string") return false;
+  const resolvedPath = path.resolve(targetPath);
+  const roots = await getProjectRoots();
+  return roots.some((root) => isUnderRoot(resolvedPath, root));
+};
+
+const assertInsideProjectRoot = async (targetPath) => {
+  if (!(await isInsideProjectRoot(targetPath))) {
+    throw new Error("Path must be inside a registered project");
+  }
+};
+
 export const registerHandlers = () => {
   // Helper to log all IPC calls
   const originalHandle = ipcMain.handle.bind(ipcMain);
@@ -242,6 +271,7 @@ export const registerHandlers = () => {
       if (!filePath) {
         throw new Error("File path is required");
       }
+      await assertInsideProjectRoot(filePath);
       const content = await fs.readFile(filePath, "utf-8");
       return content;
     } catch (e) {
@@ -257,6 +287,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("file:write", async (_, filePath, content) => {
     try {
+      await assertInsideProjectRoot(filePath);
       await fs.writeFile(filePath, content, "utf-8");
       return true;
     } catch (e) {
@@ -270,11 +301,13 @@ export const registerHandlers = () => {
   });
 
   ipcMain.handle("watcher:watch", async (_, folderPath) => {
+    await assertInsideProjectRoot(folderPath);
     watchFolder(folderPath);
     return true;
   });
 
   ipcMain.handle("watcher:stop", async (_, folderPath) => {
+    await assertInsideProjectRoot(folderPath);
     await stopWatching(folderPath);
     return true;
   });
@@ -549,13 +582,6 @@ export const registerHandlers = () => {
     }
   });
 
-  // Help ensure paths stay under project root
-  const isUnderRoot = (fullPath, root) => {
-    const normalized = path.normalize(path.resolve(fullPath));
-    const normalizedRoot = path.normalize(path.resolve(root));
-    return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
-  };
-
   ipcMain.handle("file:create", async (_, { projectRoot, targetPath, type, content }) => {
     try {
       if (!projectRoot || !targetPath || !type) {
@@ -687,6 +713,7 @@ export const registerHandlers = () => {
   // Git
   ipcMain.handle("git:status", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitStatus(projectPath);
     } catch (e) {
       logger.error("Git status error:", e);
@@ -695,6 +722,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:diff", async (_, projectPath, filePath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitDiff(projectPath, filePath);
     } catch (e) {
       logger.error("Git diff error:", e);
@@ -703,6 +731,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:add", async (_, projectPath, paths) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitAdd(projectPath, paths ?? []);
     } catch (e) {
       logger.error("Git add error:", e);
@@ -711,6 +740,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:unstage", async (_, projectPath, paths) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitUnstage(projectPath, paths ?? []);
     } catch (e) {
       logger.error("Git unstage error:", e);
@@ -719,6 +749,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:commit", async (_, projectPath, message) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitCommit(projectPath, message);
     } catch (e) {
       logger.error("Git commit error:", e);
@@ -727,6 +758,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:push", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitPush(projectPath);
     } catch (e) {
       logger.error("Git push error:", e);
@@ -735,6 +767,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:pull", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitPull(projectPath);
     } catch (e) {
       logger.error("Git pull error:", e);
@@ -743,6 +776,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:branches", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitBranches(projectPath);
     } catch (e) {
       logger.error("Git branches error:", e);
@@ -751,6 +785,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:checkout", async (_, projectPath, branchOrRef) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitCheckout(projectPath, branchOrRef);
     } catch (e) {
       logger.error("Git checkout error:", e);
@@ -759,6 +794,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:clone", async (_, repoUrl, targetPath) => {
     try {
+      await assertInsideProjectRoot(targetPath);
       return await gitService.gitClone(repoUrl, targetPath);
     } catch (e) {
       logger.error("Git clone error:", e);
@@ -767,6 +803,7 @@ export const registerHandlers = () => {
   });
   ipcMain.handle("git:remoteUrl", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitRemoteUrl(projectPath);
     } catch (e) {
       logger.error("Git remoteUrl error:", e);
@@ -776,6 +813,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("git:init", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitInit(projectPath);
     } catch (e) {
       logger.error("Git init error:", e);
@@ -785,6 +823,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("git:addRemote", async (_, projectPath, name, url) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitAddRemote(projectPath, name, url);
     } catch (e) {
       logger.error("Git addRemote error:", e);
@@ -794,6 +833,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("git:remotes", async (_, projectPath) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitRemotes(projectPath);
     } catch (e) {
       logger.error("Git remotes error:", e);
@@ -803,6 +843,7 @@ export const registerHandlers = () => {
 
   ipcMain.handle("git:removeRemote", async (_, projectPath, name) => {
     try {
+      await assertInsideProjectRoot(projectPath);
       return await gitService.gitRemoveRemote(projectPath, name);
     } catch (e) {
       logger.error("Git removeRemote error:", e);
@@ -850,6 +891,7 @@ export const registerHandlers = () => {
     }
 
     try {
+      await assertInsideProjectRoot(dirPath);
       return await getFiles(dirPath);
     } catch (e) {
       console.error(e);
@@ -902,6 +944,10 @@ export const registerHandlers = () => {
 
   ipcMain.handle("shell:openPath", async (_, path) => {
     try {
+      const userDataPath = getUserDataPath();
+      if (!isUnderRoot(path, userDataPath)) {
+        await assertInsideProjectRoot(path);
+      }
       await shell.openPath(path);
       return true;
     } catch (error) {
