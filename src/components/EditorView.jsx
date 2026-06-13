@@ -146,6 +146,7 @@ export default function EditorView() {
   const editorContentRef = useRef(editorContent);
   const currentFileRef = useRef(currentFile);
   const unsavedChangesRef = useRef(unsavedChanges);
+  const loadFileRef = useRef(null);
   const suppressReloadForPathRef = useRef({});
 
   useEffect(() => {
@@ -323,7 +324,7 @@ export default function EditorView() {
     if (targetFile) {
       const shouldLoad = targetFile !== currentFileRef.current || editorContentRef.current === "";
       if (shouldLoad) {
-        loadFile(targetFile);
+        loadFileRef.current?.(targetFile);
       }
     } else {
       setCurrentFile(null);
@@ -361,7 +362,7 @@ export default function EditorView() {
         toast.info("File changed on disk. Save or reload to see changes.");
         return;
       }
-      loadFile(current);
+      loadFileRef.current?.(current);
     });
     return () => unsub?.();
   }, [projectPath]);
@@ -429,6 +430,7 @@ export default function EditorView() {
       setIsFileLoading(false);
     }
   };
+  loadFileRef.current = loadFile;
 
   const handleFileSelect = async (node) => {
     if (node.type === "file") {
@@ -448,14 +450,14 @@ export default function EditorView() {
     [setExplorerExpanded]
   );
 
-  const handleSelectTab = (tabId) => {
+  const handleSelectTab = useCallback((tabId) => {
     const tab = openTabs.find((t) => t.id === tabId);
     if (!tab) return;
     setActiveTabId(tabId);
     if (tab.path !== currentFileRef.current) {
-      loadFile(tab.path);
+      loadFileRef.current?.(tab.path);
     }
-  };
+  }, [openTabs]);
 
   const performCloseTab = useCallback(
     (tabId) => {
@@ -477,7 +479,7 @@ export default function EditorView() {
         setActiveTabId(replacement ? replacement.id : null);
         if (replacement) {
           if (replacement.path !== currentFileRef.current) {
-            loadFile(replacement.path);
+            loadFileRef.current?.(replacement.path);
           }
         } else {
           setCurrentFile(null);
@@ -489,14 +491,14 @@ export default function EditorView() {
     [openTabs, activeTabId, setUnsavedChanges]
   );
 
-  const handleCloseTab = (tabId) => {
+  const handleCloseTab = useCallback((tabId) => {
     const tab = openTabs.find((t) => t.id === tabId);
     if (tab && unsavedChangesRef.current[tab.path] !== undefined) {
       setPendingCloseTabId(tabId);
       return;
     }
     performCloseTab(tabId);
-  };
+  }, [openTabs, performCloseTab]);
 
   const handleConfirmCloseSave = useCallback(async () => {
     if (pendingCloseTabId == null) return;
@@ -639,7 +641,7 @@ export default function EditorView() {
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [activeTabId, openTabs, handleCloseTab]);
+  }, [activeTabId, openTabs, handleCloseTab, handleSelectTab]);
 
   if (!project) return null;
 

@@ -53,6 +53,14 @@ export default function TunnelView(props) {
   const projectTunnelState = selectedProject
     ? tunnelState[selectedProject.id] || { status: "stopped", url: null, logs: [] }
     : { status: "stopped", url: null, logs: [] };
+  const selectedProjectId = selectedProject?.id;
+  const selectedTunnelMode = selectedProject?.tunnelMode;
+  const selectedTunnelPort = selectedProject?.tunnelPort;
+  const selectedTunnelToken = selectedProject?.encryptedTunnelToken;
+  const selectedAutoStartTunnel = selectedProject?.autoStartTunnel;
+  const selectedTunnelConfig = selectedProject?.tunnelConfig;
+  const currentTunnelStatusRef = useRef(projectTunnelState.status);
+  currentTunnelStatusRef.current = projectTunnelState.status;
 
   const [mode, setMode] = useState(selectedProject?.tunnelMode || "quick");
   const [port, setPort] = useState(
@@ -78,22 +86,29 @@ export default function TunnelView(props) {
 
   // Reset state on project change
   useEffect(() => {
-    if (!selectedProject) return;
-    setMode(selectedProject.tunnelMode || "quick");
-    setPort(selectedProject?.tunnelPort != null ? String(selectedProject.tunnelPort) : "3000");
-    setToken(selectedProject.encryptedTunnelToken || "");
+    if (!selectedProjectId) return;
+    setMode(selectedTunnelMode || "quick");
+    setPort(selectedTunnelPort != null ? String(selectedTunnelPort) : "3000");
+    setToken(selectedTunnelToken || "");
     setShowAdvanced(false);
     setShowHelp(false);
-    setAutoStart(selectedProject.autoStartTunnel || false);
+    setAutoStart(selectedAutoStartTunnel || false);
     setConfig({
-      protocol: selectedProject.tunnelConfig?.protocol || "http2",
-      loglevel: selectedProject.tunnelConfig?.loglevel || "info",
-      noTLSVerify: selectedProject.tunnelConfig?.noTLSVerify || false,
-      connectTimeout: selectedProject.tunnelConfig?.connectTimeout || "30s",
-      httpHostHeader: selectedProject.tunnelConfig?.httpHostHeader || "",
+      protocol: selectedTunnelConfig?.protocol || "http2",
+      loglevel: selectedTunnelConfig?.loglevel || "info",
+      noTLSVerify: selectedTunnelConfig?.noTLSVerify || false,
+      connectTimeout: selectedTunnelConfig?.connectTimeout || "30s",
+      httpHostHeader: selectedTunnelConfig?.httpHostHeader || "",
     });
-    prevStatusRef.current = projectTunnelState.status;
-  }, [selectedProject?.id]);
+    prevStatusRef.current = currentTunnelStatusRef.current;
+  }, [
+    selectedProjectId,
+    selectedTunnelMode,
+    selectedTunnelPort,
+    selectedTunnelToken,
+    selectedAutoStartTunnel,
+    selectedTunnelConfig,
+  ]);
   useEffect(() => {
     if (prevStatusRef.current !== "running" && projectTunnelState.status === "running") {
       toast.success("Tunnel established successfully!");

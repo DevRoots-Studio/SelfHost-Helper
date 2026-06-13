@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
 import { toast } from "react-toastify";
@@ -27,6 +27,8 @@ export default function ProjectLayout() {
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
   const projectPathRef = useRef(null);
   projectPathRef.current = project?.path ?? null;
+  const projectId = project?.id;
+  const projectPath = project?.path;
 
   // Redirect if project ID in URL doesn't exist (e.g. deleted)
   useEffect(() => {
@@ -35,22 +37,22 @@ export default function ProjectLayout() {
     }
   }, [projects.length, project, navigate]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
     setProjects(normalizeProjectList(projectList));
     setCategories(normalizeCategoryList(categoryList));
-  };
+  }, [setCategories, setProjects]);
 
-  const loadFileTree = async (path) => {
+  const loadFileTree = useCallback(async (path) => {
     setIsFileTreeLoading(true);
     const tree = await API.readDirectory(path);
     setFileTree(tree);
     setIsFileTreeLoading(false);
-  };
+  }, [setFileTree, setIsFileTreeLoading]);
 
   // Per-project: file tree, watcher, log history, tunnel state
   useEffect(() => {
-    if (!project) return;
+    if (!projectId) return;
     let cancelled = false;
     setStats(null);
 
@@ -58,37 +60,37 @@ export default function ProjectLayout() {
       const list = normalizeProjectList(await API.getProjects());
       if (cancelled) return;
       setProjects(list);
-      const currentProject = list.find((p) => p.id === project.id);
+      const currentProject = list.find((p) => p.id === projectId);
       if (currentProject) {
         loadFileTree(currentProject.path);
         API.watchFolder(currentProject.path);
       }
     })();
 
-    API.getLogHistory(project.id).then((history) => {
+    API.getLogHistory(projectId).then((history) => {
       if (history?.length > 0) {
         setLogs((prev) => ({
           ...prev,
-          [project.id]: history,
+          [projectId]: history,
         }));
       }
     });
 
-    API.getTunnelStatus(project.id).then((status) => {
+    API.getTunnelStatus(projectId).then((status) => {
       if (status) {
         setTunnelState((prev) => ({
           ...prev,
-          [project.id]: { ...(prev[project.id] || { logs: [] }), ...status },
+          [projectId]: { ...(prev[projectId] || { logs: [] }), ...status },
         }));
       }
     });
 
-    API.getTunnelLogs(project.id).then((logs) => {
+    API.getTunnelLogs(projectId).then((logs) => {
       if (logs?.length > 0) {
         setTunnelState((prev) => ({
           ...prev,
-          [project.id]: {
-            ...(prev[project.id] || { status: "stopped", url: null }),
+          [projectId]: {
+            ...(prev[projectId] || { status: "stopped", url: null }),
             logs,
           },
         }));
@@ -97,15 +99,15 @@ export default function ProjectLayout() {
 
     return () => {
       cancelled = true;
-      if (project?.path) {
-        API.stopWatchingFolder(project.path).catch(() => {});
+      if (projectPath) {
+        API.stopWatchingFolder(projectPath).catch(() => {});
       }
     };
-  }, [project?.id]);
+  }, [loadFileTree, projectId, projectPath, setLogs, setProjects, setStats, setTunnelState]);
 
   // File change listener (reload tree when structure changes under this project)
   useEffect(() => {
-    if (!project?.path) return;
+    if (!projectPath) return;
     let fileChangeDebounceTimer = null;
     const cleanupFileChange = API.onFileChange(({ event, filePath }) => {
       const projectPath = projectPathRef.current;
@@ -127,7 +129,7 @@ export default function ProjectLayout() {
       if (fileChangeDebounceTimer) clearTimeout(fileChangeDebounceTimer);
       cleanupFileChange();
     };
-  }, [project?.path]);
+  }, [loadFileTree, projectPath]);
 
   // Subscribe to native push-based stats events (no polling)
   useEffect(() => {

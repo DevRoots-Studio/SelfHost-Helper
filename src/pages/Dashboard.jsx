@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
 import * as atoms from "@/store/atoms";
@@ -16,11 +16,11 @@ export default function Dashboard() {
   const setTunnelState = useSetAtom(atoms.tunnelStateAtom);
   const setResourceHistory = useSetAtom(atoms.resourceHistoryAtom);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const [projectList, categoryList] = await Promise.all([API.getProjects(), API.getCategories()]);
     setProjects(normalizeProjectList(projectList));
     setCategories(normalizeCategoryList(categoryList));
-  };
+  }, [setCategories, setProjects]);
 
   useEffect(() => {
     loadData();
@@ -124,7 +124,7 @@ export default function Dashboard() {
       cleanupTunnelStatus();
       cleanupTunnelLog();
     };
-  }, []);
+  }, [loadData, setLogs, setProjects, setResourceHistory, setTunnelState]);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
