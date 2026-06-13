@@ -68,6 +68,21 @@ const appLauncher = new AutoLaunch({
   path: process.execPath,
 });
 
+const ALLOWED_EXTERNAL_URL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+export const validateExternalUrl = (url) => {
+  if (typeof url !== "string" || url.trim() !== url || url.length === 0) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_EXTERNAL_URL_PROTOCOLS.has(parsed.protocol) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Create a filesystem-safe filename segment for Windows/macOS/Linux.
  * Removes characters that are invalid on Windows and trims length.
@@ -871,7 +886,13 @@ export const registerHandlers = () => {
   // Open external URL in default browser
   ipcMain.handle("app:openExternal", async (_, url) => {
     try {
-      await shell.openExternal(url);
+      const safeUrl = validateExternalUrl(url);
+      if (!safeUrl) {
+        logger.warn(`Blocked unsafe external URL: ${String(url).slice(0, 200)}`);
+        return false;
+      }
+
+      await shell.openExternal(safeUrl);
       return true;
     } catch (error) {
       logger.error(`Failed to open external URL ${url}:`, error);
