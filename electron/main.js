@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, protocol, net } from "electron";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath, pathToFileURL } from "url";
-import { registerHandlers } from "./ipc/handlers.js";
+import { registerHandlers, validateExternalUrl } from "./ipc/handlers.js";
 import { initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
 import { stopAllProjects } from "./services/projectsManager.js";
@@ -168,7 +168,14 @@ async function createWindow() {
     mainWindow.webContents.send("window:unmaximize");
   });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    const safeUrl = validateExternalUrl(url);
+    if (safeUrl) {
+      shell.openExternal(safeUrl).catch((err) => {
+        logger.error(`Failed to open external URL: ${err.message}`);
+      });
+    } else {
+      logger.warn(`Blocked unsafe window open URL: ${String(url).slice(0, 200)}`);
+    }
     return { action: "deny" };
   });
 
