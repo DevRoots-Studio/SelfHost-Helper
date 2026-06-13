@@ -765,7 +765,7 @@ export default function EditorView() {
                     onClick={() => handleSelectTab(tab.id)}
                   >
                     <FileCode className="h-3.5 w-3.5 mr-1 text-primary/80" />
-                    <span className="truncate max-w-[140px]">{tab.fileName}</span>
+                    <span className="truncate max-w-35">{tab.fileName}</span>
                     {isDirty && (
                       <span className="ml-1 text-primary text-[11px] group-hover:hidden">*</span>
                     )}
@@ -931,7 +931,7 @@ export default function EditorView() {
                           setIsInnerBottomResizing(true);
                         }}
                       />
-                      <div className="flex-1 min-h-[80px]">
+                      <div className="flex-1 min-h-20">
                         <GitPanel
                           projectPath={projectPath}
                           isOpen={gitOpen}
