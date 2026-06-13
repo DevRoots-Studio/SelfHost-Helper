@@ -170,7 +170,9 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     const safeUrl = validateExternalUrl(url);
     if (safeUrl) {
-      shell.openExternal(safeUrl);
+      shell.openExternal(safeUrl).catch((err) => {
+        logger.error(`Failed to open external URL: ${err.message}`);
+      });
     } else {
       logger.warn(`Blocked unsafe window open URL: ${String(url).slice(0, 200)}`);
     }
