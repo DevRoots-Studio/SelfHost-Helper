@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Terminal,
   Globe,
-  Github,
+  GithubIcon,
   MessageCircle,
   Users,
   Mail,
@@ -35,7 +35,7 @@ const LINKS = [
     label: "GitHub",
     value: "DevRoots-Studio / SelfHost-Helper",
     href: "https://github.com/DevRoots-Studio/SelfHost-Helper",
-    Icon: Github,
+    Icon: GithubIcon,
     accent: "bg-white/8 text-foreground/80",
     badge: "Open Source",
   },
