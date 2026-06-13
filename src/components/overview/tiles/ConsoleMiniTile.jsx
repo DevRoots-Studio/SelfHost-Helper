@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "jotai";
 import { Terminal as TerminalIcon, Send } from "lucide-react";
 import { toast } from "react-toastify";
@@ -14,7 +14,7 @@ const API = window.api;
 
 export default function ConsoleMiniTile({ projectId, status, onSendInput }) {
   const allLogs = useAtomValue(logsAtom);
-  const logs = allLogs?.[projectId] || [];
+  const logs = useMemo(() => allLogs?.[projectId] || [], [allLogs, projectId]);
 
   const terminalContainerRef = useRef(null);
   const xtermRef = useRef(null);
