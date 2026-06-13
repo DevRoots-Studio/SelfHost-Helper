@@ -3,11 +3,12 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath, pathToFileURL } from "url";
 import { registerHandlers, validateExternalUrl } from "./ipc/handlers.js";
-import { initializeDatabase } from "./services/database.js";
+import { getProjects, initializeDatabase } from "./services/database.js";
 import { initTray } from "./tray/tray.js";
 import { stopAllProjects } from "./services/projectsManager.js";
 import logger from "./services/logger.js";
 import settingsService from "./services/settingsService.js";
+import { getSessionExternalMediaBases } from "./services/mediaAllowlist.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ const configuredExternalMediaBases = (process.env[EXTERNAL_MEDIA_DIRS_ENV_KEY] |
   .map((entry) => entry.trim())
   .filter(Boolean)
   .map((entry) => path.resolve(entry));
-let hasLoggedPermissiveExternalMediaMode = false;
+let hasLoggedMissingExternalMediaAllowlist = false;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -58,6 +59,19 @@ const resolveAndValidatePath = (candidatePath, allowedBases) => {
   const resolvedPath = path.resolve(candidatePath);
   const isAllowed = allowedBases.some((basePath) => isPathWithinBase(resolvedPath, basePath));
   return isAllowed ? resolvedPath : null;
+};
+
+const getProjectIconMediaBases = async () => {
+  try {
+    const projects = await getProjects();
+    return projects
+      .map((project) => project?.icon)
+      .filter((iconPath) => typeof iconPath === "string" && path.isAbsolute(iconPath))
+      .map((iconPath) => path.dirname(path.resolve(iconPath)));
+  } catch (error) {
+    logger.warn("[Media Protocol] Failed to load project icon allowlist:", error);
+    return [];
+  }
 };
 
 async function createWindow() {
@@ -272,29 +286,17 @@ if (!gotTheLock) {
               return new Response("Forbidden", { status: 403 });
             }
 
-            if (configuredExternalMediaBases.length > 0) {
-              allowedBases.push(...configuredExternalMediaBases);
-            } else {
-              // Backward-compatible permissive mode: allow readable files on the resolved drive root.
-              const driveRoot = path.parse(path.resolve(filePath)).root;
-              if (driveRoot) {
-                allowedBases.push(driveRoot);
-              }
-              if (
-                process.platform === "win32" &&
-                hostname &&
-                hostname.length === 1 &&
-                /^[a-zA-Z]$/.test(hostname)
-              ) {
-                allowedBases.push(path.resolve(`${hostname}:\\`));
-              }
+            allowedBases.push(
+              ...configuredExternalMediaBases,
+              ...getSessionExternalMediaBases(),
+              ...(await getProjectIconMediaBases())
+            );
 
-              if (!hasLoggedPermissiveExternalMediaMode) {
-                logger.warn(
-                  `[Media Protocol] External media requests are using permissive drive-root mode. Set ${EXTERNAL_MEDIA_DIRS_ENV_KEY} to a ${path.delimiter}-separated list of allowed directories to restrict access.`
-                );
-                hasLoggedPermissiveExternalMediaMode = true;
-              }
+            if (allowedBases.length === 0 && !hasLoggedMissingExternalMediaAllowlist) {
+              logger.warn(
+                `[Media Protocol] External media requests require an explicit allowlist. Set ${EXTERNAL_MEDIA_DIRS_ENV_KEY} or select media through the app before requesting external media paths.`
+              );
+              hasLoggedMissingExternalMediaAllowlist = true;
             }
           }
 
