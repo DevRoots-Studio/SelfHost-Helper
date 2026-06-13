@@ -18,6 +18,7 @@ import {
 const numCPUs = os.cpus().length;
 
 const runningRuntimes = {};
+const startLocks = new Map();
 const logHistory = {};
 const statusListeners = new Set();
 const listListeners = new Set();
@@ -238,6 +239,22 @@ export const writeToProcess = (id, data) => {
 
 //============================{Starts a Project}=============================
 export const startProject = async (id) => {
+  const key = String(id);
+  const existingStart = startLocks.get(key);
+  if (existingStart) return existingStart;
+
+  const startPromise = startProjectUnlocked(id);
+  startLocks.set(key, startPromise);
+  try {
+    return await startPromise;
+  } finally {
+    if (startLocks.get(key) === startPromise) {
+      startLocks.delete(key);
+    }
+  }
+};
+
+const startProjectUnlocked = async (id) => {
   const project = await getProjectById(id);
   if (!project) throw new Error("Project not found");
 
