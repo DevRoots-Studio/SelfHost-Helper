@@ -107,7 +107,7 @@ function useProjectLayout({ projectId, defaultLayout }) {
 
 function ConsoleMiniTile({ projectId, status, onSendInput }) {
   const allLogs = useAtomValue(logsAtom);
-  const logs = allLogs?.[projectId] || [];
+  const logs = useMemo(() => allLogs?.[projectId] || [], [allLogs, projectId]);
 
   const terminalContainerRef = useRef(null);
   const xtermRef = useRef(null);

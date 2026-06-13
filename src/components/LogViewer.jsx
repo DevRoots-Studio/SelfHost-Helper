@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   Terminal as TerminalIcon,
@@ -33,7 +33,7 @@ export default function LogViewer(props) {
   const status = context?.project?.status;
   const onSendInput = context?.handleSendInput;
   const allLogs = useAtomValue(logsAtom);
-  const logs = allLogs[projectId] || [];
+  const logs = useMemo(() => allLogs[projectId] || [], [allLogs, projectId]);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);

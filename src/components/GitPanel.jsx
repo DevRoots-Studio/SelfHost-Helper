@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import {
   GitBranch,
   Upload,
@@ -75,7 +75,7 @@ export default function GitPanel({
   const workingFiles =
     status?.files?.filter((f) => !f.index || f.index === " " || f.workingDir === "U") || [];
 
-  const loadGitStatus = async () => {
+  const loadGitStatus = useCallback(async () => {
     if (!projectPath) return;
     setError(null);
     setIsRefreshing(true);
@@ -105,13 +105,13 @@ export default function GitPanel({
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [onStatusChange, projectPath]);
 
   useEffect(() => {
     if (isOpen && projectPath) {
       loadGitStatus();
     }
-  }, [isOpen, projectPath]);
+  }, [isOpen, loadGitStatus, projectPath]);
 
   const handleAddAll = async () => {
     if (!projectPath) return;
