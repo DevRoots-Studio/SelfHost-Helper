@@ -139,7 +139,6 @@ release
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-package-lock.json
 src/Frontend/node_modules/
 src/Frontend/package-lock.json
 logs/
