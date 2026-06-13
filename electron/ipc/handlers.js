@@ -62,6 +62,7 @@ import {
 } from "../services/runtimeService.js";
 import logger from "../services/logger.js";
 import { exportConfigToFile, importConfigFromFile } from "../services/configBackupService.js";
+import { allowExternalMediaPath } from "../services/mediaAllowlist.js";
 
 const appLauncher = new AutoLaunch({
   name: "SelfHost Helper",
@@ -533,6 +534,7 @@ export const registerHandlers = () => {
     if (canceled) {
       return null;
     } else {
+      allowExternalMediaPath(filePaths[0]);
       return filePaths[0];
     }
   });
